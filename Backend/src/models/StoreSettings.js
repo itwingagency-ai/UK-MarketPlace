@@ -27,6 +27,13 @@ const storeSettingsSchema = new mongoose.Schema(
       smsEnabled: { type: Boolean, default: false },
       whatsappEnabled: { type: Boolean, default: false },
     },
+<<<<<<< HEAD
+=======
+    shipping: {
+      flatFee: { type: Number, default: 0, min: 0 },
+      freeShippingThreshold: { type: Number, default: 0, min: 0 },
+    },
+>>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
   },
   { timestamps: true }
 );

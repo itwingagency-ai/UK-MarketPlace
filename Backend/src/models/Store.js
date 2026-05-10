@@ -42,6 +42,25 @@ const storeSchema = new mongoose.Schema(
       postalCode: { type: String, default: "" },
       country: { type: String, default: "" },
     },
+<<<<<<< HEAD
+=======
+    commissionType: {
+      type: String,
+      enum: ["percentage", "fixed", null],
+      default: null,
+    },
+    commissionRate: {
+      type: Number,
+      default: null,
+      min: 0,
+      max: 1,
+    },
+    commissionFixed: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+>>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
   },
   { timestamps: true }
 );
