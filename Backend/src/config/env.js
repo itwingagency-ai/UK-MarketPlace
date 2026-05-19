@@ -27,8 +27,6 @@ const env = {
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN,
   clientOrigin: process.env.CLIENT_ORIGIN || "*",
   refreshCookieName: process.env.REFRESH_COOKIE_NAME || "refreshToken",
-<<<<<<< HEAD
-=======
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY || "",
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
@@ -59,7 +57,8 @@ const env = {
     smsFrom: process.env.TWILIO_SMS_FROM || "",
     whatsappFrom: process.env.TWILIO_WHATSAPP_FROM || "",
   },
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
+  // Google Maps Geocoding API — optional but required for address-based store discovery
+  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || "",
 };
 
 module.exports = env;

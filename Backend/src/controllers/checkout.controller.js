@@ -483,10 +483,10 @@ const placeOrdersWithCompensation = async ({
   } catch (err) {
     for (const item of decrementedItems) {
       // eslint-disable-next-line no-await-in-loop
-      await incrementStockForItem(item, null).catch(() => {});
+      await incrementStockForItem(item, null).catch(() => { });
     }
     if (createdOrderIds.length > 0) {
-      await Order.deleteMany({ _id: { $in: createdOrderIds } }).catch(() => {});
+      await Order.deleteMany({ _id: { $in: createdOrderIds } }).catch(() => { });
     }
     throw err;
   }

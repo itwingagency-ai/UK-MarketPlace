@@ -14,10 +14,7 @@ const {
   validateRegisterInput,
 } = require("../validators/auth.validator");
 const env = require("../config/env");
-<<<<<<< HEAD
-=======
 const { onAccountWelcome } = require("../lib/notificationHooks");
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 
 const getTokenExpiryDate = (expiresIn) =>
   new Date(Date.now() + Number(ms(expiresIn)));
@@ -66,11 +63,8 @@ const register = asyncHandler(async (req, res) => {
 
   const tokens = await issueAuthTokens(user);
 
-<<<<<<< HEAD
-=======
   onAccountWelcome(user);
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
   res.status(201).json({
     message: "Registration successful",
     user: {

@@ -9,13 +9,10 @@ const {
   normalizeSlug,
   validateAdminApprovePayload,
 } = require("../validators/vendorApplication.validator");
-<<<<<<< HEAD
-=======
 const {
   onVendorApplicationApproved,
   onVendorApplicationRejected,
 } = require("../lib/notificationHooks");
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 
 const isReplicaSetTransactionError = (err) => {
   const msg = String(err?.message || "");
@@ -128,10 +125,7 @@ const approveWithCompensation = async (
       branding: { displayName: storeName },
     });
 
-<<<<<<< HEAD
-=======
     onVendorApplicationApproved(applicant, store, application);
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
     return buildApproveResponse(application, store, applicant);
   } catch (err) {
     if (promotedUserId) {
@@ -216,8 +210,6 @@ const rejectApplication = asyncHandler(async (req, res) => {
       : "";
   await application.save();
 
-<<<<<<< HEAD
-=======
   const applicant = await User.findById(application.applicant).select(
     "name email phone"
   );
@@ -225,7 +217,6 @@ const rejectApplication = asyncHandler(async (req, res) => {
     onVendorApplicationRejected(applicant, application, application.adminNote);
   }
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
   res.status(200).json({
     message: "Application rejected",
     data: application,
@@ -330,10 +321,7 @@ const approveApplication = asyncHandler(async (req, res) => {
     );
 
     await session.commitTransaction();
-<<<<<<< HEAD
-=======
     onVendorApplicationApproved(applicant, store, application);
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
     return res
       .status(200)
       .json(buildApproveResponse(application, store, applicant));

@@ -1,22 +1,16 @@
 const express = require("express");
 const { getOverview } = require("../controllers/vendorDashboard.controller");
+const { getLocation, updateLocation } = require("../controllers/vendorLocation.controller");
+const {
+  getOperatingHours,
+  getLiveStatus,
+  replaceOperatingHours,
+  updateDay,
+  closeDay,
+} = require("../controllers/vendorOperatingHours.controller");
 const {
   createProduct,
   deleteProduct,
-<<<<<<< HEAD
-  listProducts,
-  updateProduct,
-} = require("../controllers/vendorProducts.controller");
-const {
-  getOrderById,
-  listOrders,
-  updateOrderStatus,
-} = require("../controllers/vendorOrders.controller");
-const { getSettings, updateSettings } = require("../controllers/vendorSettings.controller");
-const { requireResourceInScope } = require("../middleware/storeScope.middleware");
-const Order = require("../models/Order");
-const Product = require("../models/Product");
-=======
   getProductById,
   listProducts,
   restoreProduct,
@@ -82,7 +76,6 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const Review = require("../models/Review");
 const ShippingMethod = require("../models/ShippingMethod");
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 
 const router = express.Router();
 
@@ -90,13 +83,6 @@ router.get("/overview", getOverview);
 
 router.get("/products", listProducts);
 router.post("/products", createProduct);
-<<<<<<< HEAD
-router.patch("/products/:id", requireResourceInScope(Product), updateProduct);
-router.delete("/products/:id", requireResourceInScope(Product), deleteProduct);
-
-router.get("/orders", listOrders);
-router.get("/orders/:id", requireResourceInScope(Order), getOrderById);
-=======
 router.get("/products/:id", requireResourceInScope(Product), getProductById);
 router.patch("/products/:id", requireResourceInScope(Product), updateProduct);
 router.delete("/products/:id", requireResourceInScope(Product), deleteProduct);
@@ -131,14 +117,11 @@ router.get(
   requireResourceInScope(Order),
   getOrderHistory
 );
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 router.patch(
   "/orders/:id/status",
   requireResourceInScope(Order),
   updateOrderStatus
 );
-<<<<<<< HEAD
-=======
 router.patch(
   "/orders/:id/payment",
   requireResourceInScope(Order),
@@ -172,13 +155,10 @@ router.delete(
   requireResourceInScope(ShippingMethod),
   deleteShippingMethod
 );
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 
 router.get("/settings", getSettings);
 router.patch("/settings", updateSettings);
 
-<<<<<<< HEAD
-=======
 router.get("/commission/summary", getCommissionSummary);
 router.get("/commission/ledger", getCommissionLedger);
 router.get("/commission/preview", previewCommission);
@@ -218,5 +198,15 @@ router.patch(
   unhideReview
 );
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
+router.get("/location", getLocation);
+router.patch("/location", updateLocation);
+
+// ── Operating Hours ─────────────────────────────────────────────────────────
+// status must be registered before /:day to avoid shadowing
+router.get("/operating-hours/status", getLiveStatus);
+router.get("/operating-hours", getOperatingHours);
+router.put("/operating-hours", replaceOperatingHours);
+router.patch("/operating-hours/:day", updateDay);
+router.delete("/operating-hours/:day", closeDay);
+
 module.exports = router;

@@ -9,8 +9,6 @@ const ALLOWED_STATUSES = [
   "cancelled",
 ];
 
-<<<<<<< HEAD
-=======
 const SHIPMENT_EVENT_STATUSES = [
   "created",
   "picked_up",
@@ -25,7 +23,6 @@ const SHIPMENT_EVENT_STATUSES = [
 // system as a side effect of order-status transitions.
 const SYSTEM_ONLY_SHIPMENT_STATUSES = new Set(["created", "delivered"]);
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 const STATUS_TRANSITIONS = {
   pending: ["confirmed", "cancelled"],
   confirmed: ["packed", "cancelled"],
@@ -35,8 +32,6 @@ const STATUS_TRANSITIONS = {
   cancelled: [],
 };
 
-<<<<<<< HEAD
-=======
 const TRACKING_EDITABLE_FIELDS = [
   "carrier",
   "trackingNumber",
@@ -44,7 +39,6 @@ const TRACKING_EDITABLE_FIELDS = [
   "cancellationReason",
 ];
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 const validateOrderStatusUpdate = (currentStatus, nextStatus) => {
   if (!ALLOWED_STATUSES.includes(nextStatus)) {
     throw new ApiError(400, "Invalid target order status");
@@ -59,11 +53,6 @@ const validateOrderStatusUpdate = (currentStatus, nextStatus) => {
   }
 };
 
-<<<<<<< HEAD
-module.exports = {
-  ALLOWED_STATUSES,
-  validateOrderStatusUpdate,
-=======
 const validateOrderStatusPayload = (payload, currentStatus) => {
   if (!payload || typeof payload !== "object") {
     throw new ApiError(400, "Invalid status update payload");
@@ -160,5 +149,4 @@ module.exports = {
   validateOrderStatusUpdate,
   validateOrderStatusPayload,
   validateShipmentEventPayload,
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 };

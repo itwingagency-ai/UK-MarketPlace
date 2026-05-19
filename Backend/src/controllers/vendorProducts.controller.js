@@ -1,11 +1,3 @@
-<<<<<<< HEAD
-const ApiError = require("../lib/ApiError");
-const asyncHandler = require("../lib/asyncHandler");
-const { resolveTargetStoreId } = require("../middleware/storeScope.middleware");
-const Product = require("../models/Product");
-const { validateProductPayload } = require("../validators/product.validator");
-
-=======
 const mongoose = require("mongoose");
 const ApiError = require("../lib/ApiError");
 const asyncHandler = require("../lib/asyncHandler");
@@ -32,19 +24,11 @@ const ensureCategoryInStore = async (categoryId, storeId) => {
 const escapeRegex = (text) =>
   String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 const listProducts = asyncHandler(async (req, res) => {
   const page = Math.max(Number(req.query.page) || 1, 1);
   const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
   const skip = (page - 1) * limit;
 
-<<<<<<< HEAD
-  const products = await Product.find({ ...req.storeScopeFilter })
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit);
-  const total = await Product.countDocuments({ ...req.storeScopeFilter });
-=======
   const filter = { ...req.storeScopeFilter };
 
   if (req.query.category) {
@@ -67,7 +51,6 @@ const listProducts = asyncHandler(async (req, res) => {
       .populate("category", "name slug"),
     Product.countDocuments(filter),
   ]);
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 
   res.status(200).json({
     page,
@@ -77,8 +60,6 @@ const listProducts = asyncHandler(async (req, res) => {
   });
 });
 
-<<<<<<< HEAD
-=======
 const getProductById = asyncHandler(async (req, res) => {
   const product = req.scopedResource;
   if (!product) throw new ApiError(404, "Product not found");
@@ -86,32 +67,21 @@ const getProductById = asyncHandler(async (req, res) => {
   res.status(200).json({ data: product });
 });
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 const createProduct = asyncHandler(async (req, res) => {
   validateProductPayload(req.body);
 
   const targetStoreId = resolveTargetStoreId(req);
-<<<<<<< HEAD
-=======
   const categoryId = await ensureCategoryInStore(
     req.body.category,
     targetStoreId
   );
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
   const product = await Product.create({
     store: targetStoreId,
     title: req.body.title.trim(),
     description: req.body.description || "",
     price: Number(req.body.price),
     compareAtPrice:
-<<<<<<< HEAD
-      req.body.compareAtPrice === undefined ? null : Number(req.body.compareAtPrice),
-    stock: Number(req.body.stock),
-    category: req.body.category || "general",
-    images: req.body.images || [],
-    isActive: req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,
-=======
       req.body.compareAtPrice === undefined || req.body.compareAtPrice === null
         ? null
         : Number(req.body.compareAtPrice),
@@ -122,7 +92,6 @@ const createProduct = asyncHandler(async (req, res) => {
     variants: Array.isArray(req.body.variants) ? req.body.variants : [],
     isActive:
       req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
   });
 
   res.status(201).json({
@@ -137,27 +106,6 @@ const updateProduct = asyncHandler(async (req, res) => {
   const product = req.scopedResource;
   if (!product) throw new ApiError(404, "Product not found");
 
-<<<<<<< HEAD
-  const allowedFields = [
-    "title",
-    "description",
-    "price",
-    "compareAtPrice",
-    "stock",
-    "category",
-    "images",
-    "isActive",
-  ];
-
-  for (const key of allowedFields) {
-    if (req.body[key] !== undefined) {
-      if (key === "title") product[key] = req.body[key].trim();
-      else if (["price", "compareAtPrice", "stock"].includes(key) && req.body[key] !== null) {
-        product[key] = Number(req.body[key]);
-      } else {
-        product[key] = req.body[key];
-      }
-=======
   const directFields = ["description", "images", "options", "variants"];
   const numericFields = ["price", "compareAtPrice", "stock"];
 
@@ -188,15 +136,11 @@ const updateProduct = asyncHandler(async (req, res) => {
         req.body.category,
         product.store
       );
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
     }
   }
 
   await product.save();
-<<<<<<< HEAD
-=======
   await product.populate("category", "name slug");
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 
   res.status(200).json({
     message: "Product updated",
@@ -208,13 +152,6 @@ const deleteProduct = asyncHandler(async (req, res) => {
   const product = req.scopedResource;
   if (!product) throw new ApiError(404, "Product not found");
 
-<<<<<<< HEAD
-  product.isActive = false;
-  await product.save();
-
-  res.status(200).json({
-    message: "Product archived",
-=======
   if (req.query.hard === "true") {
     await product.deleteOne();
     return res.status(200).json({ message: "Product deleted permanently" });
@@ -235,21 +172,14 @@ const restoreProduct = asyncHandler(async (req, res) => {
   res.status(200).json({
     message: "Product restored",
     data: product,
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
   });
 });
 
 module.exports = {
   listProducts,
-<<<<<<< HEAD
-  createProduct,
-  updateProduct,
-  deleteProduct,
-=======
   getProductById,
   createProduct,
   updateProduct,
   deleteProduct,
   restoreProduct,
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 };

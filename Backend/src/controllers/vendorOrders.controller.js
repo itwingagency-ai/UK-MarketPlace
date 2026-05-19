@@ -1,9 +1,5 @@
 const ApiError = require("../lib/ApiError");
 const asyncHandler = require("../lib/asyncHandler");
-<<<<<<< HEAD
-const Order = require("../models/Order");
-const { validateOrderStatusUpdate } = require("../validators/order.validator");
-=======
 const {
   appendPaymentEvent,
   applyCommissionSnapshot,
@@ -74,26 +70,12 @@ const buildListFilter = (req) => {
 
   return filter;
 };
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 
 const listOrders = asyncHandler(async (req, res) => {
   const page = Math.max(Number(req.query.page) || 1, 1);
   const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
   const skip = (page - 1) * limit;
 
-<<<<<<< HEAD
-  const filter = { ...req.storeScopeFilter };
-  if (req.query.status) {
-    filter.orderStatus = req.query.status;
-  }
-
-  const orders = await Order.find(filter)
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit)
-    .select("customer subtotal shippingFee total paymentMethod paymentStatus orderStatus createdAt");
-  const total = await Order.countDocuments(filter);
-=======
   const filter = buildListFilter(req);
 
   const [orders, total] = await Promise.all([
@@ -107,7 +89,6 @@ const listOrders = asyncHandler(async (req, res) => {
       .populate("customer", "name email"),
     Order.countDocuments(filter),
   ]);
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 
   res.status(200).json({
     page,
@@ -121,11 +102,6 @@ const getOrderById = asyncHandler(async (req, res) => {
   const order = req.scopedResource;
   if (!order) throw new ApiError(404, "Order not found");
 
-<<<<<<< HEAD
-  res.status(200).json({ data: order });
-});
-
-=======
   await order.populate([
     { path: "customer", select: "name email" },
     { path: "items.product", select: "title images" },
@@ -155,23 +131,10 @@ const getOrderHistory = asyncHandler(async (req, res) => {
   });
 });
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 const updateOrderStatus = asyncHandler(async (req, res) => {
   const order = req.scopedResource;
   if (!order) throw new ApiError(404, "Order not found");
 
-<<<<<<< HEAD
-  const nextStatus = req.body.orderStatus;
-  if (!nextStatus) {
-    throw new ApiError(400, "orderStatus is required");
-  }
-
-  validateOrderStatusUpdate(order.orderStatus, nextStatus);
-
-  order.orderStatus = nextStatus;
-  await order.save();
-
-=======
   const { nextStatus } = validateOrderStatusPayload(req.body, order.orderStatus);
 
   order.orderStatus = nextStatus;
@@ -276,19 +239,12 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     });
   }
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
   res.status(200).json({
     message: "Order status updated",
     data: order,
   });
 });
 
-<<<<<<< HEAD
-module.exports = {
-  listOrders,
-  getOrderById,
-  updateOrderStatus,
-=======
 const addShipmentEvent = asyncHandler(async (req, res) => {
   const order = req.scopedResource;
   if (!order) throw new ApiError(404, "Order not found");
@@ -362,5 +318,4 @@ module.exports = {
   updateOrderStatus,
   addShipmentEvent,
   listShipmentEvents,
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 };

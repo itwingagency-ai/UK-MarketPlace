@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const ApiError = require("../lib/ApiError");
 const asyncHandler = require("../lib/asyncHandler");
+const { geocodeAddress, isValidLatLng } = require("../lib/geoUtils");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const Store = require("../models/Store");
@@ -132,6 +133,30 @@ const updateStore = asyncHandler(async (req, res) => {
         store.address[field] = req.body.address[field] || "";
       }
     }
+  }
+
+  // ── Geo location ──────────────────────────────────────────────────────────
+  if (req.body.lat !== undefined && req.body.lng !== undefined) {
+    const lat = Number(req.body.lat);
+    const lng = Number(req.body.lng);
+    if (!isValidLatLng(lat, lng)) {
+      throw new ApiError(400, "lat must be -90..90, lng must be -180..180");
+    }
+    store.location = { type: "Point", coordinates: [lng, lat] };
+    store.locationSet = true;
+  } else if (req.body.address && typeof req.body.address === "string") {
+    // Admin supplied a plain address string for geocoding
+    const result = await geocodeAddress(req.body.address);
+    store.location = { type: "Point", coordinates: [result.lng, result.lat] };
+    store.locationSet = true;
+  }
+
+  if (req.body.deliveryRadiusKm !== undefined) {
+    const r = Number(req.body.deliveryRadiusKm);
+    if (Number.isNaN(r) || r < 0.1 || r > 100) {
+      throw new ApiError(400, "deliveryRadiusKm must be between 0.1 and 100");
+    }
+    store.deliveryRadiusKm = r;
   }
 
   await store.save();

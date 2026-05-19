@@ -5,8 +5,6 @@ const validator = require("validator");
 const ROLES = ["admin", "vendor", "customer"];
 const STATUSES = ["active", "suspended"];
 
-<<<<<<< HEAD
-=======
 const addressSchema = new mongoose.Schema(
   {
     label: { type: String, default: "Home", trim: true, maxlength: 40 },
@@ -23,7 +21,6 @@ const addressSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -44,15 +41,12 @@ const userSchema = new mongoose.Schema(
         message: "Invalid email format",
       },
     },
-<<<<<<< HEAD
-=======
     phone: {
       type: String,
       default: "",
       trim: true,
       maxlength: 30,
     },
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
     password: {
       type: String,
       required: true,
@@ -74,13 +68,10 @@ const userSchema = new mongoose.Schema(
       ref: "Store",
       default: null,
     },
-<<<<<<< HEAD
-=======
     addresses: {
       type: [addressSchema],
       default: [],
     },
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
   },
   { timestamps: true }
 );

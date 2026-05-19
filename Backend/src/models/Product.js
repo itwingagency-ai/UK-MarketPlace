@@ -1,7 +1,5 @@
 const mongoose = require("mongoose");
 
-<<<<<<< HEAD
-=======
 const productOptionSchema = new mongoose.Schema(
   {
     name: {
@@ -63,7 +61,6 @@ const productVariantSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 const productSchema = new mongoose.Schema(
   {
     store: {
@@ -78,6 +75,13 @@ const productSchema = new mongoose.Schema(
       trim: true,
       minlength: 2,
       maxlength: 140,
+    },
+    slug: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      maxlength: 160,
+      default: "",
     },
     description: {
       type: String,
@@ -101,23 +105,15 @@ const productSchema = new mongoose.Schema(
       default: 0,
     },
     category: {
-<<<<<<< HEAD
-      type: String,
-      trim: true,
-      default: "general",
-=======
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
       default: null,
       index: true,
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
     },
     images: {
       type: [String],
       default: [],
     },
-<<<<<<< HEAD
-=======
     options: {
       type: [productOptionSchema],
       default: [],
@@ -126,18 +122,11 @@ const productSchema = new mongoose.Schema(
       type: [productVariantSchema],
       default: [],
     },
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
     isActive: {
       type: Boolean,
       default: true,
       index: true,
     },
-<<<<<<< HEAD
-  },
-  { timestamps: true }
-);
-
-=======
     averageRating: {
       type: Number,
       default: 0,
@@ -179,5 +168,42 @@ productSchema.virtual("hasVariants").get(function hasVariants() {
   return Array.isArray(this.variants) && this.variants.length > 0;
 });
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
+// ── Indexes ──────────────────────────────────────────────────────────────────
+
+// Text index for $text search — title weighted 10x over description
+productSchema.index(
+  { title: "text", description: "text" },
+  {
+    weights: { title: 10, description: 1 },
+    name: "product_text_search",
+    default_language: "english",
+  }
+);
+
+// Store-scoped slug uniqueness (allows same slug across different stores)
+productSchema.index({ store: 1, slug: 1 }, { unique: true, sparse: true });
+
+// Compound indexes for common sort operations on active products
+productSchema.index({ store: 1, isActive: 1, price: 1 });
+productSchema.index({ store: 1, isActive: 1, createdAt: -1 });
+productSchema.index({ store: 1, isActive: 1, averageRating: -1 });
+
+// Global active-products index for cross-store search
+productSchema.index({ isActive: 1, createdAt: -1 });
+
+// ── Pre-save: auto-generate slug from title ──────────────────────────────────
+
+productSchema.pre("save", function preSave(next) {
+  if (this.isModified("title") && (!this.slug || this.slug === "")) {
+    this.slug = this.title
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .substring(0, 150);
+  }
+  next();
+});
+
 module.exports = mongoose.model("Product", productSchema);

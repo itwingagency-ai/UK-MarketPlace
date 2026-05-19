@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 const crypto = require("crypto");
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 const mongoose = require("mongoose");
 
 const ORDER_STATUS = [
@@ -22,20 +19,15 @@ const orderItemSchema = new mongoose.Schema(
       ref: "Product",
       required: true,
     },
-<<<<<<< HEAD
-=======
     variantId: {
       type: mongoose.Schema.Types.ObjectId,
       default: null,
     },
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
     title: {
       type: String,
       required: true,
       trim: true,
     },
-<<<<<<< HEAD
-=======
     sku: {
       type: String,
       default: "",
@@ -46,7 +38,6 @@ const orderItemSchema = new mongoose.Schema(
       of: String,
       default: () => new Map(),
     },
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
     quantity: {
       type: Number,
       required: true,
@@ -66,10 +57,6 @@ const orderItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
-<<<<<<< HEAD
-const orderSchema = new mongoose.Schema(
-  {
-=======
 const statusHistorySchema = new mongoose.Schema(
   {
     status: {
@@ -208,7 +195,6 @@ const orderSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
     store: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Store",
@@ -221,11 +207,6 @@ const orderSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-<<<<<<< HEAD
-    items: {
-      type: [orderItemSchema],
-      validate: [(arr) => arr.length > 0, "Order must contain at least one item"],
-=======
     customerSnapshot: {
       name: { type: String, default: "" },
       email: { type: String, default: "", lowercase: true, trim: true },
@@ -241,7 +222,6 @@ const orderSchema = new mongoose.Schema(
         (arr) => Array.isArray(arr) && arr.length > 0,
         "Order must contain at least one item",
       ],
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
     },
     subtotal: {
       type: Number,
@@ -268,10 +248,7 @@ const orderSchema = new mongoose.Schema(
       type: String,
       enum: PAYMENT_STATUSES,
       default: "pending",
-<<<<<<< HEAD
-=======
       index: true,
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
     },
     orderStatus: {
       type: String,
@@ -279,12 +256,6 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
       index: true,
     },
-<<<<<<< HEAD
-  },
-  { timestamps: true }
-);
-
-=======
     statusHistory: {
       type: [statusHistorySchema],
       default: [],
@@ -362,5 +333,4 @@ orderSchema.statics.PAYMENT_METHODS = PAYMENT_METHODS;
 orderSchema.statics.PAYMENT_STATUSES = PAYMENT_STATUSES;
 orderSchema.statics.SHIPMENT_EVENT_STATUSES = SHIPMENT_EVENT_STATUSES;
 
->>>>>>> 6bc776ee27df335a77035d2b3ee2cd4147284a81
 module.exports = mongoose.model("Order", orderSchema);
