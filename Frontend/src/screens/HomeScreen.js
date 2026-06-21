@@ -13,20 +13,108 @@ import {
   Platform,
   KeyboardAvoidingView,
   Dimensions,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { getNearbyStores } from '../api/stores.api';
+import { getNearbyStores, decodePostcode } from '../api/stores.api';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Spacing, Typography, Radius } from '../theme';
 
 const { width, height } = Dimensions.get('window');
 
+// ─── Coming Soon Modal ────────────────────────────────────────────────────────
+function ComingSoonModal({ visible, postcode, onClose }) {
+  const slideAnim = useRef(new Animated.Value(300)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          damping: 18,
+          stiffness: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 300, duration: 200, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [visible]);
+
+  return (
+    <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
+      <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
+        <Animated.View
+          style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}
+        >
+          {/* Top accent bar */}
+          <View style={styles.modalAccentBar} />
+
+          {/* Icon */}
+          <View style={styles.modalIconWrapper}>
+            <Text style={styles.modalIconEmoji}>🏪</Text>
+          </View>
+
+          {/* Text */}
+          <Text style={styles.modalTitle}>No stores in your area yet</Text>
+          {postcode ? (
+            <Text style={styles.modalPostcodeLabel}>{postcode}</Text>
+          ) : null}
+          <Text style={styles.modalBody}>
+            We're working hard to bring Snappy Shopper to your neighbourhood. Be the first to
+            know when we launch near you!
+          </Text>
+
+          {/* Coming soon badge */}
+          <View style={styles.comingSoonBadge}>
+            <Text style={styles.comingSoonDot}>●</Text>
+            <Text style={styles.comingSoonText}>Coming Soon to This Area</Text>
+          </View>
+
+          {/* Steps */}
+          <View style={styles.stepsContainer}>
+            {[
+              { icon: '📧', label: 'Get notified when we launch' },
+              { icon: '🚀', label: 'New stores added every week' },
+              { icon: '🗺️', label: 'Try a nearby postcode' },
+            ].map((item, i) => (
+              <View key={i} style={styles.stepRow}>
+                <View style={styles.stepIconWrapper}>
+                  <Text style={styles.stepIcon}>{item.icon}</Text>
+                </View>
+                <Text style={styles.stepLabel}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Actions */}
+          <TouchableOpacity style={styles.modalPrimaryBtn} onPress={onClose} activeOpacity={0.85}>
+            <Text style={styles.modalPrimaryBtnText}>Try another postcode</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose} activeOpacity={0.7}>
+            <Text style={styles.modalSecondaryBtnText}>Dismiss</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation }) {
   const { isAuthenticated, logout } = useAuth();
   const [postcode, setPostcode] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
+  const [notFoundPostcode, setNotFoundPostcode] = useState('');
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handleSearchPress = async () => {
@@ -38,16 +126,48 @@ export default function HomeScreen({ navigation }) {
       Animated.timing(scaleAnim, { toValue: 0.97, duration: 80, useNativeDriver: true }),
       Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
     ]).start();
+
     setIsSearching(true);
+    const trimmed = postcode.trim().toUpperCase();
+
     try {
-      const data = await getNearbyStores({ postcode: postcode.trim() });
-      const stores = data.stores ?? data;
-      navigation.navigate('StoreList', { stores, query: postcode.trim() });
+      // Fetch stores + decode postcode to human-readable location in parallel
+      const [storeResult, locationResult] = await Promise.allSettled([
+        getNearbyStores({ postcode: trimmed }),
+        decodePostcode(trimmed),
+      ]);
+
+      // Extract stores from response
+      const apiData = storeResult.status === 'fulfilled' ? storeResult.value : null;
+      const stores = apiData?.data?.stores ?? apiData?.stores ?? [];
+
+      if (stores.length === 0) {
+        // No stores — show professional "coming soon" modal
+        setNotFoundPostcode(trimmed);
+        setShowComingSoon(true);
+        setIsSearching(false);
+        return;
+      }
+
+      // Build human-readable location label from postcodes.io
+      let locationLabel = trimmed;
+      if (locationResult.status === 'fulfilled' && locationResult.value) {
+        const loc = locationResult.value;
+        const parts = [loc.admin_ward, loc.admin_district].filter(Boolean);
+        if (parts.length > 0) locationLabel = parts.join(', ');
+      } else if (apiData?.data?.resolvedLocation?.formattedAddress) {
+        locationLabel = apiData.data.resolvedLocation.formattedAddress;
+      }
+
+      navigation.navigate('ShopHome', {
+        stores,
+        postcode: trimmed,
+        locationLabel,
+      });
     } catch (err) {
-      Alert.alert(
-        'No stores found',
-        err.response?.data?.message ?? 'Could not find stores for that postcode. Please try again.'
-      );
+      // API or network error — show coming soon modal
+      setNotFoundPostcode(trimmed);
+      setShowComingSoon(true);
     } finally {
       setIsSearching(false);
     }
@@ -65,8 +185,20 @@ export default function HomeScreen({ navigation }) {
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const { latitude, longitude } = loc.coords;
       const data = await getNearbyStores({ lat: latitude, lng: longitude });
-      const stores = data.stores ?? data;
-      navigation.navigate('StoreList', { stores, query: 'your location' });
+      const stores = data?.data?.stores ?? data?.stores ?? [];
+
+      if (stores.length === 0) {
+        setNotFoundPostcode('your location');
+        setShowComingSoon(true);
+        setIsLocating(false);
+        return;
+      }
+
+      navigation.navigate('ShopHome', {
+        stores,
+        postcode: 'My Location',
+        locationLabel: 'Your Location',
+      });
     } catch (err) {
       Alert.alert('Location error', 'Unable to get your location. Please try entering a postcode.');
     } finally {
@@ -174,6 +306,13 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Coming Soon Modal */}
+      <ComingSoonModal
+        visible={showComingSoon}
+        postcode={notFoundPostcode}
+        onClose={() => setShowComingSoon(false)}
+      />
     </View>
   );
 }
@@ -342,5 +481,156 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     fontWeight: Typography.weight.semibold,
     color: Colors.primary,
+  },
+
+  // ── Coming Soon Modal ──────────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: Spacing['2xl'],
+    paddingBottom: Spacing['5xl'],
+    paddingTop: 0,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  modalAccentBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+    marginTop: 12,
+    marginBottom: Spacing.lg,
+  },
+  modalIconWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFF5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+    borderWidth: 2,
+    borderColor: '#FECACA',
+  },
+  modalIconEmoji: {
+    fontSize: 36,
+  },
+  modalTitle: {
+    fontSize: Typography.size.xl,
+    fontWeight: Typography.weight.extrabold,
+    color: Colors.text,
+    textAlign: 'center',
+    letterSpacing: -0.4,
+    marginBottom: Spacing.sm,
+  },
+  modalPostcodeLabel: {
+    fontSize: Typography.size.lg,
+    fontWeight: Typography.weight.bold,
+    color: Colors.primary,
+    letterSpacing: 1.5,
+    marginBottom: Spacing.md,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+  },
+  modalBody: {
+    fontSize: Typography.size.sm,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: Spacing.lg,
+    maxWidth: 300,
+  },
+  comingSoonBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF7ED',
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    marginBottom: Spacing['2xl'],
+    gap: 6,
+  },
+  comingSoonDot: {
+    fontSize: 8,
+    color: '#F59E0B',
+  },
+  comingSoonText: {
+    fontSize: Typography.size.xs,
+    fontWeight: Typography.weight.bold,
+    color: '#92400E',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  stepsContainer: {
+    width: '100%',
+    gap: Spacing.md,
+    marginBottom: Spacing['2xl'],
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  stepIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  stepIcon: {
+    fontSize: 18,
+  },
+  stepLabel: {
+    fontSize: Typography.size.sm,
+    fontWeight: Typography.weight.medium,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  modalPrimaryBtn: {
+    width: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.full,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+    marginBottom: Spacing.md,
+  },
+  modalPrimaryBtnText: {
+    fontSize: Typography.size.base,
+    fontWeight: Typography.weight.bold,
+    color: Colors.white,
+    letterSpacing: 0.3,
+  },
+  modalSecondaryBtn: {
+    paddingVertical: Spacing.sm,
+  },
+  modalSecondaryBtnText: {
+    fontSize: Typography.size.sm,
+    fontWeight: Typography.weight.semibold,
+    color: Colors.muted,
   },
 });

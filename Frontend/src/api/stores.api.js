@@ -1,3 +1,4 @@
+import axios from 'axios';
 import client from './client';
 
 /**
@@ -14,6 +15,35 @@ export const getNearbyStores = async ({ postcode, lat, lng } = {}) => {
 
   const { data } = await client.get('/stores/nearby', { params });
   return data;
+};
+
+/**
+ * Decode a UK postcode to a human-readable location name.
+ * Uses the free postcodes.io API (no key required).
+ * Returns { admin_ward, admin_district, region, country } or null on failure.
+ *
+ * @param {string} postcode - e.g. "DD1 3JA"
+ */
+export const decodePostcode = async (postcode) => {
+  try {
+    const encoded = encodeURIComponent(postcode.trim().toUpperCase());
+    const { data } = await axios.get(`https://api.postcodes.io/postcodes/${encoded}`, {
+      timeout: 5000,
+    });
+    if (data.status === 200 && data.result) {
+      return {
+        admin_ward: data.result.admin_ward,
+        admin_district: data.result.admin_district,
+        region: data.result.region,
+        country: data.result.country,
+        latitude: data.result.latitude,
+        longitude: data.result.longitude,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 };
 
 /**

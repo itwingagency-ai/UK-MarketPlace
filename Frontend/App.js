@@ -12,7 +12,8 @@ import { CartProvider } from './src/context/CartContext';
 import HomeScreen from './src/screens/HomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
-import StoreListScreen from './src/screens/StoreListScreen';
+import ShopHomeScreen from './src/screens/ShopHomeScreen';
+import StoreDetailScreen from './src/screens/StoreDetailScreen';
 
 import { Colors } from './src/theme';
 
@@ -20,8 +21,7 @@ const Stack = createNativeStackNavigator();
 
 /**
  * Auth stack — shown when the user is NOT logged in.
- * HomeScreen is accessible to all (store search works without auth),
- * but Login/Register let users authenticate.
+ * HomeScreen has the postcode search; Login/Register for authentication.
  */
 function AuthStack() {
   return (
@@ -29,20 +29,20 @@ function AuthStack() {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
-      <Stack.Screen name="StoreList" component={StoreListScreen} />
     </Stack.Navigator>
   );
 }
 
 /**
  * App stack — shown when the user IS logged in.
- * Still includes Home (with logout button) and store browsing.
+ * HomeScreen → postcode entry → ShopHome (Figma home with stores).
  */
 function AppStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="StoreList" component={StoreListScreen} />
+      <Stack.Screen name="ShopHome" component={ShopHomeScreen} />
+      <Stack.Screen name="StoreDetail" component={StoreDetailScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
     </Stack.Navigator>
