@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 /**
  * <FormBuilder> — renders a form from a field definition array.
  *
  * Props:
- *   fields       – [{ key, label, type, placeholder?, required?, options?, rows?, disabled?, helpText? }]
- *   values       – { [key]: value }
- *   onChange     – (key, value) => void
+ *   fields       – [{ key or name, label, type, placeholder?, required?, options?, rows?, disabled?, helpText? }]
+ *   values       – { [key]: value } (Controlled mode)
+ *   initialValues- { [key]: value } (Uncontrolled mode)
+ *   onChange     – (key, value) => void (Controlled mode)
  *   onSubmit     – (values) => void
  *   submitting   – boolean
  *   submitLabel  – string (default 'Save')
@@ -16,7 +17,8 @@ import { useState } from 'react';
  */
 export default function FormBuilder({
   fields = [],
-  values = {},
+  values,
+  initialValues = {},
   onChange,
   onSubmit,
   submitting = false,
@@ -24,8 +26,26 @@ export default function FormBuilder({
   cancelLabel = 'Cancel',
   onCancel,
   errors = {},
+  children,
 }) {
   const [localErrors, setLocalErrors] = useState({});
+  const [localValues, setLocalValues] = useState(initialValues);
+
+  // Sync internal state if initialValues changes (e.g. opening different edit item)
+  useEffect(() => {
+    setLocalValues(initialValues);
+  }, [initialValues]);
+
+  const isControlled = values !== undefined;
+  const currentValues = isControlled ? values : localValues;
+
+  const handleChange = (fieldKey, val) => {
+    if (isControlled) {
+      onChange?.(fieldKey, val);
+    } else {
+      setLocalValues((prev) => ({ ...prev, [fieldKey]: val }));
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -33,22 +53,27 @@ export default function FormBuilder({
     // Basic required validation
     const errs = {};
     fields.forEach((f) => {
-      if (f.required && !values[f.key]?.toString().trim()) {
-        errs[f.key] = `${f.label} is required`;
+      const fieldKey = f.key || f.name;
+      if (f.required) {
+        const val = currentValues[fieldKey];
+        if (val === undefined || val === null || val.toString().trim() === '') {
+          errs[fieldKey] = `${f.label} is required`;
+        }
       }
     });
     setLocalErrors(errs);
 
     if (Object.keys(errs).length > 0) return;
-    onSubmit?.(values);
+    onSubmit?.(currentValues);
   };
 
   const allErrors = { ...localErrors, ...errors };
 
   const renderField = (f) => {
-    const val = values[f.key] ?? '';
-    const err = allErrors[f.key];
-    const fieldId = `form-field-${f.key}`;
+    const fieldKey = f.key || f.name;
+    const val = currentValues[fieldKey] ?? '';
+    const err = allErrors[fieldKey];
+    const fieldId = `form-field-${fieldKey}`;
 
     switch (f.type) {
       case 'textarea':
@@ -57,7 +82,7 @@ export default function FormBuilder({
             id={fieldId}
             className={`form-input${err ? ' form-input-error' : ''}`}
             value={val}
-            onChange={(e) => onChange?.(f.key, e.target.value)}
+            onChange={(e) => handleChange(fieldKey, e.target.value)}
             placeholder={f.placeholder || ''}
             rows={f.rows || 3}
             disabled={f.disabled || submitting}
@@ -71,7 +96,7 @@ export default function FormBuilder({
             id={fieldId}
             className={`form-select${err ? ' form-input-error' : ''}`}
             value={val}
-            onChange={(e) => onChange?.(f.key, e.target.value)}
+            onChange={(e) => handleChange(fieldKey, e.target.value)}
             disabled={f.disabled || submitting}
           >
             <option value="">{f.placeholder || 'Select…'}</option>
@@ -83,6 +108,7 @@ export default function FormBuilder({
           </select>
         );
 
+      case 'switch':
       case 'checkbox':
         return (
           <label className="form-checkbox" style={{ marginTop: 'var(--space-1)' }}>
@@ -90,7 +116,7 @@ export default function FormBuilder({
               id={fieldId}
               type="checkbox"
               checked={!!val}
-              onChange={(e) => onChange?.(f.key, e.target.checked)}
+              onChange={(e) => handleChange(fieldKey, e.target.checked)}
               disabled={f.disabled || submitting}
             />
             {f.placeholder || f.label}
@@ -104,7 +130,7 @@ export default function FormBuilder({
             className={`form-input${err ? ' form-input-error' : ''}`}
             type="number"
             value={val}
-            onChange={(e) => onChange?.(f.key, e.target.value)}
+            onChange={(e) => handleChange(fieldKey, e.target.value)}
             placeholder={f.placeholder || ''}
             disabled={f.disabled || submitting}
             min={f.min}
@@ -120,7 +146,7 @@ export default function FormBuilder({
             className={`form-input${err ? ' form-input-error' : ''}`}
             type={f.type || 'text'}
             value={val}
-            onChange={(e) => onChange?.(f.key, e.target.value)}
+            onChange={(e) => handleChange(fieldKey, e.target.value)}
             placeholder={f.placeholder || ''}
             disabled={f.disabled || submitting}
           />
@@ -130,19 +156,24 @@ export default function FormBuilder({
 
   return (
     <form className="form-builder" onSubmit={handleSubmit}>
-      {fields.map((f) => (
-        <div key={f.key} className="form-group">
-          {f.type !== 'checkbox' && (
-            <label className="form-label" htmlFor={`form-field-${f.key}`}>
-              {f.label}
-              {f.required && <span className="form-required">*</span>}
-            </label>
-          )}
-          {renderField(f)}
-          {f.helpText && <span className="form-help">{f.helpText}</span>}
-          {allErrors[f.key] && <span className="form-error">{allErrors[f.key]}</span>}
-        </div>
-      ))}
+      {fields.map((f) => {
+        const fieldKey = f.key || f.name;
+        return (
+          <div key={fieldKey} className="form-group">
+            {f.type !== 'checkbox' && f.type !== 'switch' && (
+              <label className="form-label" htmlFor={`form-field-${fieldKey}`}>
+                {f.label}
+                {f.required && <span className="form-required">*</span>}
+              </label>
+            )}
+            {renderField(f)}
+            {f.helpText && <span className="form-help">{f.helpText}</span>}
+            {allErrors[fieldKey] && <span className="form-error">{allErrors[fieldKey]}</span>}
+          </div>
+        );
+      })}
+
+      {children}
 
       <div className="form-actions">
         {onCancel && (
@@ -153,7 +184,7 @@ export default function FormBuilder({
         <button type="submit" className="btn btn-primary" disabled={submitting}>
           {submitting ? (
             <>
-              <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderTopColor: '#fff' }} />
+              <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderTopColor: '#fff', marginRight: 8, display: 'inline-block', borderRadius: '50%' }} />
               Saving…
             </>
           ) : (

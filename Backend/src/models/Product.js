@@ -193,7 +193,7 @@ productSchema.index({ isActive: 1, createdAt: -1 });
 
 // ── Pre-save: auto-generate slug from title ──────────────────────────────────
 
-productSchema.pre("save", function preSave(next) {
+productSchema.pre("save", function preSave() {
   if (this.isModified("title") && (!this.slug || this.slug === "")) {
     this.slug = this.title
       .toLowerCase()
@@ -203,7 +203,6 @@ productSchema.pre("save", function preSave(next) {
       .replace(/-+/g, "-")
       .substring(0, 150);
   }
-  next();
 });
 
 module.exports = mongoose.model("Product", productSchema);

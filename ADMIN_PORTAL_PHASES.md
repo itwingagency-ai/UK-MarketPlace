@@ -15,7 +15,7 @@
 | 2     | Authentication & Access Control         | ✅ Done         |
 | 3     | Shared UI Architecture & CRUD Framework | ✅ Done         |
 | 4     | Vendor Dashboard & Store Management     | ⬜ Pending      |
-| 5     | Product, Inventory & Category Management| ⬜ Pending      |
+| 5     | Product, Inventory & Category Management| ✅ Done         |
 | 6     | Order Management, Reviews & Analytics   | ⬜ Pending      |
 | 7     | Admin Panel & Platform Control          | ⬜ Pending      |
 
@@ -94,16 +94,16 @@
 
 ### Deliverables
 
-- [ ] Vendor dashboard home — stat cards, revenue chart, recent orders
-- [ ] Store settings page — name, description, logo, contact info
-- [ ] Operating hours manager — weekly schedule with open/close toggles
-- [ ] Location manager — address with map preview
-- [ ] Shipping methods — CRUD table
-- [ ] Analytics overview panel — sales trend chart, top products
+- [x] Vendor dashboard home — stat cards, revenue chart, recent orders
+- [x] Store settings page — name, description, logo, contact info
+- [x] Operating hours manager — weekly schedule with open/close toggles
+- [x] Location manager — address with map preview
+- [x] Shipping methods — CRUD table
+- [x] Analytics overview panel — sales trend chart, top products
 
 ---
 
-## Phase 5 — Product, Inventory & Category Management ⬜
+## Phase 5 — Product, Inventory & Category Management ✅
 
 **Goal**: Full product catalog management with inventory controls.
 
@@ -117,12 +117,12 @@
 
 ### Deliverables
 
-- [ ] Product list page — search, filter by category/status, sort, paginate
-- [ ] Product create/edit form — name, images, pricing, stock, discounts
-- [ ] Category management — tree or flat list CRUD
-- [ ] Bulk actions — activate, deactivate, delete
-- [ ] Low-stock indicator and stock quick-edit
-- [ ] Soft delete + restore flow
+- [x] Product list page — search, filter by category/status, sort, paginate
+- [x] Product create/edit form — name, images, pricing, stock, discounts
+- [x] Category management — tree or flat list CRUD
+- [x] Bulk actions — activate, deactivate, delete
+- [x] Low-stock indicator and stock quick-edit
+- [x] Soft delete + restore flow
 
 ---
 

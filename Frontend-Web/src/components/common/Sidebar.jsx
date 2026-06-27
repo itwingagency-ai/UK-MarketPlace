@@ -66,8 +66,8 @@ const vendorNav = [
   {
     label: 'Catalog',
     items: [
-      { to: '/vendor/products', icon: Package, text: 'Products' },
       { to: '/vendor/categories', icon: Tag, text: 'Categories' },
+      { to: '/vendor/products', icon: Package, text: 'Products' },
     ],
   },
   {

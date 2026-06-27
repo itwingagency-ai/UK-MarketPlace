@@ -312,7 +312,11 @@ const formatYmd = (date) => {
 const generateOrderNumber = () =>
   `ORD-${formatYmd(new Date())}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
 
-orderSchema.pre("validate", function preValidateOrder(next) {
+orderSchema.pre("save", function preSave() {
+  this.totalAmount = this.subtotal + this.shippingFee;
+});
+
+orderSchema.pre("validate", function preValidateOrder() {
   if (!this.orderNumber) {
     this.orderNumber = generateOrderNumber();
   }

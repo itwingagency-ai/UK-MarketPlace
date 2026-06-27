@@ -20,7 +20,13 @@ import StoresPage from './pages/admin/StoresPage';
 
 /* ── Vendor Pages ── */
 import VendorDashboard from './pages/vendor/VendorDashboard';
-
+import StoreSettingsPage from './pages/vendor/settings/StoreSettingsPage';
+import OperatingHoursPage from './pages/vendor/settings/OperatingHoursPage';
+import LocationPage from './pages/vendor/settings/LocationPage';
+import ShippingMethodsPage from './pages/vendor/settings/ShippingMethodsPage';
+import VendorAnalyticsPage from './pages/vendor/VendorAnalyticsPage';
+import ProductsPage from './pages/vendor/ProductsPage';
+import CategoriesPage from './pages/vendor/CategoriesPage';
 /* ── Shared ── */
 import PlaceholderPage from './components/common/PlaceholderPage';
 
@@ -69,18 +75,18 @@ export default function App() {
           >
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<VendorDashboard />} />
-            {/* Phase 4 stubs */}
-            <Route path="settings" element={<PlaceholderPage title="Store Settings" description="Manage your store name, description, logo, and contact info." phase={4} />} />
-            <Route path="shipping" element={<PlaceholderPage title="Shipping Methods" description="Configure your delivery and shipping options." phase={4} />} />
-            <Route path="operating-hours" element={<PlaceholderPage title="Operating Hours" description="Set your weekly store schedule." phase={4} />} />
-            <Route path="location" element={<PlaceholderPage title="Store Location" description="Update your store address and delivery zone." phase={4} />} />
-            {/* Phase 5 stubs */}
-            <Route path="products" element={<PlaceholderPage title="Products" description="Manage your product catalog — create, edit, and organise products." phase={5} />} />
-            <Route path="categories" element={<PlaceholderPage title="Categories" description="Organise products into categories for easy browsing." phase={5} />} />
-            {/* Phase 6 stubs */}
+            {/* Phase 4 */}
+            <Route path="settings" element={<StoreSettingsPage />} />
+            <Route path="shipping" element={<ShippingMethodsPage />} />
+            <Route path="operating-hours" element={<OperatingHoursPage />} />
+            <Route path="location" element={<LocationPage />} />
+            {/* Phase 5 */}
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="categories" element={<CategoriesPage />} />
+            {/* Phase 6 stubs / Analytics (Phase 4 deliverables) */}
             <Route path="orders" element={<PlaceholderPage title="Orders" description="View and process customer orders through all lifecycle stages." phase={6} />} />
             <Route path="reviews" element={<PlaceholderPage title="Reviews" description="Manage customer reviews and respond to feedback." phase={6} />} />
-            <Route path="analytics" element={<PlaceholderPage title="Analytics" description="Sales trends, revenue tracking, and customer insights." phase={6} />} />
+            <Route path="analytics" element={<VendorAnalyticsPage />} />
             <Route path="reports" element={<PlaceholderPage title="Reports" description="Download sales and product performance reports." phase={6} />} />
             <Route path="commission" element={<PlaceholderPage title="Commission" description="View your commission summary and transaction ledger." phase={4} />} />
           </Route>

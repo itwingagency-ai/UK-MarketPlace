@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, Fragment } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown, Search } from 'lucide-react';
 import Pagination from './Pagination';
 
@@ -26,6 +26,7 @@ import Pagination from './Pagination';
  *   emptyTitle   – string
  *   emptyText    – string
  *   actions      – (row) => ReactNode  (action buttons per row)
+ *   expandable   – (row) => ReactNode  (render expanded row content)
  */
 export default function DataTable({
   columns = [],
@@ -48,8 +49,19 @@ export default function DataTable({
   emptyTitle = 'No Data',
   emptyText = 'There are no records to display.',
   actions,
+  expandable,
 }) {
   const [localSort, setLocalSort] = useState({ key: null, dir: 'asc' });
+  const [expandedRowKeys, setExpandedRowKeys] = useState(new Set());
+
+  const toggleExpand = (key) => {
+    setExpandedRowKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const handleSort = useCallback(
     (key) => {
@@ -110,6 +122,7 @@ export default function DataTable({
         <table className="data-table">
           <thead>
             <tr>
+              {expandable && <th style={{ width: 40 }}></th>}
               {selectable && (
                 <th style={{ width: 40 }}>
                   <input
@@ -142,7 +155,7 @@ export default function DataTable({
             {loading ? (
               <tr>
                 <td
-                  colSpan={columns.length + (selectable ? 1 : 0) + (actions ? 1 : 0)}
+                  colSpan={columns.length + (selectable ? 1 : 0) + (actions ? 1 : 0) + (expandable ? 1 : 0)}
                   style={{ textAlign: 'center', padding: 'var(--space-8)' }}
                 >
                   <div className="loading-overlay">
@@ -153,7 +166,7 @@ export default function DataTable({
               </tr>
             ) : sortedData.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + (selectable ? 1 : 0) + (actions ? 1 : 0)}>
+                <td colSpan={columns.length + (selectable ? 1 : 0) + (actions ? 1 : 0) + (expandable ? 1 : 0)}>
                   <div className="empty-state">
                     {emptyIcon && <div className="empty-state-icon">{emptyIcon}</div>}
                     <h3>{emptyTitle}</h3>
@@ -163,25 +176,44 @@ export default function DataTable({
               </tr>
             ) : (
               sortedData.map((row) => (
-                <tr key={row[rowKey]}>
-                  {selectable && (
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(row[rowKey])}
-                        onChange={(e) => onSelect?.(row[rowKey], e.target.checked)}
-                      />
-                    </td>
+                <Fragment key={row[rowKey]}>
+                  <tr 
+                    onClick={() => expandable && toggleExpand(row[rowKey])} 
+                    style={{ cursor: expandable ? 'pointer' : 'default' }}
+                  >
+                    {expandable && (
+                      <td style={{ textAlign: 'center' }}>
+                        {expandedRowKeys.has(row[rowKey]) ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                      </td>
+                    )}
+                    {selectable && (
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row[rowKey])}
+                          onChange={(e) => onSelect?.(row[rowKey], e.target.checked)}
+                        />
+                      </td>
+                    )}
+                    {columns.map((col) => (
+                      <td key={col.key}>
+                        {col.render ? col.render(row[col.key], row) : row[col.key]}
+                      </td>
+                    ))}
+                    {actions && (
+                      <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>{actions(row)}</td>
+                    )}
+                  </tr>
+                  {expandable && expandedRowKeys.has(row[rowKey]) && (
+                    <tr className="expanded-row" style={{ background: 'var(--gray-50)' }}>
+                      <td colSpan={columns.length + (selectable ? 1 : 0) + (actions ? 1 : 0) + 1} style={{ padding: '0' }}>
+                        <div style={{ padding: 'var(--space-4)', borderTop: '1px dashed var(--border-color)', borderBottom: '1px dashed var(--border-color)' }}>
+                          {expandable(row)}
+                        </div>
+                      </td>
+                    </tr>
                   )}
-                  {columns.map((col) => (
-                    <td key={col.key}>
-                      {col.render ? col.render(row[col.key], row) : row[col.key]}
-                    </td>
-                  ))}
-                  {actions && (
-                    <td style={{ textAlign: 'right' }}>{actions(row)}</td>
-                  )}
-                </tr>
+                </Fragment>
               ))
             )}
           </tbody>

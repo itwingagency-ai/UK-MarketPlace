@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PageHeader, DataTable, StatusBadge, Drawer, FilterBar } from '../../components/common';
+import { PageHeader, DataTable, StatusBadge, Drawer, FilterBar, Modal } from '../../components/common';
 import useFetch from '../../hooks/useFetch';
 import client from '../../api/client';
 import { formatDate } from '../../utils/formatters';
@@ -11,6 +11,11 @@ export default function VendorApplicationsPage() {
   const [filters, setFilters] = useState({ status: '' });
   const [drawerApp, setDrawerApp] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // Modal states
+  const [approveId, setApproveId] = useState(null);
+  const [rejectId, setRejectId] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const { data, loading, error, refetch } = useFetch('/admin/vendor-applications', {
     params: { page, limit: 20, status: filters.status || undefined },
@@ -33,25 +38,32 @@ export default function VendorApplicationsPage() {
   };
 
   /* ── Approve / Reject ─────────────────────────────────────────────── */
-  const handleApprove = async (id) => {
-    if (!window.confirm('Approve this application? This will create a store and promote the user to vendor.')) return;
+  const handleApproveClick = (id) => setApproveId(id);
+  const handleRejectClick = (id) => {
+    setRejectReason('');
+    setRejectId(id);
+  };
+
+  const confirmApprove = async () => {
+    if (!approveId) return;
     try {
-      await client.patch(`/admin/vendor-applications/${id}/approve`);
+      await client.patch(`/admin/vendor-applications/${approveId}/approve`);
       toast.success('Application approved — store created!');
       setDrawerApp(null);
+      setApproveId(null);
       refetch();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to approve');
     }
   };
 
-  const handleReject = async (id) => {
-    const reason = window.prompt('Rejection reason (optional):');
-    if (reason === null) return;
+  const confirmReject = async () => {
+    if (!rejectId) return;
     try {
-      await client.patch(`/admin/vendor-applications/${id}/reject`, { adminNote: reason });
+      await client.patch(`/admin/vendor-applications/${rejectId}/reject`, { adminNote: rejectReason });
       toast.success('Application rejected');
       setDrawerApp(null);
+      setRejectId(null);
       refetch();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to reject');
@@ -155,10 +167,10 @@ export default function VendorApplicationsPage() {
               </button>
               {row.status === 'pending' && (
                 <>
-                  <button className="btn btn-primary btn-sm" onClick={() => handleApprove(row._id)}>
+                  <button className="btn btn-primary btn-sm" onClick={() => handleApproveClick(row._id)}>
                     <CheckCircle size={14} /> Approve
                   </button>
-                  <button className="btn btn-danger btn-sm" onClick={() => handleReject(row._id)}>
+                  <button className="btn btn-danger btn-sm" onClick={() => handleRejectClick(row._id)}>
                     <XCircle size={14} /> Reject
                   </button>
                 </>
@@ -177,10 +189,10 @@ export default function VendorApplicationsPage() {
         footer={
           drawerApp?.status === 'pending' && (
             <>
-              <button className="btn btn-danger" onClick={() => handleReject(drawerApp._id)}>
+              <button className="btn btn-danger" onClick={() => handleRejectClick(drawerApp._id)}>
                 <XCircle size={14} /> Reject
               </button>
-              <button className="btn btn-primary" onClick={() => handleApprove(drawerApp._id)}>
+              <button className="btn btn-primary" onClick={() => handleApproveClick(drawerApp._id)}>
                 <CheckCircle size={14} /> Approve
               </button>
             </>
@@ -315,6 +327,60 @@ export default function VendorApplicationsPage() {
           </div>
         ) : null}
       </Drawer>
+
+      {/* ── Approve Modal ── */}
+      <Modal
+        open={!!approveId}
+        onClose={() => setApproveId(null)}
+        title="Approve Application"
+        size="sm"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setApproveId(null)}>Cancel</button>
+            <button className="btn btn-primary" onClick={confirmApprove}>
+              <CheckCircle size={14} /> Confirm Approval
+            </button>
+          </>
+        }
+      >
+        <p style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--gray-700)' }}>
+          Are you sure you want to approve this application?
+        </p>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-600)' }}>
+          This will automatically create a new store and promote the user's account to the Vendor role. This action cannot be easily undone.
+        </p>
+      </Modal>
+
+      {/* ── Reject Modal ── */}
+      <Modal
+        open={!!rejectId}
+        onClose={() => setRejectId(null)}
+        title="Reject Application"
+        size="sm"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setRejectId(null)}>Cancel</button>
+            <button className="btn btn-danger" onClick={confirmReject}>
+              <XCircle size={14} /> Confirm Rejection
+            </button>
+          </>
+        }
+      >
+        <p style={{ marginBottom: 'var(--space-3)', fontSize: 'var(--text-sm)', color: 'var(--gray-700)' }}>
+          Are you sure you want to reject this application?
+        </p>
+        <div className="form-group">
+          <label htmlFor="reject-reason">Rejection Reason (Optional)</label>
+          <textarea
+            id="reject-reason"
+            className="form-input"
+            rows={3}
+            placeholder="Explain why the application was rejected. The applicant will see this."
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+          />
+        </div>
+      </Modal>
     </div>
   );
 }
