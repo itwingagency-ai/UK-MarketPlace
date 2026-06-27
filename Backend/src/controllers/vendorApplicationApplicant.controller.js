@@ -4,6 +4,7 @@ const Store = require("../models/Store");
 const User = require("../models/User");
 const VendorApplication = require("../models/VendorApplication");
 const { validateVendorApplicationSubmit } = require("../validators/vendorApplication.validator");
+const { onVendorApplicationSubmitted } = require("../lib/notificationHooks");
 
 const submitApplication = asyncHandler(async (req, res) => {
   const { storeName, slug } = validateVendorApplicationSubmit(req.body);
@@ -50,6 +51,8 @@ const submitApplication = asyncHandler(async (req, res) => {
       country: req.body.address?.country || "",
     },
   });
+
+  onVendorApplicationSubmitted(user, application);
 
   res.status(201).json({
     message: "Application submitted",

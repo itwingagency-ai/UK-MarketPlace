@@ -11,9 +11,9 @@
 
 | Phase | Title                                   | Status         |
 |-------|-----------------------------------------|----------------|
-| 1     | Core System Foundation                  | 🔄 In Progress |
-| 2     | Authentication & Access Control         | ⬜ Pending      |
-| 3     | Shared UI Architecture & CRUD Framework | ⬜ Pending      |
+| 1     | Core System Foundation                  | ✅ Done         |
+| 2     | Authentication & Access Control         | ✅ Done         |
+| 3     | Shared UI Architecture & CRUD Framework | ✅ Done         |
 | 4     | Vendor Dashboard & Store Management     | ⬜ Pending      |
 | 5     | Product, Inventory & Category Management| ⬜ Pending      |
 | 6     | Order Management, Reviews & Analytics   | ⬜ Pending      |
@@ -39,39 +39,39 @@
 
 ---
 
-## Phase 2 — Authentication & Access Control ⬜
+## Phase 2 — Authentication & Access Control ✅
 
 **Goal**: Fully working login/logout with JWT refresh, role-based routing.
 
 ### Deliverables
 
-- [ ] Login page (email + password, role-based redirect)
-- [ ] Token storage strategy (accessToken in memory, refreshToken in localStorage)
-- [ ] Axios request interceptor for Bearer token injection
-- [ ] Axios response interceptor for transparent token refresh (401 → /auth/refresh)
-- [ ] Logout (revoke refresh token, clear state)
-- [ ] Auth guard HOC (`<RequireAuth role="admin">`)
-- [ ] Session persistence on page reload via silent refresh
-- [ ] Unauthorized & Session Expired pages
+- [x] Login page (email + password, role-based redirect)
+- [x] Token storage strategy (accessToken in memory, refreshToken in localStorage)
+- [x] Axios request interceptor for Bearer token injection
+- [x] Axios response interceptor for transparent token refresh (401 → /auth/refresh)
+- [x] Logout (revoke refresh token, clear state)
+- [x] Auth guard HOC (`<RequireAuth role="admin">`)
+- [x] Session persistence on page reload via silent refresh
+- [x] Unauthorized & Session Expired pages
 
 ---
 
-## Phase 3 — Shared UI Architecture & CRUD Framework ⬜
+## Phase 3 — Shared UI Architecture & CRUD Framework ✅
 
 **Goal**: Reusable component library following Active Admin patterns.
 
 ### Deliverables
 
-- [ ] `<DataTable>` — sortable, paginated, searchable, bulk-selectable
-- [ ] `<FilterBar>` — composable filter dropdowns and text inputs
-- [ ] `<PageHeader>` — title, breadcrumbs, action buttons
-- [ ] `<Modal>` and `<Drawer>` — confirmation dialogs, edit sidebars
-- [ ] `<StatusBadge>` — colour-coded status chips
-- [ ] `<FormBuilder>` — reusable form fields with validation
-- [ ] `<StatCard>` — metric cards with trend indicators
-- [ ] `<Pagination>` component
-- [ ] Toast / notification system
-- [ ] Skeleton loading states
+- [x] `<DataTable>` — sortable, paginated, searchable, bulk-selectable
+- [x] `<FilterBar>` — composable filter dropdowns and text inputs
+- [x] `<PageHeader>` — title, breadcrumbs, action buttons
+- [x] `<Modal>` and `<Drawer>` — confirmation dialogs, edit sidebars
+- [x] `<StatusBadge>` — colour-coded status chips
+- [x] `<FormBuilder>` — reusable form fields with validation
+- [x] `<StatCard>` — metric cards with trend indicators
+- [x] `<Pagination>` component
+- [x] Toast / notification system
+- [x] Skeleton loading states
 
 ---
 
@@ -174,8 +174,8 @@
 
 - [ ] Admin dashboard — platform KPIs, recent activity, top stores
 - [ ] Users management — list, view, suspend/reactivate
-- [ ] Stores management — list, view, suspend/reactivate, set commission
-- [ ] Vendor applications — review queue, approve/reject with notes
+- [x] Stores management — list, view, suspend/reactivate, set commission
+- [x] Vendor applications — review queue, approve/reject with notes
 - [ ] All orders — cross-store order view
 - [ ] Platform settings — commission rate, payment config
 - [ ] Notification templates — event-based template editor

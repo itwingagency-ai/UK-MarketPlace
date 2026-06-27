@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { AlertCircle } from 'lucide-react';
+import client from '../../api/client';
+import ApplicationPendingPage from './ApplicationPendingPage';
 
 export default function LoginPage() {
   const { login, isAuthenticated, user } = useAuth();
@@ -13,10 +15,23 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Customer with pending application state
+  const [pendingApp, setPendingApp] = useState(null);
+
   // If already logged in, redirect based on role
   if (isAuthenticated && user) {
-    const dest = user.role === 'admin' ? '/admin/dashboard' : '/vendor/dashboard';
-    return <Navigate to={dest} replace />;
+    if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+    if (user.role === 'vendor') return <Navigate to="/vendor/dashboard" replace />;
+  }
+
+  // Show pending application page
+  if (pendingApp) {
+    return (
+      <ApplicationPendingPage
+        status={pendingApp.status}
+        storeName={pendingApp.storeName}
+      />
+    );
   }
 
   const handleSubmit = async (e) => {
@@ -36,8 +51,21 @@ export default function LoginPage() {
         navigate('/admin/dashboard', { replace: true });
       } else if (loggedInUser.role === 'vendor') {
         navigate('/vendor/dashboard', { replace: true });
-      } else {
-        setError('Only admin and vendor accounts can access this portal.');
+      } else if (loggedInUser.role === 'customer') {
+        // Customer trying to log in — check if they have a pending vendor application
+        try {
+          const { data } = await client.get('/vendor-applications/me');
+          if (data.data && data.data.status === 'pending') {
+            setPendingApp({ status: 'pending', storeName: data.data.storeName });
+          } else if (data.data && data.data.status === 'rejected') {
+            setPendingApp({ status: 'rejected', storeName: data.data.storeName });
+          } else {
+            setError('Only admin and vendor accounts can access this portal. Please apply as a vendor first.');
+          }
+        } catch {
+          setError('Only admin and vendor accounts can access this portal.');
+        }
+        // Clear tokens — customers can't use the portal
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
@@ -133,7 +161,10 @@ export default function LoginPage() {
         </div>
 
         <div className="auth-info">
-          Only authorised admin and vendor accounts may sign in.
+          Want to become a vendor?{' '}
+          <Link to="/signup" style={{ color: '#5B9F12', fontWeight: 'var(--weight-semibold)' }}>
+            Apply Here
+          </Link>
         </div>
       </div>
     </div>

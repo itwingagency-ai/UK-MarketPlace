@@ -9,6 +9,7 @@ import VendorLayout from './layouts/VendorLayout';
 
 /* ── Auth Pages ── */
 import LoginPage from './pages/auth/LoginPage';
+import SignUpPage from './pages/auth/SignUpPage';
 import UnauthorizedPage from './pages/auth/UnauthorizedPage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -30,6 +31,7 @@ export default function App() {
         <Routes>
           {/* ─── Public Routes ─── */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignUpPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
           {/* ─── Admin Routes (role: admin) ─── */}

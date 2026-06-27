@@ -244,6 +244,29 @@ const onShipmentEvent = async (order, event) => {
   }
 };
 
+const onVendorApplicationSubmitted = async (applicant, application) => {
+  if (!applicant?._id) return;
+  try {
+    const admins = await User.find({ role: "admin" });
+    for (const admin of admins) {
+      notifyAsync({
+        user: admin,
+        eventType: "admin.vendor_application_submitted",
+        context: {
+          applicantName: applicant.name || "",
+          storeName: application.storeName || "",
+          dashboardUrl: `${env.appUrl.replace(/\/+$/, "")}/admin/vendor-applications`,
+        },
+        related: {
+          vendorApplication: application?._id || null,
+        },
+      });
+    }
+  } catch (_err) {
+    // swallow
+  }
+};
+
 const onVendorApplicationApproved = async (applicant, store, application) => {
   if (!applicant?._id) return;
   notifyAsync({
@@ -337,6 +360,7 @@ module.exports = {
   onOrderDelivered,
   onOrderCancelled,
   onShipmentEvent,
+  onVendorApplicationSubmitted,
   onVendorApplicationApproved,
   onVendorApplicationRejected,
   onReviewSubmitted,
