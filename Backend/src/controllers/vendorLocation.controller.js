@@ -49,7 +49,7 @@ const updateLocation = asyncHandler(async (req, res) => {
   const store = await Store.findById(storeId);
   if (!store) throw new ApiError(404, "Store not found");
 
-  const { address, lat, lng, deliveryRadiusKm, operatingHours } = req.body;
+  const { address, addressDetails, lat, lng, deliveryRadiusKm, operatingHours } = req.body;
 
   let resolvedLat, resolvedLng, geocodedAddress;
 
@@ -58,7 +58,23 @@ const updateLocation = asyncHandler(async (req, res) => {
     resolvedLat = Number(lat);
     resolvedLng = Number(lng);
   }
-  // Case 2: address string → geocode via Google Maps
+  // Case 2: addressDetails object → update store.address and geocode
+  else if (addressDetails !== undefined && typeof addressDetails === "object") {
+    store.address = {
+      line1: addressDetails.line1 || store.address.line1,
+      line2: addressDetails.line2 || store.address.line2,
+      city: addressDetails.city || store.address.city,
+      state: addressDetails.state || store.address.state,
+      postalCode: addressDetails.postalCode || store.address.postalCode,
+      country: addressDetails.country || store.address.country,
+    };
+    const addressString = [store.address.line1, store.address.city, store.address.postalCode, store.address.country].filter(Boolean).join(", ");
+    const result = await geocodeAddress(addressString);
+    resolvedLat = result.lat;
+    resolvedLng = result.lng;
+    geocodedAddress = result.formattedAddress;
+  }
+  // Case 3: address string → geocode via Google Maps
   else if (address !== undefined) {
     const result = await geocodeAddress(address);
     resolvedLat = result.lat;

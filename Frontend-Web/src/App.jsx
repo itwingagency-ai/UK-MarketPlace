@@ -12,11 +12,19 @@ import LoginPage from './pages/auth/LoginPage';
 import SignUpPage from './pages/auth/SignUpPage';
 import UnauthorizedPage from './pages/auth/UnauthorizedPage';
 import NotFoundPage from './pages/NotFoundPage';
+import StorefrontPage from './pages/public/StorefrontPage';
 
 /* ── Admin Pages ── */
 import AdminDashboard from './pages/admin/AdminDashboard';
 import VendorApplicationsPage from './pages/admin/VendorApplicationsPage';
 import StoresPage from './pages/admin/StoresPage';
+import UsersPage from './pages/admin/UsersPage';
+import AllOrdersPage from './pages/admin/AllOrdersPage';
+import ReviewsModerationPage from './pages/admin/ReviewsModerationPage';
+import NotificationsPage from './pages/admin/NotificationsPage';
+import PlatformSettingsPage from './pages/admin/PlatformSettingsPage';
+import CommissionPage from './pages/admin/CommissionPage';
+import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
 
 /* ── Vendor Pages ── */
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -27,6 +35,10 @@ import ShippingMethodsPage from './pages/vendor/settings/ShippingMethodsPage';
 import VendorAnalyticsPage from './pages/vendor/VendorAnalyticsPage';
 import ProductsPage from './pages/vendor/ProductsPage';
 import CategoriesPage from './pages/vendor/CategoriesPage';
+import OrdersPage from './pages/vendor/OrdersPage';
+import ReviewsPage from './pages/vendor/ReviewsPage';
+import ReportsPage from './pages/vendor/ReportsPage';
+import CommissionPageVendor from './pages/vendor/CommissionPage';
 /* ── Shared ── */
 import PlaceholderPage from './components/common/PlaceholderPage';
 
@@ -39,29 +51,29 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          <Route path="/store/:slug" element={<StorefrontPage />} />
 
           {/* ─── Admin Routes (role: admin) ─── */}
           <Route
             path="/admin"
             element={
-              <ProtectedRoute allowedRoles={['admin']}>
+              <ProtectedRoute allowedRoles={['admin', 'superadmin', 'super_admin', 'super-admin', 'super admin']}>
                 <AdminLayout />
               </ProtectedRoute>
             }
           >
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
-            {/* Phase 7 stubs */}
             {/* Phase 7 */}
             <Route path="stores" element={<StoresPage />} />
             <Route path="vendor-applications" element={<VendorApplicationsPage />} />
-            <Route path="users" element={<PlaceholderPage title="User Management" description="Manage all platform users, suspend or reactivate accounts." phase={7} />} />
-            <Route path="orders" element={<PlaceholderPage title="All Orders" description="Cross-store order monitoring and management." phase={7} />} />
-            <Route path="reviews" element={<PlaceholderPage title="Review Moderation" description="Moderate customer reviews and handle reports." phase={7} />} />
-            <Route path="notifications" element={<PlaceholderPage title="Notifications" description="Manage notification templates and view delivery logs." phase={7} />} />
-            <Route path="settings" element={<PlaceholderPage title="Platform Settings" description="Configure commission rates, payment settings, and platform behaviour." phase={7} />} />
-            <Route path="commission" element={<PlaceholderPage title="Commission Management" description="View commission summaries and set per-store rates." phase={7} />} />
-            <Route path="analytics" element={<PlaceholderPage title="Platform Analytics" description="Platform-wide growth metrics and performance charts." phase={7} />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="orders" element={<AllOrdersPage />} />
+            <Route path="reviews" element={<ReviewsModerationPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="settings" element={<PlatformSettingsPage />} />
+            <Route path="commission" element={<CommissionPage />} />
+            <Route path="analytics" element={<AdminAnalyticsPage />} />
           </Route>
 
           {/* ─── Vendor Routes (role: vendor) ─── */}
@@ -83,12 +95,11 @@ export default function App() {
             {/* Phase 5 */}
             <Route path="products" element={<ProductsPage />} />
             <Route path="categories" element={<CategoriesPage />} />
-            {/* Phase 6 stubs / Analytics (Phase 4 deliverables) */}
-            <Route path="orders" element={<PlaceholderPage title="Orders" description="View and process customer orders through all lifecycle stages." phase={6} />} />
-            <Route path="reviews" element={<PlaceholderPage title="Reviews" description="Manage customer reviews and respond to feedback." phase={6} />} />
-            <Route path="analytics" element={<VendorAnalyticsPage />} />
-            <Route path="reports" element={<PlaceholderPage title="Reports" description="Download sales and product performance reports." phase={6} />} />
-            <Route path="commission" element={<PlaceholderPage title="Commission" description="View your commission summary and transaction ledger." phase={4} />} />
+            {/* Phase 6 */}
+            <Route path="orders" element={<OrdersPage />} />
+            <Route path="reviews" element={<ReviewsPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="commission" element={<CommissionPageVendor />} />
           </Route>
 
           {/* ─── Catch-all ─── */}

@@ -72,22 +72,23 @@ const validateStoreLocationUpdate = (body) => {
     throw new ApiError(400, "Invalid request body");
   }
 
-  const { address, lat, lng, deliveryRadiusKm, operatingHours } = body;
+  const { address, addressDetails, lat, lng, deliveryRadiusKm, operatingHours } = body;
 
   const hasAddress = address !== undefined;
+  const hasAddressDetails = addressDetails !== undefined;
   const hasLat     = lat !== undefined;
   const hasLng     = lng !== undefined;
 
   // Must provide at least one field to update
   const hasAnything =
-    hasAddress || hasLat || hasLng ||
+    hasAddress || hasAddressDetails || hasLat || hasLng ||
     deliveryRadiusKm !== undefined ||
     operatingHours !== undefined;
 
   if (!hasAnything) {
     throw new ApiError(
       400,
-      "Provide at least one field: address, lat/lng, deliveryRadiusKm, or operatingHours"
+      "Provide at least one field: address, addressDetails, lat/lng, deliveryRadiusKm, or operatingHours"
     );
   }
 

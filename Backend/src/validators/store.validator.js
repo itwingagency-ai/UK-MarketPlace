@@ -5,10 +5,10 @@ const validateSettingsPayload = (payload) => {
     throw new ApiError(400, "Invalid settings payload");
   }
 
-  if (payload.branding && payload.branding.displayName !== undefined) {
-    const name = payload.branding.displayName.trim();
+  if (payload.storeName !== undefined) {
+    const name = payload.storeName.trim();
     if (name.length > 120) {
-      throw new ApiError(400, "branding.displayName must be 120 characters or less");
+      throw new ApiError(400, "storeName must be 120 characters or less");
     }
   }
 };

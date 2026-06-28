@@ -45,6 +45,11 @@ const storeSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    description: {
+      type: String,
+      default: "",
+      maxlength: 2000,
+    },
     status: {
       type: String,
       enum: STORE_STATUS,

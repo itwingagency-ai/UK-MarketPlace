@@ -14,10 +14,10 @@
 | 1     | Core System Foundation                  | ✅ Done         |
 | 2     | Authentication & Access Control         | ✅ Done         |
 | 3     | Shared UI Architecture & CRUD Framework | ✅ Done         |
-| 4     | Vendor Dashboard & Store Management     | ⬜ Pending      |
+| 4     | Vendor Dashboard & Store Management     | ✅ Done         |
 | 5     | Product, Inventory & Category Management| ✅ Done         |
-| 6     | Order Management, Reviews & Analytics   | ⬜ Pending      |
-| 7     | Admin Panel & Platform Control          | ⬜ Pending      |
+| 6     | Order Management, Reviews & Analytics   | ✅ Done         |
+| 7     | Admin Panel & Platform Control          | ✅ Done         |
 
 ---
 
@@ -126,7 +126,7 @@
 
 ---
 
-## Phase 6 — Order Management, Reviews & Analytics ⬜
+## Phase 6 — Order Management, Reviews & Analytics ✅
 
 **Goal**: Full order lifecycle management and customer review tools.
 
@@ -143,16 +143,16 @@
 
 ### Deliverables
 
-- [ ] Orders list — filter by status, date range, search
-- [ ] Order detail page — customer info, items, payment, shipping events timeline
-- [ ] Order status update controls
-- [ ] Reviews list — rating distribution, respond, hide/unhide
-- [ ] Analytics dashboard — charts for sales trend, category breakdown, customer insights
-- [ ] Sales & product performance reports (downloadable CSV)
+- [x] Orders list — filter by status, date range, search
+- [x] Order detail page — customer info, items, payment, shipping events timeline
+- [x] Order status update controls
+- [x] Reviews list — rating distribution, respond, hide/unhide
+- [x] Analytics dashboard — charts for sales trend, category breakdown, customer insights
+- [x] Sales & product performance reports (downloadable CSV)
 
 ---
 
-## Phase 7 — Admin Panel & Platform Control ⬜
+## Phase 7 — Admin Panel & Platform Control ✅
 
 **Goal**: Super-admin view of the entire platform.
 
@@ -172,16 +172,16 @@
 
 ### Deliverables
 
-- [ ] Admin dashboard — platform KPIs, recent activity, top stores
-- [ ] Users management — list, view, suspend/reactivate
+- [x] Admin dashboard — platform KPIs, recent activity, top stores
+- [x] Users management — list, view, suspend/reactivate
 - [x] Stores management — list, view, suspend/reactivate, set commission
 - [x] Vendor applications — review queue, approve/reject with notes
-- [ ] All orders — cross-store order view
-- [ ] Platform settings — commission rate, payment config
-- [ ] Notification templates — event-based template editor
-- [ ] Notification log — delivery history
-- [ ] Reviews moderation — reports queue, approve/remove reviews
-- [ ] Admin analytics — platform growth, revenue, store performance
+- [x] All orders — cross-store order view
+- [x] Platform settings — commission rate, payment config
+- [x] Notification templates — event-based template editor
+- [x] Notification log — delivery history
+- [x] Reviews moderation — reports queue, approve/remove reviews
+- [x] Admin analytics — platform growth, revenue, store performance
 
 ---
 

@@ -27,6 +27,7 @@ export default function SignUpPage() {
   // Step 2 – Store / Vendor Application
   const [storeName, setStoreName] = useState('');
   const [slug, setSlug] = useState('');
+  const [slugStatus, setSlugStatus] = useState(''); // 'checking', 'available', 'taken', ''
   const [description, setDescription] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
@@ -38,14 +39,14 @@ export default function SignUpPage() {
   /* ── Auto-generate slug from store name ──────────────────────────── */
   const handleStoreNameChange = (val) => {
     setStoreName(val);
-    setSlug(
-      val
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-    );
+    const baseSlug = val
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    const randomSuffix = Math.floor(Math.random() * 10000);
+    setSlug(`${baseSlug}-${randomSuffix}`);
   };
 
   /* ── Validation ──────────────────────────────────────────────────── */
@@ -60,13 +61,36 @@ export default function SignUpPage() {
     return null;
   };
 
-  const validateStep2 = () => {
+  const validateStep2 = async () => {
     if (!storeName.trim() || storeName.trim().length < 2)
       return 'Store name must be at least 2 characters.';
-    if (!slug || slug.length < 2) return 'Store URL slug is required.';
-    const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-    if (!slugRegex.test(slug))
-      return 'Slug must be lowercase letters, numbers, and hyphens only.';
+
+    if (!addressLine1.trim()) return 'Address Line 1 is required.';
+    if (!addressCity.trim()) return 'City is required.';
+    if (!addressPostalCode.trim()) return 'Postal Code is required.';
+    if (!addressCountry.trim()) return 'Country is required.';
+
+    try {
+      const isUK = ['united kingdom', 'uk', 'great britain', 'gb'].includes(addressCountry.trim().toLowerCase());
+      
+      if (isUK) {
+        // Strict UK validation
+        const response = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(addressPostalCode.trim())}/validate`);
+        const data = await response.json();
+        if (!data.result) {
+          return 'Invalid UK Postal Code.';
+        }
+      } else {
+        // Generic international validation (3-10 chars, alphanumeric/spaces/hyphens)
+        const intlRegex = /^[a-zA-Z0-9\s-]{3,10}$/;
+        if (!intlRegex.test(addressPostalCode.trim())) {
+          return 'Invalid Postal Code format.';
+        }
+      }
+    } catch (e) {
+      return 'Unable to verify postal code. Please try again.';
+    }
+
     return null;
   };
 
@@ -96,13 +120,13 @@ export default function SignUpPage() {
       return;
     }
 
-    const err = validateStep2();
+    setSubmitting(true);
+    const err = await validateStep2();
     if (err) {
       setError(err);
+      setSubmitting(false);
       return;
     }
-
-    setSubmitting(true);
     try {
       // 1. Register as a customer
       const registerRes = await authService.register(name.trim(), email.trim(), password);
@@ -323,28 +347,6 @@ export default function SignUpPage() {
                   />
                 </div>
 
-                <div className="auth-form-row">
-                  <label className="form-label" htmlFor="signup-slug">
-                    Store URL Slug*
-                  </label>
-                  <input
-                    id="signup-slug"
-                    className="form-input"
-                    type="text"
-                    placeholder="my-awesome-store"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value.toLowerCase())}
-                  />
-                  <span
-                    style={{
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--gray-500)',
-                      marginTop: 'var(--space-1)',
-                    }}
-                  >
-                    marketplace.co.uk/stores/{slug || '...'}
-                  </span>
-                </div>
 
                 <div className="auth-form-row">
                   <label className="form-label" htmlFor="signup-description">
@@ -391,7 +393,7 @@ export default function SignUpPage() {
 
                 <div className="auth-form-row">
                   <label className="form-label" htmlFor="signup-address">
-                    Address Line 1
+                    Address Line 1*
                   </label>
                   <input
                     id="signup-address"
@@ -419,7 +421,7 @@ export default function SignUpPage() {
 
                 <div className="auth-form-row">
                   <label className="form-label" htmlFor="signup-postal">
-                    Postal Code
+                    Postal Code*
                   </label>
                   <input
                     id="signup-postal"

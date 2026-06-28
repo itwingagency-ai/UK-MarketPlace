@@ -75,7 +75,6 @@ const vendorNav = [
     items: [
       { to: '/vendor/orders', icon: ShoppingCart, text: 'Orders' },
       { to: '/vendor/reviews', icon: Star, text: 'Reviews' },
-      { to: '/vendor/analytics', icon: BarChart3, text: 'Analytics' },
       { to: '/vendor/reports', icon: FileText, text: 'Reports' },
     ],
   },
@@ -94,7 +93,8 @@ const vendorNav = [
 export default function Sidebar({ role }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const sections = role === 'admin' ? adminNav : vendorNav;
+  const isAdminRole = ['admin', 'superadmin', 'super_admin', 'super-admin', 'super admin'].includes(role?.toLowerCase());
+  const sections = isAdminRole ? adminNav : vendorNav;
 
   const handleLogout = async () => {
     await logout();
@@ -120,7 +120,7 @@ export default function Sidebar({ role }) {
         <div>
           <div className="sidebar-brand-text">UK Marketplace</div>
           <div className="sidebar-brand-role">
-            {role === 'admin' ? 'Admin Portal' : 'Vendor Portal'}
+            {isAdminRole ? 'Admin Portal' : 'Vendor Portal'}
           </div>
         </div>
       </div>

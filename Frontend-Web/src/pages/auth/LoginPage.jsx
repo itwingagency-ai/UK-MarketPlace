@@ -20,7 +20,7 @@ export default function LoginPage() {
 
   // If already logged in, redirect based on role
   if (isAuthenticated && user) {
-    if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+    if (['admin', 'superadmin', 'super_admin', 'super-admin', 'super admin'].includes(user.role?.toLowerCase())) return <Navigate to="/admin/dashboard" replace />;
     if (user.role === 'vendor') return <Navigate to="/vendor/dashboard" replace />;
   }
 
@@ -46,12 +46,13 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const loggedInUser = await login(email.trim(), password);
+      const userRole = loggedInUser.role?.toLowerCase();
 
-      if (loggedInUser.role === 'admin') {
+      if (['admin', 'superadmin', 'super_admin', 'super-admin', 'super admin'].includes(userRole)) {
         navigate('/admin/dashboard', { replace: true });
-      } else if (loggedInUser.role === 'vendor') {
+      } else if (userRole === 'vendor') {
         navigate('/vendor/dashboard', { replace: true });
-      } else if (loggedInUser.role === 'customer') {
+      } else if (userRole === 'customer') {
         // Customer trying to log in — check if they have a pending vendor application
         try {
           const { data } = await client.get('/vendor-applications/me');

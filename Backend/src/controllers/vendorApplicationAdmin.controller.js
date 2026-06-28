@@ -94,6 +94,7 @@ const approveWithCompensation = async (
       name: storeName,
       slug,
       owner: applicant._id,
+      description: application.description || "",
       status: "active",
       contact: {
         phone: application.contact?.phone || "",
@@ -282,6 +283,7 @@ const approveApplication = asyncHandler(async (req, res) => {
           name: storeName,
           slug,
           owner: applicant._id,
+          description: application.description || "",
           status: "active",
           contact: {
             phone: application.contact?.phone || "",
