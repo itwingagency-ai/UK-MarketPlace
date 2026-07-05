@@ -61,6 +61,17 @@ export const vendorService = {
     return data;
   },
 
+  /* ── Commission ──────────────────────────────────────────────────────── */
+  getCommissionSummary: async (params) => {
+    const { data } = await client.get('/vendor/dashboard/commission/summary', { params });
+    return data;
+  },
+  getCommissionLedger: async (params) => {
+    const { data } = await client.get('/vendor/dashboard/commission/ledger', { params });
+    return data;
+  },
+
+
   /* ── Categories ─────────────────────────────────────────────────────── */
   getCategories: async () => {
     const { data } = await client.get('/vendor/dashboard/categories');
