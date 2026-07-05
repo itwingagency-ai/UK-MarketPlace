@@ -6,8 +6,7 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 
 export default function CommissionPage() {
   const [loading, setLoading] = useState(true);
-  const [overview, setOverview] = useState(null);
-  const [settings, setSettings] = useState(null);
+  const [summary, setSummary] = useState(null);
 
   // Ledger state
   const [orders, setOrders] = useState([]);
@@ -18,8 +17,7 @@ export default function CommissionPage() {
   const fetchLedger = useCallback(async (currentPage) => {
     try {
       setOrdersLoading(true);
-      // Fetch delivered orders to form the commission ledger
-      const res = await vendorService.getOrders({ page: currentPage, limit: 10, status: 'delivered' });
+      const res = await vendorService.getCommissionLedger({ page: currentPage, limit: 10 });
       setOrders(res.data || []);
       setTotalOrders(res.total || 0);
     } catch (err) {
@@ -30,24 +28,18 @@ export default function CommissionPage() {
   }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchSummary = async () => {
       try {
         setLoading(true);
-        // Try to get commission rate from settings or overview
-        const [overviewData, settingsData] = await Promise.all([
-          vendorService.getDashboardOverview().catch(() => null),
-          vendorService.getStoreSettings().catch(() => null)
-        ]);
-        
-        setOverview(overviewData);
-        setSettings(settingsData);
+        const res = await vendorService.getCommissionSummary();
+        setSummary(res.data);
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
+    fetchSummary();
   }, []);
 
   useEffect(() => {
@@ -67,10 +59,19 @@ export default function CommissionPage() {
     );
   }
 
-  // Attempt to extract commission rate, defaulting to 15 if not provided by backend yet
-  const commissionRate = settings?.commissionRate ?? overview?.commissionRate ?? 15;
-  const totalSales = overview?.sales?.current || 0;
-  const estimatedCommissionPaid = (totalSales * commissionRate) / 100;
+  const commissionRate = (summary?.effectiveConfig?.rate ?? 0) * 100;
+  const commissionType = summary?.effectiveConfig?.type ?? 'percentage';
+  const commissionFixed = summary?.effectiveConfig?.fixed ?? 0;
+  
+  const renderCommissionConfig = () => {
+    if (commissionType === 'percentage') return `${commissionRate}%`;
+    if (commissionType === 'fixed') return formatCurrency(commissionFixed);
+    if (commissionType === 'both') return `${commissionRate}% + ${formatCurrency(commissionFixed)}`;
+    return 'N/A';
+  };
+
+  const totalSales = summary?.totals?.revenue || 0;
+  const totalCommissionPaid = summary?.totals?.commission || 0;
 
   const columns = [
     {
@@ -83,7 +84,7 @@ export default function CommissionPage() {
       ),
     },
     {
-      key: 'createdAt',
+      key: 'placedAt',
       label: 'Date',
       render: (v) => <span style={{ fontSize: 'var(--text-sm)' }}>{formatDate(v)}</span>,
     },
@@ -93,24 +94,31 @@ export default function CommissionPage() {
       render: (v) => <strong style={{ color: 'var(--gray-900)' }}>{formatCurrency(v || 0)}</strong>,
     },
     {
-      key: 'commissionRateCol',
-      label: 'Comm. Rate',
-      render: () => <span className="badge badge-neutral">{commissionRate}%</span>,
+      key: 'commissionConfig',
+      label: 'Comm. Config',
+      render: (_, row) => {
+        const cType = row.commission?.type;
+        if (!cType) return <span className="badge badge-neutral">N/A</span>;
+        let text = '';
+        if (cType === 'percentage') text = `${(row.commission.rate * 100).toFixed(1)}%`;
+        else if (cType === 'fixed') text = formatCurrency(row.commission.fixed);
+        else if (cType === 'both') text = `${(row.commission.rate * 100).toFixed(1)}% + ${formatCurrency(row.commission.fixed)}`;
+        return <span className="badge badge-neutral">{text}</span>;
+      },
     },
     {
       key: 'commissionFee',
       label: 'Comm. Fee',
       render: (_, row) => {
-        const fee = ((row.total || 0) * commissionRate) / 100;
+        const fee = row.commission?.amount || 0;
         return <span style={{ color: '#ef4444', fontWeight: 500 }}>-{formatCurrency(fee)}</span>;
       },
     },
     {
-      key: 'netEarnings',
+      key: 'netPayout',
       label: 'Net Earnings',
       render: (_, row) => {
-        const fee = ((row.total || 0) * commissionRate) / 100;
-        const net = (row.total || 0) - fee;
+        const net = row.netPayout || 0;
         return <strong style={{ color: '#10b981' }}>{formatCurrency(net)}</strong>;
       },
     },
@@ -130,12 +138,12 @@ export default function CommissionPage() {
       <div className="grid grid-cols-2" style={{ gap: 'var(--space-6)', marginBottom: 'var(--space-6)' }}>
         <div className="card stat-card">
           <div className="stat-card-header">
-            <span className="stat-card-label">Current Commission Rate</span>
+            <span className="stat-card-label">Current Commission Config</span>
             <div className="stat-card-icon" style={{ background: 'var(--primary-100)', color: 'var(--primary-600)' }}>
               <Percent size={18} />
             </div>
           </div>
-          <div className="stat-card-value">{commissionRate}%</div>
+          <div className="stat-card-value">{renderCommissionConfig()}</div>
           <div className="stat-card-trend">
             <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
               Applied to all successful orders
@@ -145,12 +153,12 @@ export default function CommissionPage() {
 
         <div className="card stat-card">
           <div className="stat-card-header">
-            <span className="stat-card-label">Est. Total Commission Paid</span>
+            <span className="stat-card-label">Total Commission Paid</span>
             <div className="stat-card-icon warning">
               <DollarSign size={18} />
             </div>
           </div>
-          <div className="stat-card-value">{formatCurrency(estimatedCommissionPaid)}</div>
+          <div className="stat-card-value">{formatCurrency(totalCommissionPaid)}</div>
           <div className="stat-card-trend">
             <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
               Based on total sales of {formatCurrency(totalSales)}
@@ -162,7 +170,7 @@ export default function CommissionPage() {
       <div className="card">
         <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <FileText size={18} />
-          <h3 style={{ margin: 0 }}>Transaction Ledger (Delivered Orders)</h3>
+          <h3 style={{ margin: 0 }}>Transaction Ledger (Paid Orders)</h3>
         </div>
         
         <DataTable
@@ -173,9 +181,9 @@ export default function CommissionPage() {
           page={page}
           pageSize={10}
           onPageChange={setPage}
-          rowKey="_id"
+          rowKey="id"
           emptyTitle="No Completed Transactions"
-          emptyText="Commission is calculated when an order is successfully delivered. You have no delivered orders yet."
+          emptyText="Commission is calculated when an order is successfully paid. You have no paid orders yet."
         />
       </div>
     </div>

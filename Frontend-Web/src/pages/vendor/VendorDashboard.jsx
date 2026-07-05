@@ -20,15 +20,6 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
-/* ── Quick Action Links ─────────────────────────────────────────────── */
-const quickActions = [
-  { to: '/vendor/products', icon: Package, label: 'Products', color: '#6366f1' },
-  { to: '/vendor/orders', icon: ShoppingCart, label: 'Orders', color: '#10b981' },
-  { to: '/vendor/settings', icon: Settings, label: 'Settings', color: '#f59e0b' },
-  { to: '/vendor/shipping', icon: Truck, label: 'Shipping', color: '#8b5cf6' },
-  { to: '/vendor/operating-hours', icon: Clock, label: 'Hours', color: '#ec4899' },
-  { to: '/vendor/analytics', icon: TrendingUp, label: 'Analytics', color: '#06b6d4' },
-];
 
 /* ── Stat Config ────────────────────────────────────────────────────── */
 const statConfig = [
@@ -271,9 +262,9 @@ export default function VendorDashboard() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                       <div style={{ fontWeight: 600, fontSize: 'var(--text-md)' }}>
-                        £{Number(order.totalAmount).toFixed(2)}
+                        £{Number(order.totalAmount || order.total || 0).toFixed(2)}
                       </div>
-                      <StatusBadge status={order.status} size="sm" />
+                      <StatusBadge status={order.status || order.orderStatus} size="sm" />
                     </div>
                   </li>
                 ))}
@@ -283,57 +274,6 @@ export default function VendorDashboard() {
         </div>
       </div>
 
-      {/* ── Quick Actions ── */}
-      <div className="card">
-        <div className="card-header">
-          <h3>Quick Actions</h3>
-        </div>
-        <div className="card-body">
-          <div className="grid grid-cols-6" style={{ gap: 'var(--space-3)' }}>
-            {quickActions.map((action) => (
-              <Link
-                key={action.to}
-                to={action.to}
-                className="quick-action-card"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: 'var(--space-4) var(--space-2)',
-                  borderRadius: 'var(--radius-lg)',
-                  border: '1px solid var(--border-color)',
-                  textDecoration: 'none',
-                  color: 'var(--text-primary)',
-                  transition: 'all var(--transition-base)',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = action.color;
-                  e.currentTarget.style.boxShadow = `0 2px 12px ${action.color}20`;
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--border-color)';
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
-              >
-                <div style={{
-                  width: 40, height: 40,
-                  borderRadius: 'var(--radius-lg)',
-                  background: `${action.color}12`,
-                  color: action.color,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <action.icon size={20} />
-                </div>
-                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 500 }}>{action.label}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
