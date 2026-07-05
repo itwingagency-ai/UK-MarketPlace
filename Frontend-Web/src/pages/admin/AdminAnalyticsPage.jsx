@@ -1,16 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '../../api/adminService';
-import { PageHeader, StatCard, Skeleton } from '../../components/common';
+import { PageHeader, Skeleton } from '../../components/common';
 import toast from 'react-hot-toast';
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
 } from 'recharts';
-import {
-  DollarSign, ShoppingCart, TrendingUp,
-  BarChart3, Store,
-} from 'lucide-react';
+import { BarChart3, Store } from 'lucide-react';
 
 /* ── Chart Colors ─────────────────────────────────────────────────── */
 const COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#ede9fe'];
@@ -75,7 +72,11 @@ export default function AdminAnalyticsPage() {
 
       if (trendRes.status === 'fulfilled') {
         setSalesTrend(trendRes.value?.data?.series || []);
+      } else {
+        toast.error('Failed to load sales analytics');
+        console.error(trendRes.reason);
       }
+
       if (topStoresRes.status === 'fulfilled') {
         const storesData = topStoresRes.value?.data || [];
         const stores = storesData.map(s => ({
@@ -86,9 +87,13 @@ export default function AdminAnalyticsPage() {
           totalRevenue: s.revenue
         }));
         setTopStores(stores);
+      } else {
+        toast.error('Failed to load top stores data');
+        console.error(topStoresRes.reason);
       }
-    } catch {
-      toast.error('Failed to load analytics');
+    } catch (error) {
+      toast.error('An unexpected error occurred while loading analytics');
+      console.error(error);
     } finally {
       setLoading(false);
     }

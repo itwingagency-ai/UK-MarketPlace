@@ -9,6 +9,7 @@ import client from '../api/client';
  */
 export default function useFetch(url, options = {}) {
   const { immediate = true, params = {} } = options;
+  const paramsString = JSON.stringify(params);
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(immediate);
@@ -29,7 +30,7 @@ export default function useFetch(url, options = {}) {
 
       try {
         const res = await client.get(url, {
-          params: overrideParams || params,
+          params: overrideParams || JSON.parse(paramsString),
           signal: controller.signal,
         });
         setData(res.data);
@@ -43,8 +44,7 @@ export default function useFetch(url, options = {}) {
         setLoading(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [url]
+    [url, paramsString]
   );
 
   useEffect(() => {

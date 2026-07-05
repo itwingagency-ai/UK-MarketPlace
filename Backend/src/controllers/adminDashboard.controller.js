@@ -151,16 +151,37 @@ const salesAnalytics = asyncHandler(async (req, res) => {
     { $sort: { _id: 1 } },
   ]);
 
-  res.status(200).json({
-    data: {
-      since,
-      days,
-      series: series.map((point) => ({
+  const seriesMap = new Map(series.map((point) => [point._id, point]));
+  const filledSeries = [];
+
+  for (let i = 0; i < days; i++) {
+    const d = new Date(since);
+    d.setUTCDate(since.getUTCDate() + i);
+    const dateStr = d.toISOString().split("T")[0];
+
+    if (seriesMap.has(dateStr)) {
+      const point = seriesMap.get(dateStr);
+      filledSeries.push({
         date: point._id,
         revenue: point.revenue,
         commission: point.commission,
         orders: point.orders,
-      })),
+      });
+    } else {
+      filledSeries.push({
+        date: dateStr,
+        revenue: 0,
+        commission: 0,
+        orders: 0,
+      });
+    }
+  }
+
+  res.status(200).json({
+    data: {
+      since,
+      days,
+      series: filledSeries,
     },
   });
 });

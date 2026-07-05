@@ -8,9 +8,15 @@ import toast from 'react-hot-toast';
 export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
   
   const { data, loading, error, refetch } = useFetch('/admin/users', {
-    params: { page, limit: 20, status: filter || undefined },
+    params: { 
+      page, 
+      limit: 20, 
+      status: filter || undefined,
+      role: roleFilter || undefined 
+    },
   });
 
   const users = data?.data || [];
@@ -60,18 +66,33 @@ export default function UsersPage() {
       <div className="card">
         <div className="card-header">
           <h3>Platform Users ({total})</h3>
-          <select 
-            className="form-select" 
-            value={filter} 
-            onChange={(e) => {
-              setFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="suspended">Suspended</option>
-          </select>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <select 
+              className="form-select" 
+              value={roleFilter} 
+              onChange={(e) => {
+                setRoleFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All Roles</option>
+              <option value="customer">Customer</option>
+              <option value="vendor">Vendor</option>
+            </select>
+
+            <select 
+              className="form-select" 
+              value={filter} 
+              onChange={(e) => {
+                setFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </div>
         </div>
 
         <div className="data-table-wrapper">

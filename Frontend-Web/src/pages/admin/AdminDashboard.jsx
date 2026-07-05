@@ -6,11 +6,34 @@ import {
   Package,
   DollarSign,
   Users,
-  Store
+  Store,
+  FileText,
+  UserPlus
 } from 'lucide-react';
 import { adminService } from '../../api/adminService';
 import { formatCurrency } from '../../utils/formatters';
 import toast from 'react-hot-toast';
+
+const getRelativeTime = (dateString) => {
+  const now = new Date();
+  const date = new Date(dateString);
+  const diffInSeconds = Math.floor((now - date) / 1000);
+  
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  return `${Math.floor(diffInSeconds / 86400)}d ago`;
+};
+
+const getActivityConfig = (type) => {
+  switch (type) {
+    case 'order': return { icon: ShoppingCart, color: 'var(--status-green)', bg: 'var(--success-bg)' };
+    case 'application': return { icon: FileText, color: 'var(--status-orange)', bg: 'var(--warning-bg)' };
+    case 'store': return { icon: Store, color: 'var(--aa-green)', bg: 'var(--aa-green-light)' };
+    case 'user': return { icon: UserPlus, color: 'var(--info-text)', bg: 'var(--info-bg)' };
+    default: return { icon: LayoutDashboard, color: 'var(--gray-600)', bg: 'var(--gray-100)' };
+  }
+};
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
@@ -50,24 +73,28 @@ export default function AdminDashboard() {
           const normalizedActivity = [];
           if (actData.recentOrders) {
             actData.recentOrders.forEach(o => normalizedActivity.push({
+              type: 'order',
               description: `New order ${o.orderNumber || ''} placed`,
               createdAt: o.createdAt
             }));
           }
           if (actData.pendingApplications) {
             actData.pendingApplications.forEach(a => normalizedActivity.push({
+              type: 'application',
               description: `New vendor application from ${a.applicant?.name || 'Unknown'}`,
               createdAt: a.createdAt
             }));
           }
           if (actData.recentStores) {
             actData.recentStores.forEach(s => normalizedActivity.push({
+              type: 'store',
               description: `New store ${s.name} created`,
               createdAt: s.createdAt
             }));
           }
           if (actData.recentUsers) {
             actData.recentUsers.forEach(u => normalizedActivity.push({
+              type: 'user',
               description: `New user ${u.name} registered`,
               createdAt: u.createdAt
             }));
@@ -168,16 +195,30 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <ul className="list" style={{ marginTop: 'var(--space-2)' }}>
-                {activity.map((act, idx) => (
-                  <li key={idx} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontWeight: 500 }}>{act.description}</span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
-                        {new Date(act.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </li>
-                ))}
+                {activity.map((act, idx) => {
+                  const config = getActivityConfig(act.type);
+                  const Icon = config.icon;
+                  return (
+                    <li key={idx} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                      <div style={{ 
+                        width: 36, height: 36, borderRadius: 'var(--radius-full)', 
+                        backgroundColor: config.bg, color: config.color,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <Icon size={16} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 500, fontSize: 'var(--text-md)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {act.description}
+                        </div>
+                        <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+                          {getRelativeTime(act.createdAt)}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -200,12 +241,12 @@ export default function AdminDashboard() {
               <ul className="list" style={{ marginTop: 'var(--space-2)' }}>
                 {topStores.map((store, idx) => (
                   <li key={store._id || idx} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                    <div className="avatar" style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="avatar" style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       {store.logo ? <img src={store.logo} alt={store.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-md)' }} /> : <Store size={20} className="text-muted" />}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 500 }}>{store.name}</div>
-                      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{store.totalOrders} Orders</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{store.name}</div>
+                      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{store.totalOrders} Orders</div>
                     </div>
                     <div style={{ fontWeight: 600 }}>
                       {formatCurrency(store.totalRevenue)}

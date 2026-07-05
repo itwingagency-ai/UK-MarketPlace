@@ -30,7 +30,7 @@ const listUsers = asyncHandler(async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
   const skip = (page - 1) * limit;
 
-  const filter = {};
+  const filter = { role: { $ne: 'admin' } };
 
   if (req.query.role) {
     if (!ALLOWED_USER_ROLES.includes(req.query.role)) {
