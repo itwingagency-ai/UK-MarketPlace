@@ -72,7 +72,7 @@ const validateStoreLocationUpdate = (body) => {
     throw new ApiError(400, "Invalid request body");
   }
 
-  const { address, addressDetails, lat, lng, deliveryRadiusKm, operatingHours } = body;
+  const { address, addressDetails, lat, lng, deliveryRadiusKm, operatingHours, timezone } = body;
 
   const hasAddress = address !== undefined;
   const hasAddressDetails = addressDetails !== undefined;
@@ -83,13 +83,18 @@ const validateStoreLocationUpdate = (body) => {
   const hasAnything =
     hasAddress || hasAddressDetails || hasLat || hasLng ||
     deliveryRadiusKm !== undefined ||
-    operatingHours !== undefined;
+    operatingHours !== undefined ||
+    timezone !== undefined;
 
   if (!hasAnything) {
     throw new ApiError(
       400,
-      "Provide at least one field: address, addressDetails, lat/lng, deliveryRadiusKm, or operatingHours"
+      "Provide at least one field: address, addressDetails, lat/lng, deliveryRadiusKm, timezone, or operatingHours"
     );
+  }
+
+  if (timezone !== undefined && typeof timezone !== "string") {
+    throw new ApiError(400, "timezone must be a string");
   }
 
   // If supplying coordinates, both are required

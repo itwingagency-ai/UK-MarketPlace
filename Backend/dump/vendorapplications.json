@@ -1,0 +1,28 @@
+[
+  {
+    "_id": "6a46372cd3c65b8a73c48ec3",
+    "applicant": "6a46372cd3c65b8a73c48ec0",
+    "storeName": "test-user-2",
+    "slug": "test-user-2-636",
+    "description": "we deliver all items",
+    "contact": {
+      "phone": "+923364452671",
+      "email": "testuser2@store.com"
+    },
+    "address": {
+      "line1": "Pasrur road, Fareed Town",
+      "line2": "",
+      "city": "Lahore",
+      "state": "",
+      "postalCode": "52132",
+      "country": "Pakistan"
+    },
+    "status": "approved",
+    "reviewedBy": "6a4634589ebf0497f0fdfe9e",
+    "reviewedAt": "2026-07-02T10:04:41.108Z",
+    "adminNote": "",
+    "createdAt": "2026-07-02T10:02:20.703Z",
+    "updatedAt": "2026-07-02T10:04:41.108Z",
+    "__v": 0
+  }
+]

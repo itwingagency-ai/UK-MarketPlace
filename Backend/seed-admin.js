@@ -4,24 +4,31 @@ const User = require("./src/models/User");
 
 const seedAdmin = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/uk_marketplace");
+    await mongoose.connect(process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/multistore");
     console.log("Connected to MongoDB");
 
-    const email = "admin@marketplace.co.uk";
-    
-    let adminUser = await User.findOne({ email });
-    
-    if (adminUser) {
-      console.log("Admin user already exists");
-    } else {
-      adminUser = await User.create({
+    const admins = [
+      {
         name: "Super Admin",
-        email: email,
-        password: "password123", // Will be hashed by pre-save hook
+        email: "superadmin@marketplace.co.uk",
+        password: "abdullah2@12",
         role: "admin",
         status: "active",
-      });
-      console.log("Admin user created successfully!");
+      }
+    ];
+
+    for (const adminData of admins) {
+      let adminUser = await User.findOne({ email: adminData.email });
+
+      if (adminUser) {
+        console.log(`User ${adminData.email} already exists. Updating password...`);
+        adminUser.password = adminData.password;
+        await adminUser.save(); // The pre-save hook in User model will hash the password automatically
+        console.log(`Password for ${adminData.email} updated and hashed successfully!`);
+      } else {
+        await User.create(adminData); // The pre-save hook hashes the password on creation
+        console.log(`User ${adminData.email} created and password hashed successfully!`);
+      }
     }
   } catch (error) {
     console.error("Error seeding admin:", error);

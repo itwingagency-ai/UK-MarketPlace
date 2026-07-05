@@ -141,6 +141,7 @@ const replaceOperatingHours = asyncHandler(async (req, res) => {
   }
 
   store.operatingHours = currentHours;
+  store.markModified("operatingHours");
   await store.save();
 
   res.status(200).json({
@@ -187,6 +188,7 @@ const updateDay = asyncHandler(async (req, res) => {
   }
 
   store.operatingHours = currentHours;
+  store.markModified("operatingHours");
   await store.save();
 
   res.status(200).json({
@@ -219,6 +221,7 @@ const closeDay = asyncHandler(async (req, res) => {
   }
 
   store.operatingHours = currentHours;
+  store.markModified("operatingHours");
   await store.save();
 
   res.status(200).json({

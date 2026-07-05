@@ -159,6 +159,10 @@ const updateStore = asyncHandler(async (req, res) => {
     store.deliveryRadiusKm = r;
   }
 
+  if (req.body.timezone !== undefined) {
+    store.timezone = req.body.timezone;
+  }
+
   await store.save();
   res.status(200).json({ message: "Store updated", data: store });
 });

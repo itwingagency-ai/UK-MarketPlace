@@ -1,0 +1,85 @@
+[
+  {
+    "_id": "6a4638f3d3c65b8a73c48ecb",
+    "store": "6a4637b9d3c65b8a73c48ec6",
+    "title": "Burger",
+    "slug": "burger",
+    "description": "Enriched with beef",
+    "price": 6,
+    "compareAtPrice": 9,
+    "stock": 14,
+    "category": "6a463807d3c65b8a73c48eca",
+    "images": [],
+    "options": [],
+    "variants": [
+      {
+        "sku": "",
+        "attributes": {
+          "description": "Cheesy Burger"
+        },
+        "price": 7,
+        "compareAtPrice": null,
+        "stock": 2,
+        "images": [],
+        "isActive": true,
+        "_id": "6a4638f3d3c65b8a73c48ecc",
+        "createdAt": "2026-07-02T10:09:55.636Z",
+        "updatedAt": "2026-07-02T11:07:23.885Z"
+      },
+      {
+        "sku": "",
+        "attributes": {
+          "description": "Smash Burger"
+        },
+        "price": 8,
+        "compareAtPrice": null,
+        "stock": 3,
+        "images": [],
+        "isActive": true,
+        "_id": "6a46392cd3c65b8a73c48ed0",
+        "createdAt": "2026-07-02T10:10:52.487Z",
+        "updatedAt": "2026-07-02T11:07:23.886Z"
+      }
+    ],
+    "isActive": true,
+    "averageRating": 0,
+    "ratingCount": 0,
+    "ratingDistribution": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0
+    },
+    "createdAt": "2026-07-02T10:09:55.636Z",
+    "updatedAt": "2026-07-04T21:34:45.151Z",
+    "__v": 1
+  },
+  {
+    "_id": "6a4639fb7a3657502a655dd4",
+    "store": "6a4639fb7a3657502a655dd2",
+    "title": "Test Dummy Product",
+    "slug": "test-dummy-product",
+    "description": "",
+    "price": 99.99,
+    "compareAtPrice": null,
+    "stock": 50,
+    "category": null,
+    "images": [],
+    "isActive": true,
+    "averageRating": 0,
+    "ratingCount": 0,
+    "ratingDistribution": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0
+    },
+    "options": [],
+    "variants": [],
+    "createdAt": "2026-07-02T10:14:19.062Z",
+    "updatedAt": "2026-07-02T10:14:19.062Z",
+    "__v": 0
+  }
+]

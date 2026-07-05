@@ -32,7 +32,8 @@ const isReplicaSetTransactionError = (err) => {
     err?.name === "MongoServerError" &&
     (msg.includes("replica set") ||
       msg.includes("mongos") ||
-      msg.includes("Transaction numbers"))
+      msg.includes("Transaction numbers") ||
+      msg.includes("retryable writes"))
   );
 };
 

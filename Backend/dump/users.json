@@ -1,0 +1,72 @@
+[
+  {
+    "_id": "6a4634589ebf0497f0fdfe9e",
+    "name": "Admin",
+    "email": "admin@marketplace.co.uk",
+    "phone": "",
+    "password": "$2b$12$e8uYdwdugpvHUe43wgQ8ceTP778IzzzHb/j3y22T7R9klegrb3ilW",
+    "role": "admin",
+    "status": "active",
+    "storeId": null,
+    "addresses": [],
+    "createdAt": "2026-07-02T09:50:16.162Z",
+    "updatedAt": "2026-07-02T09:50:16.162Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a4634589ebf0497f0fdfe9f",
+    "name": "Super Admin",
+    "email": "superadmin@marketplace.co.uk",
+    "phone": "",
+    "password": "$2b$12$JH20L.op8JZjw8qCDypbq.qUDTfXXqSzlrspoocBFlWTYLnV29h2y",
+    "role": "admin",
+    "status": "active",
+    "storeId": null,
+    "addresses": [],
+    "createdAt": "2026-07-02T09:50:16.689Z",
+    "updatedAt": "2026-07-02T09:50:16.689Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a46372cd3c65b8a73c48ec0",
+    "name": "Test User 1",
+    "email": "testuser1@store.com",
+    "phone": "",
+    "password": "$2b$12$sX8MP0JjHBm/AH5wEWs0GudMby9yJoGlNuF14wNZOi9B0n7P5myJS",
+    "role": "vendor",
+    "status": "active",
+    "storeId": "6a4637b9d3c65b8a73c48ec6",
+    "addresses": [],
+    "createdAt": "2026-07-02T10:02:20.078Z",
+    "updatedAt": "2026-07-02T10:04:41.101Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a4639fa7a3657502a655dd1",
+    "name": "Test Vendor",
+    "email": "vendor@marketplace.co.uk",
+    "phone": "",
+    "password": "$2b$12$nC1Pzm0qQ6AMgMOefEvuheIjkNl/J3pNU8Uase5RW.NhhfnbdLXQG",
+    "role": "vendor",
+    "status": "active",
+    "storeId": "6a4639fb7a3657502a655dd2",
+    "addresses": [],
+    "createdAt": "2026-07-02T10:14:18.431Z",
+    "updatedAt": "2026-07-02T10:14:19.028Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a4639fb7a3657502a655dd6",
+    "name": "Test Customer",
+    "email": "customer@marketplace.co.uk",
+    "phone": "",
+    "password": "$2b$12$Kev1yJLxx6u2XG9Zxfic8OsZws9xGz4NNgmyiarLhhtrKkMfiUil6",
+    "role": "customer",
+    "status": "active",
+    "storeId": null,
+    "addresses": [],
+    "createdAt": "2026-07-02T10:14:19.080Z",
+    "updatedAt": "2026-07-02T10:14:19.080Z",
+    "__v": 0
+  }
+]

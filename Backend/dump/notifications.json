@@ -1,0 +1,210 @@
+[
+  {
+    "_id": "6a46372cd3c65b8a73c48ec2",
+    "user": "6a46372cd3c65b8a73c48ec0",
+    "eventType": "account.welcome",
+    "recipient": {
+      "name": "Test User 1",
+      "email": "testuser1@store.com",
+      "phone": ""
+    },
+    "subject": "Welcome to Marketplace",
+    "bodyPreview": "Hi Test User 1,\n\nWelcome to Marketplace! Your account (testuser1@store.com) is ready to use.\n\nYou can sign in any time at http://localhost:3000/login.\n\n— The Marketplace team",
+    "channels": [
+      {
+        "channel": "email",
+        "status": "skipped",
+        "to": "testuser1@store.com",
+        "providerMessageId": "",
+        "error": "",
+        "skippedReason": "not_configured",
+        "attemptedAt": "2026-07-02T10:02:20.674Z",
+        "sentAt": null
+      },
+      {
+        "channel": "sms",
+        "status": "skipped",
+        "to": "",
+        "providerMessageId": "",
+        "error": "",
+        "skippedReason": "no_recipient",
+        "attemptedAt": "2026-07-02T10:02:20.677Z",
+        "sentAt": null
+      },
+      {
+        "channel": "whatsapp",
+        "status": "skipped",
+        "to": "",
+        "providerMessageId": "",
+        "error": "",
+        "skippedReason": "no_recipient",
+        "attemptedAt": "2026-07-02T10:02:20.682Z",
+        "sentAt": null
+      }
+    ],
+    "related": {
+      "order": null,
+      "store": null,
+      "vendorApplication": null
+    },
+    "createdAt": "2026-07-02T10:02:20.690Z",
+    "updatedAt": "2026-07-02T10:02:20.690Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a4637b9d3c65b8a73c48ec8",
+    "user": "6a46372cd3c65b8a73c48ec0",
+    "eventType": "vendor.application_approved",
+    "recipient": {
+      "name": "Test User 1",
+      "email": "testuser1@store.com",
+      "phone": ""
+    },
+    "subject": "Your store application is approved",
+    "bodyPreview": "Hi Test User 1,\n\nGreat news — your application to open test-user-2 on Marketplace was approved.\n\nOpen your vendor dashboard: http://localhost:3000/vendor/dashboard\n\n— The Marketplace team",
+    "channels": [
+      {
+        "channel": "email",
+        "status": "skipped",
+        "to": "testuser1@store.com",
+        "providerMessageId": "",
+        "error": "",
+        "skippedReason": "not_configured",
+        "attemptedAt": "2026-07-02T10:04:41.122Z",
+        "sentAt": null
+      },
+      {
+        "channel": "sms",
+        "status": "skipped",
+        "to": "",
+        "providerMessageId": "",
+        "error": "",
+        "skippedReason": "no_recipient",
+        "attemptedAt": "2026-07-02T10:04:41.125Z",
+        "sentAt": null
+      },
+      {
+        "channel": "whatsapp",
+        "status": "skipped",
+        "to": "",
+        "providerMessageId": "",
+        "error": "",
+        "skippedReason": "no_recipient",
+        "attemptedAt": "2026-07-02T10:04:41.129Z",
+        "sentAt": null
+      }
+    ],
+    "related": {
+      "order": null,
+      "store": "6a4637b9d3c65b8a73c48ec6",
+      "vendorApplication": "6a46372cd3c65b8a73c48ec3"
+    },
+    "createdAt": "2026-07-02T10:04:41.133Z",
+    "updatedAt": "2026-07-02T10:04:41.133Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a497c755e2e6ebe12cda08b",
+    "user": "6a4639fb7a3657502a655dd6",
+    "eventType": "order.placed.customer",
+    "recipient": {
+      "name": "Test Customer",
+      "email": "customer@marketplace.co.uk",
+      "phone": ""
+    },
+    "subject": "Order confirmation — ORD-260704-A575E4",
+    "bodyPreview": "Hi Test Customer,\n\nThanks for your order from test-user-2!\n\nOrder number: ORD-260704-A575E4\nTotal: 10.00 USD\nPayment: cod\n\nTrack your order: http://localhost:3000/track/ORD-260704-A575E4?email=customer%40marketplace.co.uk\n\n— The Marketplace team",
+    "channels": [
+      {
+        "channel": "email",
+        "status": "skipped",
+        "to": "customer@marketplace.co.uk",
+        "providerMessageId": "",
+        "error": "",
+        "skippedReason": "not_configured",
+        "attemptedAt": "2026-07-04T21:34:45.268Z",
+        "sentAt": null
+      },
+      {
+        "channel": "sms",
+        "status": "skipped",
+        "to": "",
+        "providerMessageId": "",
+        "error": "",
+        "skippedReason": "no_recipient",
+        "attemptedAt": "2026-07-04T21:34:45.271Z",
+        "sentAt": null
+      },
+      {
+        "channel": "whatsapp",
+        "status": "skipped",
+        "to": "",
+        "providerMessageId": "",
+        "error": "",
+        "skippedReason": "no_recipient",
+        "attemptedAt": "2026-07-04T21:34:45.274Z",
+        "sentAt": null
+      }
+    ],
+    "related": {
+      "order": "6a497c755e2e6ebe12cda08a",
+      "store": "6a4637b9d3c65b8a73c48ec6",
+      "vendorApplication": null
+    },
+    "createdAt": "2026-07-04T21:34:45.278Z",
+    "updatedAt": "2026-07-04T21:34:45.278Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a497c755e2e6ebe12cda08c",
+    "user": "6a46372cd3c65b8a73c48ec0",
+    "eventType": "order.placed.vendor",
+    "recipient": {
+      "name": "Test User 1",
+      "email": "testuser1@store.com",
+      "phone": ""
+    },
+    "subject": "New order received — ORD-260704-A575E4",
+    "bodyPreview": "Hi Test User 1,\n\nYou just received a new order at test-user-2.\n\nOrder: ORD-260704-A575E4\nCustomer: Test Customer\nTotal: 10.00 USD\n\nManage it here: http://localhost:3000/vendor/dashboard\n\n— The Marketplace team",
+    "channels": [
+      {
+        "channel": "email",
+        "status": "skipped",
+        "to": "testuser1@store.com",
+        "providerMessageId": "",
+        "error": "",
+        "skippedReason": "not_configured",
+        "attemptedAt": "2026-07-04T21:34:45.269Z",
+        "sentAt": null
+      },
+      {
+        "channel": "sms",
+        "status": "skipped",
+        "to": "",
+        "providerMessageId": "",
+        "error": "",
+        "skippedReason": "no_recipient",
+        "attemptedAt": "2026-07-04T21:34:45.272Z",
+        "sentAt": null
+      },
+      {
+        "channel": "whatsapp",
+        "status": "skipped",
+        "to": "",
+        "providerMessageId": "",
+        "error": "",
+        "skippedReason": "no_recipient",
+        "attemptedAt": "2026-07-04T21:34:45.279Z",
+        "sentAt": null
+      }
+    ],
+    "related": {
+      "order": "6a497c755e2e6ebe12cda08a",
+      "store": "6a4637b9d3c65b8a73c48ec6",
+      "vendorApplication": null
+    },
+    "createdAt": "2026-07-04T21:34:45.283Z",
+    "updatedAt": "2026-07-04T21:34:45.283Z",
+    "__v": 0
+  }
+]

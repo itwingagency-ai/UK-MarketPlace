@@ -112,6 +112,11 @@ const storeSchema = new mongoose.Schema(
       min: 0.1,
       max: 100,
     },
+    timezone: {
+      type: String,
+      default: "UTC",
+      trim: true,
+    },
     // Map: day-of-week (lowercase) → { open, close, isClosed }
     operatingHours: {
       type: Map,

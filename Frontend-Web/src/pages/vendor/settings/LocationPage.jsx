@@ -42,6 +42,7 @@ export default function LocationPage() {
     postcode: '',
     country: 'United Kingdom',
     deliveryRadiusMiles: 10,
+    timezone: 'UTC',
   });
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export default function LocationPage() {
           postcode: loc.address?.postalCode || '',
           country: loc.address?.country || 'United Kingdom',
           deliveryRadiusMiles: Math.round((loc.deliveryRadiusKm || 8) / 1.60934),
+          timezone: loc.timezone || 'UTC',
         });
       }
     } catch (error) {
@@ -113,6 +115,7 @@ export default function LocationPage() {
           country: formData.country.trim(),
         },
         deliveryRadiusKm: formData.deliveryRadiusMiles * 1.60934,
+        timezone: formData.timezone,
       };
 
       await vendorService.updateLocation(payload);
@@ -228,6 +231,26 @@ export default function LocationPage() {
                     id="country-input"
                   />
                 </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: '1rem' }}>
+                <label className="form-label" htmlFor="timezone-select">Store Timezone</label>
+                <select
+                  className="form-input"
+                  name="timezone"
+                  value={formData.timezone}
+                  onChange={handleChange}
+                  id="timezone-select"
+                  style={{ width: '100%' }}
+                >
+                  <option value="UTC">UTC (Universal Coordinated Time)</option>
+                  <option value="Europe/London">Europe/London (London, UK)</option>
+                  <option value="Asia/Karachi">Asia/Karachi (Pakistan)</option>
+                  <option value="America/New_York">America/New_York (US Eastern)</option>
+                  <option value="America/Chicago">America/Chicago (US Central)</option>
+                  <option value="America/Denver">America/Denver (US Mountain)</option>
+                  <option value="America/Los_Angeles">America/Los_Angeles (US Pacific)</option>
+                </select>
               </div>
 
               <div style={{ paddingTop: '1rem' }}>

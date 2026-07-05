@@ -110,10 +110,18 @@ export default function OperatingHoursPage() {
   const fetchHours = async () => {
     try {
       setLoading(true);
-      const data = await vendorService.getOperatingHours();
+      const res = await vendorService.getOperatingHours();
+      const schedule = res?.data?.schedule || [];
       const initialHours = {};
       DAYS_OF_WEEK.forEach((day) => {
-        initialHours[day] = data[day] || { isOpen: false, openTime: '09:00', closeTime: '17:00' };
+        const found = schedule.find((item) => item.day === day);
+        initialHours[day] = found
+          ? {
+              isOpen: !found.isClosed,
+              openTime: found.open || '09:00',
+              closeTime: found.close || '17:00',
+            }
+          : { isOpen: false, openTime: '09:00', closeTime: '17:00' };
       });
       setHours(initialHours);
     } catch (error) {
@@ -154,7 +162,15 @@ export default function OperatingHoursPage() {
     e.preventDefault();
     try {
       setSaving(true);
-      await vendorService.updateOperatingHours(hours);
+      const payload = {};
+      Object.entries(hours).forEach(([day, val]) => {
+        payload[day] = {
+          open: val.openTime,
+          close: val.closeTime,
+          isClosed: !val.isOpen,
+        };
+      });
+      await vendorService.updateOperatingHours(payload);
       toast.success('Operating hours updated successfully');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to update operating hours');

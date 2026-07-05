@@ -1,0 +1,15 @@
+[
+  {
+    "_id": "6a463807d3c65b8a73c48eca",
+    "store": "6a4637b9d3c65b8a73c48ec6",
+    "name": "Fast Food",
+    "slug": "fast-food",
+    "parent": null,
+    "description": "Delicious yummy items",
+    "image": "",
+    "isActive": true,
+    "createdAt": "2026-07-02T10:05:59.568Z",
+    "updatedAt": "2026-07-02T10:07:04.615Z",
+    "__v": 0
+  }
+]

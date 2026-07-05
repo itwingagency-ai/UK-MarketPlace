@@ -25,7 +25,7 @@ const getLocation = asyncHandler(async (req, res) => {
   if (!storeId) throw new ApiError(400, "No store in scope");
 
   const store = await Store.findById(storeId).select(
-    "name location locationSet deliveryRadiusKm operatingHours address"
+    "name location locationSet deliveryRadiusKm operatingHours address timezone"
   );
   if (!store) throw new ApiError(404, "Store not found");
 
@@ -36,6 +36,7 @@ const getLocation = asyncHandler(async (req, res) => {
       deliveryRadiusKm: store.deliveryRadiusKm,
       operatingHours:   store.operatingHours,
       address:          store.address,
+      timezone:         store.timezone || "UTC",
     },
   });
 });
@@ -49,7 +50,7 @@ const updateLocation = asyncHandler(async (req, res) => {
   const store = await Store.findById(storeId);
   if (!store) throw new ApiError(404, "Store not found");
 
-  const { address, addressDetails, lat, lng, deliveryRadiusKm, operatingHours } = req.body;
+  const { address, addressDetails, lat, lng, deliveryRadiusKm, operatingHours, timezone } = req.body;
 
   let resolvedLat, resolvedLng, geocodedAddress;
 
@@ -99,6 +100,11 @@ const updateLocation = asyncHandler(async (req, res) => {
     store.deliveryRadiusKm = Number(deliveryRadiusKm);
   }
 
+  // Apply timezone update
+  if (timezone !== undefined) {
+    store.timezone = timezone;
+  }
+
   // Apply operating hours (merge — don't overwrite days not provided)
   if (operatingHours !== undefined) {
     const currentHours = store.operatingHours || new Map();
@@ -109,6 +115,7 @@ const updateLocation = asyncHandler(async (req, res) => {
         : (currentHours[day] = { ...(existing || {}), ...slot });
     }
     store.operatingHours = currentHours;
+    store.markModified("operatingHours");
   }
 
   await store.save();
@@ -120,6 +127,7 @@ const updateLocation = asyncHandler(async (req, res) => {
       coordinates:      store.location.coordinates,
       deliveryRadiusKm: store.deliveryRadiusKm,
       operatingHours:   store.operatingHours,
+      timezone:         store.timezone,
       ...(geocodedAddress ? { geocodedAddress } : {}),
     },
   });

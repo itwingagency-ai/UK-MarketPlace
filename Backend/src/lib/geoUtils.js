@@ -98,7 +98,7 @@ const isValidLatLng = (lat, lng) => {
   const ln = Number(lng);
   return (
     !Number.isNaN(la) && !Number.isNaN(ln) &&
-    la >= -90  && la <= 90 &&
+    la >= -90 && la <= 90 &&
     ln >= -180 && ln <= 180
   );
 };
@@ -288,10 +288,10 @@ const computeOpenStatus = (operatingHours, timezone = "UTC") => {
     };
   }
 
-  const openMin  = toMinutes(todaySlot.open);
+  const openMin = toMinutes(todaySlot.open);
   const closeMin = toMinutes(todaySlot.close);
   const closesAt = formatTime(closeMin);
-  const opensAt  = formatTime(openMin);
+  const opensAt = formatTime(openMin);
 
   // Currently open
   if (currentMinutes >= openMin && currentMinutes < closeMin) {

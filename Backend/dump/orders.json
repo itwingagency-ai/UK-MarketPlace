@@ -1,0 +1,96 @@
+[
+  {
+    "_id": "6a497c755e2e6ebe12cda08a",
+    "store": "6a4637b9d3c65b8a73c48ec6",
+    "customer": "6a4639fb7a3657502a655dd6",
+    "customerSnapshot": {
+      "name": "Test Customer",
+      "email": "customer@marketplace.co.uk",
+      "phone": ""
+    },
+    "shippingAddress": {
+      "fullName": "Test Customer",
+      "phone": "",
+      "line1": "123 Main St",
+      "line2": "",
+      "city": "London",
+      "state": "",
+      "postalCode": "W1A 1AA",
+      "country": "UK"
+    },
+    "items": [
+      {
+        "product": "6a4638f3d3c65b8a73c48ecb",
+        "variantId": "6a4638f3d3c65b8a73c48ecc",
+        "title": "Burger",
+        "sku": "",
+        "attributes": {
+          "description": "Cheesy Burger"
+        },
+        "quantity": 1,
+        "unitPrice": 7,
+        "total": 7
+      }
+    ],
+    "subtotal": 7,
+    "shippingFee": 3,
+    "total": 10,
+    "paymentMethod": "cod",
+    "paymentStatus": "pending",
+    "orderStatus": "pending",
+    "statusHistory": [
+      {
+        "status": "pending",
+        "changedBy": "6a4639fb7a3657502a655dd6",
+        "changedByRole": "customer",
+        "changedAt": "2026-07-04T21:34:45.156Z",
+        "note": "Order placed"
+      }
+    ],
+    "paymentTransaction": null,
+    "commission": {
+      "type": "percentage",
+      "rate": 0,
+      "fixed": 0,
+      "amount": 0,
+      "calculatedAt": null,
+      "sourceRate": null
+    },
+    "shippingMethod": {
+      "id": "6a464ad9c8436961a29d7507",
+      "code": "standard-delivery",
+      "name": "Standard Delivery",
+      "description": "",
+      "fee": 3,
+      "minDays": 2,
+      "maxDays": 3
+    },
+    "paymentEvents": [
+      {
+        "status": "pending",
+        "provider": "cod",
+        "providerRef": "",
+        "by": "6a4639fb7a3657502a655dd6",
+        "byRole": "customer",
+        "at": "2026-07-04T21:34:45.214Z",
+        "note": "Cash on Delivery — awaiting collection"
+      }
+    ],
+    "tracking": {
+      "carrier": "",
+      "trackingNumber": "",
+      "trackingUrl": "",
+      "shippedAt": null,
+      "deliveredAt": null,
+      "cancelledAt": null,
+      "cancellationReason": "",
+      "estimatedDeliveryEarliest": null,
+      "estimatedDeliveryLatest": null,
+      "events": []
+    },
+    "orderNumber": "ORD-260704-A575E4",
+    "createdAt": "2026-07-04T21:34:45.176Z",
+    "updatedAt": "2026-07-04T21:34:45.220Z",
+    "__v": 1
+  }
+]

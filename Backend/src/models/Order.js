@@ -329,7 +329,6 @@ orderSchema.pre("validate", function preValidateOrder() {
       },
     ];
   }
-  next();
 });
 
 orderSchema.statics.ORDER_STATUS = ORDER_STATUS;

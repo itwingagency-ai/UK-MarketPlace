@@ -1,0 +1,110 @@
+[
+  {
+    "_id": "6a4637b9d3c65b8a73c48ec6",
+    "name": "test-user-2",
+    "slug": "test-user-2-636",
+    "owner": "6a46372cd3c65b8a73c48ec0",
+    "description": "we deliver all items",
+    "status": "active",
+    "contact": {
+      "phone": "+923364452671",
+      "email": "testuser2@store.com"
+    },
+    "address": {
+      "line1": "Pasrur road, Fareed Town",
+      "line2": "",
+      "city": "Lahore",
+      "state": "",
+      "postalCode": "52132",
+      "country": "Pakistan"
+    },
+    "commissionType": null,
+    "commissionRate": null,
+    "commissionFixed": null,
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        74.35874729999999,
+        31.5203696
+      ]
+    },
+    "deliveryRadiusKm": 4.82802,
+    "locationSet": true,
+    "operatingHours": {
+      "friday": {
+        "open": "09:00",
+        "close": "22:00",
+        "isClosed": false
+      },
+      "monday": {
+        "open": "09:00",
+        "close": "22:00",
+        "isClosed": false
+      },
+      "saturday": {
+        "open": "09:00",
+        "close": "22:00",
+        "isClosed": false
+      },
+      "sunday": {
+        "open": "09:00",
+        "close": "22:00",
+        "isClosed": false
+      },
+      "thursday": {
+        "open": "09:00",
+        "close": "22:00",
+        "isClosed": false
+      },
+      "tuesday": {
+        "open": "09:00",
+        "close": "22:00",
+        "isClosed": false
+      },
+      "wednesday": {
+        "open": "09:00",
+        "close": "22:00",
+        "isClosed": false
+      }
+    },
+    "createdAt": "2026-07-02T10:04:41.090Z",
+    "updatedAt": "2026-07-04T21:36:33.617Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a4639fb7a3657502a655dd2",
+    "name": "Test Store",
+    "slug": "test-store",
+    "owner": "6a4639fa7a3657502a655dd1",
+    "description": "",
+    "status": "active",
+    "contact": {
+      "phone": "",
+      "email": ""
+    },
+    "address": {
+      "line1": "",
+      "line2": "",
+      "city": "",
+      "state": "",
+      "postalCode": "",
+      "country": ""
+    },
+    "commissionType": null,
+    "commissionRate": null,
+    "commissionFixed": null,
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        -0.1278,
+        51.5074
+      ]
+    },
+    "deliveryRadiusKm": 5,
+    "locationSet": true,
+    "operatingHours": {},
+    "createdAt": "2026-07-02T10:14:19.018Z",
+    "updatedAt": "2026-07-02T11:09:28.572Z",
+    "__v": 0
+  }
+]

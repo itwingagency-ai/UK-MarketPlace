@@ -24,7 +24,7 @@ export default function NotificationsPage() {
     try {
       setTemplatesLoading(true);
       const res = await adminService.getNotificationTemplates();
-      setTemplates(res.data || []);
+      setTemplates(res.data?.templates || []);
     } catch (err) {
       toast.error('Failed to fetch templates');
     } finally {
@@ -58,9 +58,9 @@ export default function NotificationsPage() {
     setEditingTemplate({
       eventType: template.eventType,
       channel: template.channel,
-      subject: template.subject || '',
-      body: template.body || '',
-      isActive: template.isActive !== false,
+      subject: template.override?.subject || template.defaultSubject || '',
+      body: template.override?.body || template.defaultBody || '',
+      isActive: template.override?.isActive ?? false,
     });
   };
 
@@ -105,14 +105,18 @@ export default function NotificationsPage() {
     {
       key: 'subject',
       label: 'Subject',
-      render: (v) => v || '—',
+      render: (_, row) => {
+        const subject = row.override?.subject || row.defaultSubject;
+        return subject || '—';
+      },
     },
     {
       key: 'isActive',
       label: 'Status',
-      render: (v) => (
-        <StatusBadge status={v ? 'active' : 'inactive'} />
-      ),
+      render: (_, row) => {
+        const isActive = row.override?.isActive ?? false;
+        return <StatusBadge status={isActive ? 'active' : 'inactive'} />;
+      },
     },
     {
       key: 'actions',
@@ -214,7 +218,7 @@ export default function NotificationsPage() {
       </div>
 
       <Modal
-        isOpen={!!editingTemplate}
+        open={!!editingTemplate}
         onClose={() => setEditingTemplate(null)}
         title="Edit Notification Template"
         width="600px"

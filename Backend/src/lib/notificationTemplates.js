@@ -1,6 +1,6 @@
 const NotificationTemplate = require("../models/NotificationTemplate");
 
-const NOTIFICATION_CHANNELS = ["email", "sms", "whatsapp"];
+const NOTIFICATION_CHANNELS = ["email"]; // "sms", "whatsapp" temporarily removed
 
 const NOTIFICATION_EVENTS = {
   "account.welcome": {
