@@ -20,7 +20,12 @@ export default function PlatformSettingsPage() {
         setLoading(true);
         const res = await adminService.getSettings();
         if (res.data) {
-          setSettings((prev) => ({ ...prev, ...res.data }));
+          setSettings({
+            defaultCommissionRate: Number(((res.data.commission?.defaultRate || 0) * 100).toFixed(2)),
+            platformFee: res.data.commission?.defaultFixed || 0,
+            supportEmail: res.data.supportEmail || '',
+            autoApproveVendors: res.data.features?.vendorSelfRegistration || false,
+          });
         }
       } catch (err) {
         toast.error('Failed to load platform settings');
@@ -44,10 +49,15 @@ export default function PlatformSettingsPage() {
     try {
       setSaving(true);
       await adminService.updateSettings({
-        defaultCommissionRate: Number(settings.defaultCommissionRate),
-        platformFee: Number(settings.platformFee),
         supportEmail: settings.supportEmail,
-        autoApproveVendors: settings.autoApproveVendors,
+        commission: {
+          type: 'percentage',
+          defaultRate: Number(settings.defaultCommissionRate) / 100,
+          defaultFixed: Number(settings.platformFee),
+        },
+        features: {
+          vendorSelfRegistration: settings.autoApproveVendors,
+        }
       });
       toast.success('Platform settings updated successfully');
     } catch (err) {
@@ -83,7 +93,7 @@ export default function PlatformSettingsPage() {
         </div>
         <div className="card-body">
           <form onSubmit={handleSubmit} className="form" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            
+
             <div className="form-group">
               <label className="form-label">Default Commission Rate (%)</label>
               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>

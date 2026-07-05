@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle, Star, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function ReviewsModerationPage() {
-  const [activeTab, setActiveTab] = useState('reports'); // 'reports' | 'all'
+  const [activeTab, setActiveTab] = useState('all'); // 'reports' | 'all'
   
   // Reports State
   const [reports, setReports] = useState([]);
@@ -78,6 +78,17 @@ export default function ReviewsModerationPage() {
     }
   };
 
+  const handleApproveReview = async (reviewId) => {
+    try {
+      await adminService.updateReviewStatus(reviewId, { status: 'approved' });
+      toast.success('Review approved');
+      if (activeTab === 'all') fetchReviews();
+      else fetchReports();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to approve review');
+    }
+  };
+
   const reportColumns = [
     {
       key: 'createdAt',
@@ -94,7 +105,29 @@ export default function ReviewsModerationPage() {
       label: 'Review Snippet',
       render: (v, row) => (
         <div style={{ maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 'var(--text-sm)' }}>
-          {row.review?.comment || '—'}
+          {row.review?.body || '—'}
+        </div>
+      ),
+    },
+    {
+      key: 'reviewer',
+      label: 'Reviewer',
+      render: (_, row) => (
+        <div style={{ fontSize: 'var(--text-sm)' }}>
+          <div style={{ fontWeight: 'bold' }}>{row.review?.user?.name || 'Unknown User'}</div>
+          <div style={{ color: 'var(--text-muted)' }}>{row.review?.user?.email || ''}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'target',
+      label: 'Target',
+      render: (_, row) => (
+        <div style={{ fontSize: 'var(--text-sm)' }}>
+          <div style={{ fontWeight: 'bold' }} title={row.review?.product?.title || 'Unknown Product'}>
+            {row.review?.product?.title ? (row.review.product.title.length > 30 ? row.review.product.title.substring(0, 30) + '...' : row.review.product.title) : 'Unknown Product'}
+          </div>
+          <div style={{ color: 'var(--text-muted)' }}>Store: {row.review?.store?.name || 'Unknown Store'}</div>
         </div>
       ),
     },
@@ -142,11 +175,33 @@ export default function ReviewsModerationPage() {
       ),
     },
     {
-      key: 'comment',
+      key: 'body',
       label: 'Comment',
-      render: (v) => (
+      render: (v, row) => (
         <div style={{ maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 'var(--text-sm)' }}>
-          {v || '—'}
+          {row.body || '—'}
+        </div>
+      ),
+    },
+    {
+      key: 'reviewer',
+      label: 'Reviewer',
+      render: (_, row) => (
+        <div style={{ fontSize: 'var(--text-sm)' }}>
+          <div style={{ fontWeight: 'bold' }}>{row.user?.name || 'Unknown User'}</div>
+          <div style={{ color: 'var(--text-muted)' }}>{row.user?.email || ''}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'target',
+      label: 'Target',
+      render: (_, row) => (
+        <div style={{ fontSize: 'var(--text-sm)' }}>
+          <div style={{ fontWeight: 'bold' }} title={row.product?.title || 'Unknown Product'}>
+            {row.product?.title ? (row.product.title.length > 30 ? row.product.title.substring(0, 30) + '...' : row.product.title) : 'Unknown Product'}
+          </div>
+          <div style={{ color: 'var(--text-muted)' }}>Store: {row.store?.name || 'Unknown Store'}</div>
         </div>
       ),
     },
@@ -160,9 +215,16 @@ export default function ReviewsModerationPage() {
       label: 'Actions',
       width: 100,
       render: (_, row) => (
-        <button className="btn btn-ghost-danger btn-sm" onClick={() => handleDeleteReview(row._id)} title="Delete Review">
-          <Trash2 size={16} />
-        </button>
+        <div className="action-buttons" style={{ display: 'flex', gap: '8px' }}>
+          {(row.status === 'pending' || row.status === 'rejected') && (
+            <button className="btn btn-ghost-success btn-sm" onClick={() => handleApproveReview(row._id)} title="Approve Review">
+              <CheckCircle size={16} />
+            </button>
+          )}
+          <button className="btn btn-ghost-danger btn-sm" onClick={() => handleDeleteReview(row._id)} title="Delete Review">
+            <Trash2 size={16} />
+          </button>
+        </div>
       ),
     },
   ];
@@ -177,18 +239,18 @@ export default function ReviewsModerationPage() {
       <div className="card">
         <div style={{ borderBottom: '1px solid var(--border-color)', display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-2) var(--space-4)' }}>
           <button
-            className={`btn btn-ghost ${activeTab === 'reports' ? 'active' : ''}`}
-            onClick={() => setActiveTab('reports')}
-            style={activeTab === 'reports' ? { color: 'var(--primary-color)', borderBottom: '2px solid var(--primary-color)', borderRadius: 0 } : { borderRadius: 0 }}
-          >
-            Reported Reviews
-          </button>
-          <button
             className={`btn btn-ghost ${activeTab === 'all' ? 'active' : ''}`}
             onClick={() => setActiveTab('all')}
             style={activeTab === 'all' ? { color: 'var(--primary-color)', borderBottom: '2px solid var(--primary-color)', borderRadius: 0 } : { borderRadius: 0 }}
           >
             All Reviews
+          </button>
+          <button
+            className={`btn btn-ghost ${activeTab === 'reports' ? 'active' : ''}`}
+            onClick={() => setActiveTab('reports')}
+            style={activeTab === 'reports' ? { color: 'var(--primary-color)', borderBottom: '2px solid var(--primary-color)', borderRadius: 0 } : { borderRadius: 0 }}
+          >
+            Reported Reviews
           </button>
         </div>
 

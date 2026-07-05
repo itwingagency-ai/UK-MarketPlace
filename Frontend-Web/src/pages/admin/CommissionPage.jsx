@@ -6,8 +6,9 @@ import { DollarSign, Edit2, Store } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function CommissionPage() {
-  const [summary, setSummary] = useState({ totalCommission: 0, pendingPayouts: 0 });
+  const [summary, setSummary] = useState({ revenue: 0, commission: 0, netToVendors: 0 });
   const [stores, setStores] = useState([]);
+  const [platformConfig, setPlatformConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -17,51 +18,73 @@ export default function CommissionPage() {
   const [newCommission, setNewCommission] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const fetchSummary = async () => {
-    try {
-      const res = await adminService.getCommissionSummary();
-      setSummary(res.data || { totalCommission: 0, pendingPayouts: 0 });
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchStores = async () => {
+  const fetchCommissionData = async () => {
     try {
       setLoading(true);
-      const res = await adminService.getStores({ page, limit: 10, search });
-      setStores(res.data || []);
-      setTotal(res.total || 0);
+      const [summaryRes, storesRes] = await Promise.all([
+        adminService.getCommissionSummary(),
+        adminService.getStores({ page, limit: 10, search })
+      ]);
+      
+      if (summaryRes?.data) {
+        setSummary(summaryRes.data.totals || { revenue: 0, commission: 0, netToVendors: 0 });
+        setPlatformConfig(summaryRes.data.platform);
+        
+        const byStoreDict = {};
+        if (summaryRes.data.byStore) {
+          summaryRes.data.byStore.forEach(s => {
+            byStoreDict[s.storeId] = s;
+          });
+        }
+        
+        setTotal(storesRes.total || 0);
+        
+        const combinedStores = (storesRes.data || []).map(store => {
+          const stats = byStoreDict[store._id] || {};
+          const isCustom = store.commissionRate !== null && store.commissionRate !== undefined;
+          return {
+            storeId: store._id,
+            storeName: store.name,
+            override: { commissionRate: store.commissionRate },
+            revenue: stats.revenue || 0,
+            commission: stats.commission || 0,
+            effective: stats.effective || { 
+              source: isCustom ? 'store' : 'platform',
+              rate: isCustom ? store.commissionRate : summaryRes.data.platform?.defaultRate 
+            }
+          };
+        });
+
+        setStores(combinedStores);
+      }
     } catch (err) {
-      toast.error('Failed to fetch stores');
+      toast.error('Failed to load commission data');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchSummary();
-  }, []);
-
-  useEffect(() => {
-    fetchStores();
+    fetchCommissionData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, search]);
 
   const handleEditCommission = (store) => {
     setEditingStore(store);
-    setNewCommission(store.commissionRate || '');
+    const rate = store.override?.commissionRate;
+    setNewCommission(rate !== null && rate !== undefined ? Number((rate * 100).toFixed(2)) : '');
   };
 
   const handleSaveCommission = async () => {
     try {
       setSaving(true);
-      await adminService.setStoreCommission(editingStore._id, {
-        commissionRate: newCommission === '' ? null : Number(newCommission)
+      await adminService.setStoreCommission(editingStore.storeId, {
+        type: newCommission === '' ? null : 'percentage',
+        rate: newCommission === '' ? null : Number(newCommission) / 100
       });
       toast.success('Commission rate updated');
       setEditingStore(null);
-      fetchStores();
+      fetchCommissionData();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update commission rate');
     } finally {
@@ -71,30 +94,34 @@ export default function CommissionPage() {
 
   const columns = [
     {
-      key: 'name',
+      key: 'storeName',
       label: 'Store Name',
-      render: (v) => <strong style={{ color: 'var(--gray-900)' }}>{v}</strong>,
+      render: (v) => <strong style={{ color: 'var(--gray-900)' }}>{v || '—'}</strong>,
     },
     {
-      key: 'owner',
-      label: 'Owner',
-      render: (v) => v?.name || '—',
-    },
-    {
-      key: 'totalRevenue',
+      key: 'revenue',
       label: 'Total Sales',
       render: (v) => formatCurrency(v || 0),
     },
     {
-      key: 'commissionRate',
+      key: 'commission',
+      label: 'Platform Earnings',
+      render: (v) => formatCurrency(v || 0),
+    },
+    {
+      key: 'effective',
       label: 'Commission Rate',
-      render: (v) => (
-        v !== undefined && v !== null ? (
-          <span className="badge badge-primary">{v}% (Custom)</span>
-        ) : (
-          <span className="badge badge-neutral">Platform Default</span>
-        )
-      ),
+      render: (v, row) => {
+        const ratePct = v?.rate !== undefined ? Number((v.rate * 100).toFixed(2)) : 0;
+        const isCustom = v?.source === 'store';
+        return (
+          isCustom ? (
+            <span className="badge badge-primary">{ratePct}% (Custom)</span>
+          ) : (
+            <span className="badge badge-neutral">{ratePct}% (Platform)</span>
+          )
+        );
+      },
     },
     {
       key: 'actions',
@@ -123,16 +150,16 @@ export default function CommissionPage() {
               <DollarSign size={18} />
             </div>
           </div>
-          <div className="stat-card-value">{formatCurrency(summary.totalCommission)}</div>
+          <div className="stat-card-value">{formatCurrency(summary.commission)}</div>
         </div>
         <div className="card stat-card">
           <div className="stat-card-header">
-            <span className="stat-card-label">Pending Payouts (Est.)</span>
+            <span className="stat-card-label">Pending Payouts (Net to Vendors)</span>
             <div className="stat-card-icon warning">
               <Store size={18} />
             </div>
           </div>
-          <div className="stat-card-value">{formatCurrency(summary.pendingPayouts)}</div>
+          <div className="stat-card-value">{formatCurrency(summary.netToVendors)}</div>
         </div>
       </div>
 
@@ -148,18 +175,18 @@ export default function CommissionPage() {
           searchable
           searchValue={search}
           onSearch={(v) => { setSearch(v); setPage(1); }}
-          rowKey="_id"
+          rowKey="storeId"
         />
       </div>
 
       <Modal
-        isOpen={!!editingStore}
+        open={!!editingStore}
         onClose={() => setEditingStore(null)}
         title="Edit Commission Rate"
       >
         <div style={{ marginBottom: 'var(--space-4)' }}>
           <p style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
-            Set a custom commission rate for <strong>{editingStore?.name}</strong>. Leave blank to use the platform default.
+            Set a custom commission rate for <strong>{editingStore?.storeName}</strong>. Leave blank to use the platform default.
           </p>
           <div className="form-group">
             <label className="form-label">Commission Rate (%)</label>

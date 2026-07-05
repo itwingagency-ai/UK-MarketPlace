@@ -221,16 +221,6 @@ export default function VendorApplicationsPage() {
                   <span className="detail-label">Store Name</span>
                   <span className="detail-value">{drawerApp.storeName}</span>
                 </div>
-                <div className="detail-row">
-                  <span className="detail-label">URL Slug</span>
-                  <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>/{drawerApp.slug}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Subdomain</span>
-                  <span className="detail-value" style={{ fontFamily: 'var(--font-mono)', color: 'var(--aa-green)' }}>
-                    {drawerApp.slug}.marketplace.co.uk
-                  </span>
-                </div>
                 {drawerApp.description && (
                   <div className="detail-row">
                     <span className="detail-label"><FileText size={12} /> Description</span>

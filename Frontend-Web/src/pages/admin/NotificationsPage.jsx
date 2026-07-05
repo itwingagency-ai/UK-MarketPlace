@@ -156,12 +156,27 @@ export default function NotificationsPage() {
     {
       key: 'channel',
       label: 'Channel',
-      render: (v) => <span style={{ textTransform: 'capitalize' }}>{v}</span>,
+      render: (_, row) => (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
+          {row.channels?.map((c, i) => (
+            <span key={i} style={{ textTransform: 'capitalize', fontSize: 'var(--text-sm)' }}>
+              {c.channel}
+              {i < row.channels.length - 1 ? ', ' : ''}
+            </span>
+          ))}
+        </div>
+      ),
     },
     {
       key: 'status',
       label: 'Status',
-      render: (v) => <StatusBadge status={v} size="sm" />,
+      render: (_, row) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {row.channels?.map((c, i) => (
+            <StatusBadge key={i} status={c.status} size="sm" />
+          ))}
+        </div>
+      ),
     },
   ];
 

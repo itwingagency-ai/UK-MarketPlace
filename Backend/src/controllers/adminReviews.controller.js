@@ -177,6 +177,11 @@ const listReports = asyncHandler(async (req, res) => {
       .populate({
         path: "review",
         select: "rating title body status product store user",
+        populate: [
+          { path: "product", select: "title" },
+          { path: "store", select: "name" },
+          { path: "user", select: "name email" }
+        ]
       }),
     ReviewReport.countDocuments(filter),
   ]);
