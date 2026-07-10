@@ -9,7 +9,7 @@ import client from './client';
  */
 export const getNearbyStores = async ({ postcode, lat, lng } = {}) => {
   const params = {};
-  if (postcode) params.postcode = postcode;
+  if (postcode) params.address = postcode;
   if (lat !== undefined) params.lat = lat;
   if (lng !== undefined) params.lng = lng;
 

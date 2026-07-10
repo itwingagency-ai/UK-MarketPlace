@@ -19,79 +19,42 @@ import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 
 const { width } = Dimensions.get('window');
 
-// ─── Store Card ───────────────────────────────────────────────────────────────
+// ─── Store Banner ─────────────────────────────────────────────────────────────
 
-function StoreCard({ store, onPress }) {
+const BG_COLORS = ['#4A148C', '#2E7D32', '#0D47A1', '#E65100', '#C2185B', '#006064'];
+
+function StoreBanner({ store, onPress, index }) {
   const isOpen = store.isOpen ?? store.status === 'open';
-
-  const addressLine = [store.address?.line1, store.address?.city]
-    .filter(Boolean)
-    .join(', ');
+  const bgColor = BG_COLORS[index % BG_COLORS.length];
 
   return (
-    <TouchableOpacity style={cardStyles.card} onPress={onPress} activeOpacity={0.82}>
-      {/* Open/Closed ribbon */}
-      <View style={[cardStyles.ribbon, isOpen ? cardStyles.ribbonOpen : cardStyles.ribbonClosed]}>
-        <View style={[cardStyles.ribbonDot, isOpen ? cardStyles.dotOpen : cardStyles.dotClosed]} />
-        <Text style={[cardStyles.ribbonText, isOpen ? cardStyles.ribbonTextOpen : cardStyles.ribbonTextClosed]}>
-          {isOpen ? 'Open now' : 'Closed'}
+    <TouchableOpacity
+      style={[bannerStyles.card, { backgroundColor: bgColor }]}
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
+      <View style={bannerStyles.content}>
+        <Text style={bannerStyles.name} numberOfLines={2}>
+          {store.name}
         </Text>
+        {store.statusLabel && (
+          <Text style={bannerStyles.status} numberOfLines={2}>
+            {store.statusLabel}
+          </Text>
+        )}
+        <View style={bannerStyles.btn}>
+          <Text style={bannerStyles.btnText}>Shop now</Text>
+        </View>
       </View>
-
-      <View style={cardStyles.row}>
-        {/* Icon */}
-        <View style={cardStyles.iconWrapper}>
-          <Text style={cardStyles.icon}>🏪</Text>
-        </View>
-
-        {/* Info */}
-        <View style={cardStyles.info}>
-          <Text style={cardStyles.name} numberOfLines={1}>{store.name}</Text>
-          {!!addressLine && (
-            <Text style={cardStyles.address} numberOfLines={1}>{addressLine}</Text>
-          )}
-
-          <View style={cardStyles.pillRow}>
-            {store.distanceKm != null && (
-              <View style={cardStyles.pill}>
-                <Text style={cardStyles.pillText}>📍 {store.distanceKm.toFixed(1)} km</Text>
-              </View>
-            )}
-            {store.deliveryFee != null ? (
-              <View style={cardStyles.pill}>
-                <Text style={cardStyles.pillText}>
-                  🚐 £{(store.deliveryFee / 100).toFixed(2)} delivery
-                </Text>
-              </View>
-            ) : store.deliveryRadiusKm != null ? (
-              <View style={cardStyles.pill}>
-                <Text style={cardStyles.pillText}>🚐 {store.deliveryRadiusKm} km radius</Text>
-              </View>
-            ) : null}
-            {store.minOrder != null && (
-              <View style={cardStyles.pill}>
-                <Text style={cardStyles.pillText}>
-                  Min £{(store.minOrder / 100).toFixed(2)}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Chevron */}
-        <Text style={cardStyles.chevron}>›</Text>
+      {/* Decorative icon on right */}
+      <View style={bannerStyles.iconWrapper}>
+        <Text style={bannerStyles.icon}>🏪</Text>
       </View>
-
-      {/* Status label */}
-      {!!store.statusLabel && (
-        <View style={cardStyles.statusRow}>
-          <Text style={cardStyles.statusLabel}>{store.statusLabel}</Text>
-        </View>
-      )}
-
-      {/* CTA footer */}
-      <View style={cardStyles.footer}>
-        <Text style={cardStyles.footerCta}>Browse products →</Text>
+      
+      {/* Open/Closed indicator */}
+      <View style={[bannerStyles.indicator, isOpen ? bannerStyles.indicatorOpen : bannerStyles.indicatorClosed]}>
+        <View style={[bannerStyles.dot, isOpen ? bannerStyles.dotOpen : bannerStyles.dotClosed]} />
+        <Text style={bannerStyles.indicatorText}>{isOpen ? 'Open' : 'Closed'}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -188,19 +151,30 @@ export default function ShopHomeScreen({ route, navigation }) {
   }, []);
 
   const handleStorePress = (store) => {
-    navigation.navigate('StoreDetail', { store });
+    navigation.navigate('StoreCategories', { store });
   };
 
   // ── List header ───────────────────────────────────────────────────────────
   const ListHeader = () => (
     <View style={styles.listHeader}>
+      {/* Featured Banner */}
+      <View style={styles.featuredBanner}>
+        <Text style={styles.featuredEmoji}>🎉</Text>
+        <View style={styles.featuredContent}>
+          <Text style={styles.featuredTitle}>CRACK INTO PLEASURE</Text>
+          <TouchableOpacity style={styles.featuredBtn} activeOpacity={0.8}>
+            <Text style={styles.featuredBtnText}>Shop now</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <Text style={styles.resultsCount}>
         {visibleStores.length}{' '}
         {visibleStores.length === 1 ? 'store' : 'stores'} near{' '}
         <Text style={styles.resultsCountAccent}>{postcode}</Text>
       </Text>
       {!loading && stores.length > 0 && (
-        <Text style={styles.resultsHint}>Tap a store to browse its products</Text>
+        <Text style={styles.resultsHint}>Tap a store to browse categories</Text>
       )}
     </View>
   );
@@ -271,9 +245,11 @@ export default function ShopHomeScreen({ route, navigation }) {
         <FlatList
           data={visibleStores}
           keyExtractor={(item, i) => item._id ?? item.id ?? String(i)}
-          renderItem={({ item }) => (
-            <StoreCard store={item} onPress={() => handleStorePress(item)} />
+          renderItem={({ item, index }) => (
+            <StoreBanner store={item} index={index} onPress={() => handleStorePress(item)} />
           )}
+          numColumns={2}
+          columnWrapperStyle={styles.columnWrapper}
           contentContainerStyle={styles.list}
           ListHeaderComponent={<ListHeader />}
           ListEmptyComponent={
@@ -294,7 +270,6 @@ export default function ShopHomeScreen({ route, navigation }) {
               colors={[Colors.primary]}
             />
           }
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
     </View>
@@ -396,7 +371,49 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.base,
     paddingBottom: Spacing['3xl'],
   },
-  listHeader: { marginBottom: Spacing.md },
+  columnWrapper: {
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  listHeader: { marginBottom: Spacing.lg },
+  featuredBanner: {
+    backgroundColor: '#1E1B4B',
+    borderRadius: Radius.xl,
+    padding: Spacing.xl,
+    marginBottom: Spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  featuredContent: { flex: 1, zIndex: 2 },
+  featuredTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FBBF24',
+    marginBottom: Spacing.md,
+    textTransform: 'uppercase',
+  },
+  featuredBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.white,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+  },
+  featuredBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1E1B4B',
+  },
+  featuredEmoji: {
+    position: 'absolute',
+    right: -10,
+    bottom: -20,
+    fontSize: 110,
+    opacity: 0.9,
+    zIndex: 1,
+  },
   resultsCount: {
     fontSize: Typography.size.lg,
     fontWeight: Typography.weight.extrabold,
@@ -408,7 +425,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.xs, color: Colors.muted,
     fontWeight: Typography.weight.medium, marginTop: 3,
   },
-  separator: { height: Spacing.md },
 
   // States
   centeredState: {
@@ -445,104 +461,78 @@ const styles = StyleSheet.create({
   },
 });
 
-// ─── Store Card Styles ────────────────────────────────────────────────────────
+// ─── Store Banner Styles ──────────────────────────────────────────────────────
 
-const cardStyles = StyleSheet.create({
+const bannerStyles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.white,
+    flex: 1,
+    height: 140,
     borderRadius: Radius.xl,
     overflow: 'hidden',
+    padding: Spacing.md,
+    position: 'relative',
     ...Shadow.md,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
   },
-  ribbon: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: 7,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+  content: {
+    flex: 1,
+    zIndex: 2,
+    justifyContent: 'flex-start',
   },
-  ribbonOpen: { backgroundColor: '#F0FDF4' },
-  ribbonClosed: { backgroundColor: Colors.surface },
-  ribbonDot: { width: 7, height: 7, borderRadius: 3.5 },
-  dotOpen: { backgroundColor: '#16A34A' },
-  dotClosed: { backgroundColor: Colors.muted },
-  ribbonText: { fontSize: 11, fontWeight: '700' },
-  ribbonTextOpen: { color: '#16A34A' },
-  ribbonTextClosed: { color: Colors.muted },
-
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing.base,
+  name: {
+    fontSize: Typography.size.lg,
+    fontWeight: Typography.weight.extrabold,
+    color: Colors.white,
+    textTransform: 'uppercase',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  status: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '500',
+    marginBottom: Spacing.sm,
+  },
+  btn: {
+    marginTop: 'auto',
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.white,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+  },
+  btnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.text,
   },
   iconWrapper: {
-    width: 58,
-    height: 58,
-    borderRadius: Radius.lg,
-    backgroundColor: '#EFF6FF',
+    position: 'absolute',
+    right: -10,
+    bottom: -10,
+    opacity: 0.8,
+    transform: [{ scale: 1.5 }],
+    zIndex: 1,
+  },
+  icon: {
+    fontSize: 60,
+  },
+  indicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#BFDBFE',
-    flexShrink: 0,
-  },
-  icon: { fontSize: 28 },
-  info: { flex: 1 },
-  name: {
-    fontSize: Typography.size.base,
-    fontWeight: Typography.weight.extrabold,
-    color: Colors.text,
-    marginBottom: 3,
-    letterSpacing: -0.2,
-  },
-  address: {
-    fontSize: Typography.size.xs,
-    color: Colors.textSecondary,
-    marginBottom: 7,
-  },
-  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  pill: {
-    paddingHorizontal: 8,
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 6,
     paddingVertical: 3,
-    backgroundColor: Colors.surface,
     borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    zIndex: 3,
   },
-  pillText: { fontSize: 10, fontWeight: '600', color: Colors.textSecondary },
-  chevron: {
-    fontSize: 26,
-    color: Colors.muted,
-    fontWeight: '300',
-    lineHeight: 28,
-  },
-
-  statusRow: {
-    paddingHorizontal: Spacing.base,
-    paddingBottom: 8,
-  },
-  statusLabel: {
-    fontSize: Typography.size.xs,
-    color: Colors.textSecondary,
-    fontWeight: Typography.weight.medium,
-  },
-
-  footer: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
-    backgroundColor: '#F8FAFF',
-  },
-  footerCta: {
-    fontSize: Typography.size.sm,
-    fontWeight: Typography.weight.bold,
-    color: Colors.primary,
-    letterSpacing: 0.2,
-  },
+  indicatorOpen: {},
+  indicatorClosed: {},
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  dotOpen: { backgroundColor: '#4ADE80' },
+  dotClosed: { backgroundColor: '#F87171' },
+  indicatorText: { fontSize: 9, fontWeight: '700', color: Colors.white },
 });

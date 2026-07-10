@@ -188,8 +188,8 @@ function ErrorState({ onRetry }) {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
-export default function StoreDetailScreen({ route, navigation }) {
-  const { store } = route.params ?? {};
+export default function StoreProductsScreen({ route, navigation }) {
+  const { store, category } = route.params ?? {};
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -199,14 +199,12 @@ export default function StoreDetailScreen({ route, navigation }) {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [total, setTotal] = useState(0);
-  const [activeCategory, setActiveCategory] = useState('all');
-  const [categories, setCategories] = useState([{ id: 'all', label: 'All' }]);
 
   const storeSlug = store?.slug;
 
   // ── Fetch products ──────────────────────────────────────────────────────────
   const fetchProducts = useCallback(async (opts = {}) => {
-    const { pageNum = 1, isRefresh = false, catFilter = activeCategory } = opts;
+    const { pageNum = 1, isRefresh = false } = opts;
 
     if (!storeSlug) {
       setError(true);
@@ -226,7 +224,7 @@ export default function StoreDetailScreen({ route, navigation }) {
 
     try {
       const params = { page: pageNum, limit: 20 };
-      if (catFilter !== 'all') params.category = catFilter;
+      if (category && category.slug !== 'all') params.category = category.slug;
 
       const data = await getStoreProducts(storeSlug, params);
       const fetched = data?.data?.products ?? data?.products ?? [];
@@ -237,16 +235,6 @@ export default function StoreDetailScreen({ route, navigation }) {
 
       if (pageNum === 1) {
         setProducts(fetched);
-        // Extract unique categories from products for filter pills
-        const seen = new Set();
-        const cats = [{ id: 'all', label: 'All' }];
-        fetched.forEach((p) => {
-          if (p.category && !seen.has(p.category.slug)) {
-            seen.add(p.category.slug);
-            cats.push({ id: p.category.slug, label: p.category.name });
-          }
-        });
-        if (cats.length > 1) setCategories(cats);
       } else {
         setProducts((prev) => [...prev, ...fetched]);
       }
@@ -260,7 +248,7 @@ export default function StoreDetailScreen({ route, navigation }) {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [storeSlug, activeCategory]);
+  }, [storeSlug, category]);
 
   useEffect(() => {
     fetchProducts({ pageNum: 1 });
@@ -272,13 +260,6 @@ export default function StoreDetailScreen({ route, navigation }) {
     if (!loadingMore && hasMore && !loading) {
       fetchProducts({ pageNum: page + 1 });
     }
-  };
-
-  const handleCategoryChange = (catId) => {
-    setActiveCategory(catId);
-    setProducts([]);
-    setPage(1);
-    fetchProducts({ pageNum: 1, catFilter: catId });
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -298,34 +279,13 @@ export default function StoreDetailScreen({ route, navigation }) {
 
   const renderHeader = () => (
     <View>
-      {/* Category filter pills */}
-      {categories.length > 1 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.catFilterRow}
-        >
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              style={[styles.catChip, activeCategory === cat.id && styles.catChipActive]}
-              onPress={() => handleCategoryChange(cat.id)}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.catChipText, activeCategory === cat.id && styles.catChipTextActive]}>
-                {cat.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
-
-      {/* Results count */}
+      <View style={styles.resultsRow}>
+        <Text style={styles.categoryTitle}>{category?.label || 'All Products'}</Text>
+      </View>
       {!loading && (
         <View style={styles.resultsRow}>
           <Text style={styles.resultsText}>
             {total > 0 ? `${total} product${total !== 1 ? 's' : ''}` : 'No products'}
-            {activeCategory !== 'all' ? ' in this category' : ''}
           </Text>
         </View>
       )}
@@ -404,25 +364,9 @@ const styles = StyleSheet.create({
   loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
   loadingText: { fontSize: Typography.size.sm, color: Colors.muted, fontWeight: Typography.weight.medium },
 
-  // Category filter row
-  catFilterRow: {
-    paddingHorizontal: Spacing['2xl'],
-    paddingTop: Spacing.base,
-    paddingBottom: Spacing.sm,
-    gap: Spacing.sm,
-  },
-  catChip: {
-    paddingHorizontal: 14, paddingVertical: 7,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.white,
-    borderWidth: 1.5, borderColor: Colors.border,
-  },
-  catChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  catChipText: { fontSize: Typography.size.sm, fontWeight: Typography.weight.semibold, color: Colors.textSecondary },
-  catChipTextActive: { color: Colors.white },
-
   // Results count
-  resultsRow: { paddingHorizontal: Spacing['2xl'], paddingVertical: Spacing.sm },
+  resultsRow: { paddingHorizontal: Spacing['2xl'], paddingTop: Spacing.sm },
+  categoryTitle: { fontSize: 22, fontWeight: '900', color: Colors.text, letterSpacing: -0.5 },
   resultsText: { fontSize: Typography.size.xs, color: Colors.muted, fontWeight: Typography.weight.medium },
 
   // Products grid
