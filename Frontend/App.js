@@ -13,7 +13,8 @@ import HomeScreen from './src/screens/HomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ShopHomeScreen from './src/screens/ShopHomeScreen';
-import StoreDetailScreen from './src/screens/StoreDetailScreen';
+import StoreCategoriesScreen from './src/screens/StoreCategoriesScreen';
+import StoreProductsScreen from './src/screens/StoreProductsScreen';
 
 import { Colors } from './src/theme';
 
@@ -27,6 +28,9 @@ function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="ShopHome" component={ShopHomeScreen} />
+      <Stack.Screen name="StoreCategories" component={StoreCategoriesScreen} />
+      <Stack.Screen name="StoreProducts" component={StoreProductsScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
     </Stack.Navigator>
@@ -42,7 +46,8 @@ function AppStack() {
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="ShopHome" component={ShopHomeScreen} />
-      <Stack.Screen name="StoreDetail" component={StoreDetailScreen} />
+      <Stack.Screen name="StoreCategories" component={StoreCategoriesScreen} />
+      <Stack.Screen name="StoreProducts" component={StoreProductsScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
     </Stack.Navigator>
