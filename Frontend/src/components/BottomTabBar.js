@@ -16,7 +16,7 @@ const { width } = Dimensions.get('window');
 // ─── Simple SVG-free Icons (pure View + Text) ──────────────────────────────────
 
 function HomeIcon({ focused }) {
-  const color = focused ? Colors.primary : Colors.muted;
+  const color = focused ? '#50178E' : Colors.muted;
   return (
     <View style={iconStyles.container}>
       {/* Simple house shape */}
@@ -29,7 +29,7 @@ function HomeIcon({ focused }) {
 }
 
 function BasketIcon({ focused, badgeCount }) {
-  const color = focused ? Colors.primary : Colors.muted;
+  const color = focused ? '#50178E' : Colors.muted;
   return (
     <View style={iconStyles.container}>
       {/* Simple basket/cart shape */}
@@ -47,7 +47,7 @@ function BasketIcon({ focused, badgeCount }) {
 }
 
 function AccountIcon({ focused }) {
-  const color = focused ? Colors.primary : Colors.muted;
+  const color = focused ? '#50178E' : Colors.muted;
   return (
     <View style={iconStyles.container}>
       {/* Simple person silhouette */}
@@ -58,7 +58,7 @@ function AccountIcon({ focused }) {
 }
 
 function MoreIcon({ focused }) {
-  const color = focused ? Colors.primary : Colors.muted;
+  const color = focused ? '#50178E' : Colors.muted;
   return (
     <View style={iconStyles.container}>
       {/* Three horizontal lines (hamburger) */}
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#50178E',
   },
   label: {
     fontSize: 10,
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   labelActive: {
-    color: Colors.primary,
+    color: '#50178E',
     fontWeight: '700',
   },
   labelInactive: {

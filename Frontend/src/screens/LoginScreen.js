@@ -9,29 +9,35 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
-  KeyboardAvoidingView,
   ScrollView,
   Dimensions,
   Animated,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import Input from '../components/Input';
 import { Colors, Spacing, Typography, Radius } from '../theme';
+// IMPORT COMMENTED OUT FOR EXPO GO COMPATIBILITY
+// import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
+// GoogleSignin.configure({
+//   webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+//   offlineAccess: true,
+// });
 
 const { width, height } = Dimensions.get('window');
 const HERO_HEIGHT = height * 0.42;
 
 export default function LoginScreen({ navigation }) {
-  const { login, isLoading: authLoading } = useAuth();
+  const { login, googleLogin, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dealsChecked, setDealsChecked] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
-
   const shake = () => {
     Animated.sequence([
       Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: true }),
@@ -77,12 +83,36 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
-  const handleSocialPress = (provider) => {
-    Alert.alert(`${provider} Sign-in`, `${provider} sign-in coming soon!`);
+  const handleSocialPress = async (provider) => {
+    if (provider === 'Google') {
+      Alert.alert(
+        'Google Sign-In',
+        'Google Sign-In requires a custom development build. It will not work inside the standard Expo Go app. Please test Email/Password and OTP flows here instead!'
+      );
+      /* 
+      try {
+        await GoogleSignin.hasPlayServices();
+        const userInfo = await GoogleSignin.signIn();
+        setIsSubmitting(true);
+        const result = await googleLogin(userInfo.idToken);
+        setIsSubmitting(false);
+        if (!result.success) {
+          Alert.alert('Login Failed', result.error);
+        }
+      } catch (error) {
+        if (error.code !== 'SIGN_IN_CANCELLED') {
+          Alert.alert('Google Sign-In Error', error.message || 'An error occurred');
+        }
+        setIsSubmitting(false);
+      }
+      */
+    } else {
+      Alert.alert(`${provider} Sign-in`, `${provider} sign-in coming soon!`);
+    }
   };
 
   const handleForgotPassword = () => {
-    Alert.alert('Forgot Password', 'Password reset link will be sent to your email.');
+    navigation.navigate('ForgotPassword');
   };
 
   const isLoading = isSubmitting || authLoading;
@@ -91,18 +121,152 @@ export default function LoginScreen({ navigation }) {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      {/* Hero image — full width at top */}
-      <Image
-        source={require('../../assets/login_hero.png')}
-        style={styles.heroImage}
-        resizeMode="cover"
-      />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}
+      >
+        {/* Hero image scrolls naturally with the page */}
+        <Image
+          source={require('../../assets/login_hero.png')}
+          style={styles.heroImage}
+          resizeMode="cover"
+        />
+        <View style={styles.heroOverlay} />
 
-      {/* Gradient overlay on hero for depth */}
-      <View style={styles.heroOverlay} />
+        <Animated.View style={[styles.card, { transform: [{ translateX: shakeAnim }] }]}>
+          {/* Welcome block */}
+          <Text style={styles.welcomeLabel}>Welcome back</Text>
+          <Text style={styles.title}>Log in to Snappy</Text>
+          <Text style={styles.tagline}>Your groceries, delivered in a snap.</Text>
 
-      {/* Back button */}
-      <SafeAreaView style={styles.backArea} edges={['top']}>
+          {/* Email Input */}
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.label}>Email</Text>
+            <View style={[
+              styles.inputContainer,
+              emailError && styles.inputContainerError,
+            ]}>
+              <Text style={styles.inputIcon}>✉️</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="youremail@example.com"
+                placeholderTextColor={Colors.muted}
+                value={email}
+                onChangeText={(t) => { setEmail(t); setEmailError(''); }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                autoCorrect={false}
+              />
+            </View>
+            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+          </View>
+
+          {/* Password Input */}
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.label}>Password</Text>
+            <View style={[
+              styles.inputContainer,
+              passwordError && styles.inputContainerError,
+            ]}>
+              <Text style={styles.inputIcon}>🔒</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Enter your password"
+                placeholderTextColor={Colors.muted}
+                value={password}
+                onChangeText={(t) => { setPassword(t); setPasswordError(''); }}
+                secureTextEntry={!isPasswordVisible}
+                autoCapitalize="none"
+                autoCorrect={false}
+                onSubmitEditing={handleLogin}
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setIsPasswordVisible((v) => !v)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.eyeIcon}>{isPasswordVisible ? '🙈' : '👁'}</Text>
+              </TouchableOpacity>
+            </View>
+            {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+          </View>
+
+          {/* Forgot / Create account row */}
+          <View style={styles.linksRow}>
+            <TouchableOpacity onPress={handleForgotPassword} activeOpacity={0.7}>
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Register')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.createText}>Create account</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Log in button */}
+          <TouchableOpacity
+            style={[styles.loginBtn, isLoading && styles.loginBtnDisabled]}
+            onPress={handleLogin}
+            disabled={isLoading}
+            activeOpacity={0.85}
+          >
+            {isLoading ? (
+              <ActivityIndicator color={Colors.white} size="small" />
+            ) : (
+              <Text style={styles.loginBtnText}>Log in</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerLabel}>or continue with</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Social buttons */}
+          <TouchableOpacity
+            style={styles.socialBtn}
+            onPress={() => handleSocialPress('Google')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.googleIconWrapper}>
+              <Text style={styles.googleG}>G</Text>
+            </View>
+            <Text style={styles.socialBtnText}>Continue with Google</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.socialBtn, { marginTop: Spacing.sm }]}
+            onPress={() => handleSocialPress('Facebook')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.facebookIconWrapper}>
+              <Text style={styles.facebookF}>f</Text>
+            </View>
+            <Text style={styles.socialBtnText}>Continue with Facebook</Text>
+          </TouchableOpacity>
+
+          {/* Deals checkbox */}
+          <TouchableOpacity
+            style={styles.dealsRow}
+            onPress={() => setDealsChecked((v) => !v)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.checkbox, dealsChecked && styles.checkboxChecked]}>
+              {dealsChecked && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.dealsText}>Send me deals &amp; offers</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </ScrollView>
+
+      {/* Back button fixed at top */}
+      <SafeAreaView style={styles.backArea} edges={['top']} pointerEvents="box-none">
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation.canGoBack() ? navigation.goBack() : null}
@@ -111,121 +275,6 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
       </SafeAreaView>
-
-      {/* Bottom sheet card */}
-      <KeyboardAvoidingView
-        style={styles.cardWrapper}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? -20 : 0}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          bounces={false}
-        >
-          <Animated.View style={[styles.card, { transform: [{ translateX: shakeAnim }] }]}>
-            {/* Welcome block */}
-            <Text style={styles.welcomeLabel}>Welcome back</Text>
-            <Text style={styles.title}>Log in to Snappy</Text>
-            <Text style={styles.tagline}>Your groceries, delivered in a snap.</Text>
-
-            {/* Form */}
-            <View style={styles.form}>
-              <Input
-                label="Email"
-                placeholder="youremail@example.com"
-                value={email}
-                onChangeText={(t) => { setEmail(t); setEmailError(''); }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                leftIcon={<Text style={styles.inputIcon}>✉️</Text>}
-                error={emailError}
-              />
-              <Input
-                label="Password"
-                placeholder="Enter your password"
-                value={password}
-                onChangeText={(t) => { setPassword(t); setPasswordError(''); }}
-                secureTextEntry
-                autoCapitalize="none"
-                leftIcon={<Text style={styles.inputIcon}>🔒</Text>}
-                error={passwordError}
-              />
-            </View>
-
-            {/* Forgot / Create account row */}
-            <View style={styles.linksRow}>
-              <TouchableOpacity onPress={handleForgotPassword} activeOpacity={0.7}>
-                <Text style={styles.forgotText}>Forgot password?</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Register')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.createText}>Create account</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Log in button */}
-            <TouchableOpacity
-              style={[styles.loginBtn, isLoading && styles.loginBtnDisabled]}
-              onPress={handleLogin}
-              disabled={isLoading}
-              activeOpacity={0.85}
-            >
-              {isLoading ? (
-                <ActivityIndicator color={Colors.white} size="small" />
-              ) : (
-                <Text style={styles.loginBtnText}>Log in</Text>
-              )}
-            </TouchableOpacity>
-
-            {/* Divider */}
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerLabel}>or continue with</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Social buttons */}
-            <TouchableOpacity
-              style={styles.socialBtn}
-              onPress={() => handleSocialPress('Google')}
-              activeOpacity={0.8}
-            >
-              <View style={styles.googleIconWrapper}>
-                <Text style={styles.googleG}>G</Text>
-              </View>
-              <Text style={styles.socialBtnText}>Continue with Google</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.socialBtn, { marginTop: Spacing.sm }]}
-              onPress={() => handleSocialPress('Facebook')}
-              activeOpacity={0.8}
-            >
-              <View style={styles.facebookIconWrapper}>
-                <Text style={styles.facebookF}>f</Text>
-              </View>
-              <Text style={styles.socialBtnText}>Continue with Facebook</Text>
-            </TouchableOpacity>
-
-            {/* Deals checkbox */}
-            <TouchableOpacity
-              style={styles.dealsRow}
-              onPress={() => setDealsChecked((v) => !v)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.checkbox, dealsChecked && styles.checkboxChecked]}>
-                {dealsChecked && <Text style={styles.checkmark}>✓</Text>}
-              </View>
-              <Text style={styles.dealsText}>Send me deals &amp; offers</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -236,9 +285,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5EEE8',
   },
   heroImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
     width,
     height: HERO_HEIGHT,
   },
@@ -254,7 +300,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
     zIndex: 20,
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 44 : 0,
@@ -278,24 +323,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 22,
   },
-  cardWrapper: {
-    position: 'absolute',
-    top: HERO_HEIGHT - 32,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
   scrollContent: {
     flexGrow: 1,
   },
   card: {
+    flex: 1, // Take remaining space
     backgroundColor: Colors.white,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
+    marginTop: -32, // Overlaps the hero image naturally
     paddingHorizontal: Spacing['2xl'],
     paddingTop: Spacing['2xl'],
-    paddingBottom: Spacing['5xl'],
-    minHeight: height - HERO_HEIGHT + 32,
+    paddingBottom: Platform.OS === 'ios' ? 100 : Spacing['5xl'], // Extra padding for keyboard
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
@@ -320,11 +359,58 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginBottom: Spacing.xl,
   },
-  form: {
-    width: '100%',
+  // Input field styles (matching ShopHomeScreen pattern)
+  fieldWrapper: {
+    marginBottom: Spacing.base,
+  },
+  label: {
+    fontSize: Typography.size.sm,
+    fontWeight: Typography.weight.semibold,
+    color: Colors.text,
+    marginBottom: Spacing.xs,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    minHeight: 52,
+  },
+  inputContainerFocused: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.white,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  inputContainerError: {
+    borderColor: Colors.error,
   },
   inputIcon: {
     fontSize: 16,
+    marginRight: Spacing.sm,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: Typography.size.base,
+    color: Colors.text,
+    paddingVertical: Spacing.sm,
+  },
+  eyeButton: {
+    padding: Spacing.xs,
+  },
+  eyeIcon: {
+    fontSize: 16,
+  },
+  errorText: {
+    color: Colors.error,
+    fontSize: Typography.size.xs,
+    marginTop: Spacing.xs,
   },
   linksRow: {
     flexDirection: 'row',

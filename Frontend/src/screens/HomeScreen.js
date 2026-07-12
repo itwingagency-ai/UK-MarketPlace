@@ -19,6 +19,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { getNearbyStores, decodePostcode } from '../api/stores.api';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from '../context/LocationContext';
+import { useCart } from '../context/CartContext';
+import { useCustomAlert } from '../context/AlertContext';
 import { Colors, Spacing, Typography, Radius } from '../theme';
 
 const { width, height } = Dimensions.get('window');
@@ -110,6 +113,7 @@ function ComingSoonModal({ visible, postcode, onClose }) {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation }) {
   const { isAuthenticated, logout } = useAuth();
+  const { updateLocation } = useLocation();
   const [postcode, setPostcode] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -117,19 +121,11 @@ export default function HomeScreen({ navigation }) {
   const [notFoundPostcode, setNotFoundPostcode] = useState('');
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const handleSearchPress = async () => {
-    if (!postcode.trim()) {
-      Alert.alert('Postcode required', 'Please enter a postcode to search stores near you.');
-      return;
-    }
-    Animated.sequence([
-      Animated.timing(scaleAnim, { toValue: 0.97, duration: 80, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
-    ]).start();
+  const { itemCount, clearCart } = useCart();
+  const { showAlert } = useCustomAlert();
 
+  const executeSearch = async (trimmed) => {
     setIsSearching(true);
-    const trimmed = postcode.trim().toUpperCase();
-
     try {
       // Fetch stores + decode postcode to human-readable location in parallel
       const [storeResult, locationResult] = await Promise.allSettled([
@@ -142,7 +138,6 @@ export default function HomeScreen({ navigation }) {
       const stores = apiData?.data?.stores ?? apiData?.stores ?? [];
 
       if (stores.length === 0) {
-        // No stores — show professional "coming soon" modal
         setNotFoundPostcode(trimmed);
         setShowComingSoon(true);
         setIsSearching(false);
@@ -159,6 +154,10 @@ export default function HomeScreen({ navigation }) {
         locationLabel = apiData.data.resolvedLocation.formattedAddress;
       }
 
+      if (apiData?.data?.resolvedLocation?.lat) {
+        updateLocation(trimmed, locationLabel, apiData.data.resolvedLocation.lat, apiData.data.resolvedLocation.lng);
+      }
+
       navigation.navigate('MainTabs', {
         screen: 'ShopHomeTab',
         params: { screen: 'ShopHome', params: {
@@ -168,7 +167,6 @@ export default function HomeScreen({ navigation }) {
         }},
       });
     } catch (err) {
-      // API or network error — show coming soon modal
       setNotFoundPostcode(trimmed);
       setShowComingSoon(true);
     } finally {
@@ -176,12 +174,53 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const handleUseLocation = async () => {
+  const handleSearchPress = async () => {
+    if (!postcode.trim()) {
+      showAlert({
+        title: 'Postcode required',
+        message: 'Please enter a postcode to search stores near you.',
+        icon: 'map-pin',
+        showCancel: false,
+        confirmText: 'Got it',
+      });
+      return;
+    }
+    
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.97, duration: 80, useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+    ]).start();
+
+    const trimmed = postcode.trim().toUpperCase();
+
+    if (itemCount > 0) {
+      showAlert({
+        title: 'Change Location?',
+        message: 'Changing your location will clear your current basket. Do you want to continue?',
+        isDestructive: true,
+        confirmText: 'Clear & Change',
+        onConfirm: async () => {
+          await clearCart();
+          executeSearch(trimmed);
+        }
+      });
+    } else {
+      executeSearch(trimmed);
+    }
+  };
+
+  const executeLocationSearch = async () => {
     setIsLocating(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission denied', 'Enable location access in settings to use this feature.');
+        showAlert({
+          title: 'Permission denied',
+          message: 'Enable location access in settings to use this feature.',
+          icon: 'alert-circle',
+          showCancel: false,
+          confirmText: 'OK'
+        });
         setIsLocating(false);
         return;
       }
@@ -197,6 +236,8 @@ export default function HomeScreen({ navigation }) {
         return;
       }
 
+      updateLocation('My Location', 'Your Location', latitude, longitude);
+
       navigation.navigate('MainTabs', {
         screen: 'ShopHomeTab',
         params: { screen: 'ShopHome', params: {
@@ -206,17 +247,44 @@ export default function HomeScreen({ navigation }) {
         }},
       });
     } catch (err) {
-      Alert.alert('Location error', 'Unable to get your location. Please try entering a postcode.');
+      showAlert({
+        title: 'Location error',
+        message: 'Unable to get your location. Please try entering a postcode.',
+        icon: 'alert-triangle',
+        showCancel: false,
+        confirmText: 'Got it'
+      });
     } finally {
       setIsLocating(false);
     }
   };
 
+  const handleUseLocation = async () => {
+    if (itemCount > 0) {
+      showAlert({
+        title: 'Change Location?',
+        message: 'Changing your location will clear your current basket. Do you want to continue?',
+        isDestructive: true,
+        confirmText: 'Clear & Change',
+        onConfirm: async () => {
+          await clearCart();
+          executeLocationSearch();
+        }
+      });
+    } else {
+      executeLocationSearch();
+    }
+  };
+
   const handleLogout = async () => {
-    Alert.alert('Log out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: () => logout() },
-    ]);
+    showAlert({
+      title: 'Log out',
+      message: 'Are you sure you want to log out?',
+      icon: 'log-out',
+      isDestructive: true,
+      confirmText: 'Log out',
+      onConfirm: () => logout()
+    });
   };
 
   return (

@@ -266,8 +266,8 @@ export default function CategoriesPage() {
             }
           }
           onSubmit={handleSave}
-          submitText={editingCategory ? 'Save Changes' : 'Create Category'}
-          loading={submitting}
+          submitLabel={editingCategory ? 'Save Changes' : 'Create Category'}
+          submitting={submitting}
         />
       </Drawer>
 

@@ -64,13 +64,21 @@ const updateSettings = asyncHandler(async (req, res) => {
   const settingsUpdates = { ...otherSettings };
   if (logoUrl !== undefined) settingsUpdates["branding.logoUrl"] = logoUrl;
   if (storeName !== undefined) settingsUpdates["branding.displayName"] = storeName;
-  if (req.file && req.file.location) {
+  if (req.files && req.files.bannerImage && req.files.bannerImage[0].location) {
     const oldSettings = await StoreSettings.findOne({ store: storeId });
     if (oldSettings?.branding?.bannerUrl) {
       await deleteFileFromS3(oldSettings.branding.bannerUrl);
     }
-    settingsUpdates["branding.bannerUrl"] = req.file.location;
+    settingsUpdates["branding.bannerUrl"] = req.files.bannerImage[0].location;
     settingsUpdates["branding.bannerUploadedAt"] = new Date();
+  }
+
+  if (req.files && req.files.logoImage && req.files.logoImage[0].location) {
+    const oldSettings = await StoreSettings.findOne({ store: storeId });
+    if (oldSettings?.branding?.logoUrl) {
+      await deleteFileFromS3(oldSettings.branding.logoUrl);
+    }
+    settingsUpdates["branding.logoUrl"] = req.files.logoImage[0].location;
   }
 
   const updatedSettings = await StoreSettings.findOneAndUpdate(

@@ -57,9 +57,9 @@ const formatStore = (store, distanceKm, status, branding, reviewData = null, shi
     if (shippingMethod.minDays === 0 && shippingMethod.maxDays === 0) {
       deliveryTime = "Same day delivery";
     } else if (shippingMethod.minDays === shippingMethod.maxDays) {
-      deliveryTime = `${shippingMethod.minDays} day${shippingMethod.minDays !== 1 ? 's' : ''}`;
+      deliveryTime = `${shippingMethod.minDays} min${shippingMethod.minDays !== 1 ? 's' : ''}`;
     } else {
-      deliveryTime = `${shippingMethod.minDays}-${shippingMethod.maxDays} days`;
+      deliveryTime = `${shippingMethod.minDays}-${shippingMethod.maxDays} mins`;
     }
   }
 
@@ -325,7 +325,7 @@ const getStoreProducts = asyncHandler(async (req, res) => {
       .limit(limit)
       .populate("category", "name slug image")
       .select(
-        "title slug price compareAtPrice stock images averageRating ratingCount isActive category variants"
+        "title slug description price compareAtPrice stock images averageRating ratingCount isActive category variants"
       ),
     Product.countDocuments(filter),
   ]);

@@ -5,7 +5,7 @@ import client from './client';
  */
 export const getCart = async () => {
   const { data } = await client.get('/cart');
-  return data;
+  return data.data ?? data;
 };
 
 /**
@@ -15,7 +15,7 @@ export const getCart = async () => {
  */
 export const addItem = async (productId, quantity = 1) => {
   const { data } = await client.post('/cart/items', { productId, quantity });
-  return data;
+  return data.data ?? data;
 };
 
 /**
@@ -23,7 +23,7 @@ export const addItem = async (productId, quantity = 1) => {
  */
 export const updateItemQuantity = async (itemId, quantity) => {
   const { data } = await client.patch(`/cart/items/${itemId}`, { quantity });
-  return data;
+  return data.data ?? data;
 };
 
 /**
@@ -31,7 +31,7 @@ export const updateItemQuantity = async (itemId, quantity) => {
  */
 export const removeItem = async (itemId) => {
   const { data } = await client.delete(`/cart/items/${itemId}`);
-  return data;
+  return data.data ?? data;
 };
 
 /**
@@ -39,5 +39,5 @@ export const removeItem = async (itemId) => {
  */
 export const clearCart = async () => {
   const { data } = await client.delete('/cart');
-  return data;
+  return data.data ?? data;
 };

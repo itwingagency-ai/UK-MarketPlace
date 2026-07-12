@@ -4,12 +4,20 @@ const {
   logout,
   refresh,
   register,
+  verifySignup,
+  forgotPassword,
+  resetPassword,
+  googleLogin,
 } = require("../controllers/auth.controller");
 
 const router = express.Router();
 
 router.post("/register", register);
+router.post("/verify-signup", verifySignup);
 router.post("/login", login);
+router.post("/google", googleLogin);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 router.post("/refresh", refresh);
 router.post("/logout", logout);
 

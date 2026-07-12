@@ -10,16 +10,26 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { CartProvider, useCart } from './src/context/CartContext';
 
+import { FavoritesProvider } from './src/context/FavoritesContext';
+import { LocationProvider } from './src/context/LocationContext';
+import { AlertProvider } from './src/context/AlertContext';
+
 import HomeScreen from './src/screens/HomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import OtpVerificationScreen from './src/screens/OtpVerificationScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
+import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import ShopHomeScreen from './src/screens/ShopHomeScreen';
 import StoreCategoriesScreen from './src/screens/StoreCategoriesScreen';
 import StoreProductsScreen from './src/screens/StoreProductsScreen';
 import StoreInfoScreen from './src/screens/StoreInfoScreen';
 import BasketScreen from './src/screens/BasketScreen';
 import AccountScreen from './src/screens/AccountScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import FavouritesScreen from './src/screens/FavouritesScreen';
 import MoreScreen from './src/screens/MoreScreen';
+import ProductDetailScreen from './src/screens/ProductDetailScreen';
 import BottomTabBar from './src/components/BottomTabBar';
 
 import { Colors } from './src/theme';
@@ -69,11 +79,24 @@ function ShopHomeStack() {
  * Allows navigation to Login/Register screens.
  */
 function AccountStack() {
+  const { isAuthenticated } = useAuth();
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-      <Stack.Screen name="Account" component={AccountScreen} />
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
+      {!isAuthenticated ? (
+        <>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        </>
+      ) : (
+        <>
+          <Stack.Screen name="Account" component={AccountScreen} />
+          <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="Favourites" component={FavouritesScreen} />
+        </>
+      )}
     </Stack.Navigator>
   );
 }
@@ -89,6 +112,10 @@ function RootStack() {
       <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+      <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
     </Stack.Navigator>
   );
 }
@@ -120,12 +147,18 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <CartProvider>
-            <StatusBar style="auto" />
-            <RootNavigator />
-          </CartProvider>
-        </AuthProvider>
+        <AlertProvider>
+          <LocationProvider>
+            <AuthProvider>
+              <FavoritesProvider>
+                <CartProvider>
+                  <StatusBar style="auto" />
+                  <RootNavigator />
+                </CartProvider>
+              </FavoritesProvider>
+            </AuthProvider>
+          </LocationProvider>
+        </AlertProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

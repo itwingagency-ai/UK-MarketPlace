@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const validator = require("validator");
 
 const ROLES = ["admin", "vendor", "customer"];
-const STATUSES = ["active", "suspended"];
+const STATUSES = ["active", "suspended", "unverified"];
 
 const addressSchema = new mongoose.Schema(
   {
@@ -71,6 +71,23 @@ const userSchema = new mongoose.Schema(
     addresses: {
       type: [addressSchema],
       default: [],
+    },
+    favoriteStores: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Store",
+      },
+    ],
+    favoriteProducts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+      },
+    ],
+    googleId: {
+      type: String,
+      sparse: true,
+      unique: true,
     },
   },
   { timestamps: true }

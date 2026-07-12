@@ -27,7 +27,7 @@ import { Ionicons, Feather, SimpleLineIcons } from '@expo/vector-icons';
 function StoreHeader({ store, onBack, onInfo }) {
   const insets = useSafeAreaInsets();
   const bannerUrl = store.branding?.bannerUrl || store.imageUrl || DEFAULT_CATEGORY_IMAGE;
-  const logoUrl = store.logoUrl || store.imageUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=200&auto=format&fit=crop';
+  const logoUrl = store.branding?.logoUrl || store.imageUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=200&auto=format&fit=crop';
   const city = store.address?.city || '';
   const storeName = `${store.name}${city ? ` - ${city}` : ''}`;
   const rating = store.averageRating ?? 0;
@@ -138,7 +138,11 @@ export default function StoreCategoriesScreen({ route, navigation }) {
           source={{ uri: imageUrl }}
           style={bannerStyles.bgImage}
           resizeMode="cover"
-        />
+        >
+          <View style={bannerStyles.overlay}>
+            <Text style={bannerStyles.categoryName}>{item.label}</Text>
+          </View>
+        </ImageBackground>
       </TouchableOpacity>
     );
   };
@@ -154,7 +158,7 @@ export default function StoreCategoriesScreen({ route, navigation }) {
 
       {loading ? (
         <View style={styles.stateContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" color="#50178E" />
           <Text style={styles.stateText}>Loading categories…</Text>
         </View>
       ) : error ? (
@@ -241,6 +245,18 @@ const bannerStyles = StyleSheet.create({
   bgImage: {
     width: '100%',
     height: '100%',
+    justifyContent: 'flex-end',
+  },
+  overlay: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  categoryName: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
 });
 

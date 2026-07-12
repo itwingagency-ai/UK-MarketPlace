@@ -46,4 +46,18 @@ router.delete("/reviews/:id", deleteMyReview);
 router.post("/reviews/:id/helpful", toggleHelpful);
 router.post("/reviews/:id/report", reportReview);
 
+const {
+  getFavorites,
+  addFavoriteStore,
+  removeFavoriteStore,
+  addFavoriteProduct,
+  removeFavoriteProduct,
+} = require("../controllers/customerProfile.controller");
+
+router.get("/me/favorites", getFavorites);
+router.post("/me/favorites/stores/:id", addFavoriteStore);
+router.delete("/me/favorites/stores/:id", removeFavoriteStore);
+router.post("/me/favorites/products/:id", addFavoriteProduct);
+router.delete("/me/favorites/products/:id", removeFavoriteProduct);
+
 module.exports = router;

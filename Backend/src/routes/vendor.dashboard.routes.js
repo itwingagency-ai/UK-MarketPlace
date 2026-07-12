@@ -159,7 +159,7 @@ router.delete(
 );
 
 router.get("/settings", getSettings);
-router.patch("/settings", upload.single("bannerImage"), updateSettings);
+router.patch("/settings", upload.fields([{ name: "bannerImage", maxCount: 1 }, { name: "logoImage", maxCount: 1 }]), updateSettings);
 
 router.get("/commission/summary", getCommissionSummary);
 router.get("/commission/ledger", getCommissionLedger);

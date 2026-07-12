@@ -185,8 +185,8 @@ export default function ProductsPage() {
         }
       }
 
-      let existingImages = typeof values.images === 'string' ? values.images.split(',').map(u => u.trim()).filter(Boolean) : (values.images || []);
-      payload.append('images', JSON.stringify(existingImages));
+      // let existingImages = typeof values.images === 'string' ? values.images.split(',').map(u => u.trim()).filter(Boolean) : (values.images || []);
+      // payload.append('images', JSON.stringify(existingImages));
 
       const variantsData = localVariants.map(v => ({
         ...v,
@@ -436,7 +436,7 @@ export default function ProductsPage() {
           onSelect={handleSelect}
           onSelectAll={handleSelectAll}
           rowKey="_id"
-          expandable={renderVariants}
+          // expandable={renderVariants}
           emptyIcon={<Package />}
           emptyTitle="No Products Found"
           emptyText="You haven't added any products matching this criteria yet."
@@ -526,16 +526,8 @@ export default function ProductsPage() {
               min: '0',
             },
             {
-              name: 'images',
-              label: 'Existing Images (URLs)',
-              type: 'textarea',
-              placeholder: 'https://example.com/image1.jpg, https://example.com/image2.jpg',
-              helpText: 'Enter existing image URLs separated by commas.',
-              rows: 3,
-            },
-            {
               name: 'imageFiles',
-              label: 'Upload New Images',
+              label: 'Product Photos',
               type: 'file',
               accept: 'image/*',
               multiple: true,
@@ -561,11 +553,11 @@ export default function ProductsPage() {
             }
           }
           onSubmit={handleSave}
-          submitText={editingProduct ? 'Save Changes' : 'Create Product'}
-          loading={submitting}
+          submitLabel={editingProduct ? 'Save Changes' : 'Create Product'}
+          submitting={submitting}
         >
           {/* Variants Section */}
-          <div style={{ marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-color)' }}>
+          {/* <div style={{ marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
               <h3 style={{ fontSize: 'var(--text-md)', fontWeight: '600' }}>Product Variants</h3>
               <button 
@@ -669,7 +661,7 @@ export default function ProductsPage() {
                 ))}
               </div>
             )}
-          </div>
+          </div> */}
         </FormBuilder>
       </Drawer>
 
