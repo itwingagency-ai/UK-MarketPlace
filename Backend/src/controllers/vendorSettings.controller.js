@@ -4,6 +4,7 @@ const { resolveTargetStoreId } = require("../middleware/storeScope.middleware");
 const Store = require("../models/Store");
 const StoreSettings = require("../models/StoreSettings");
 const { validateSettingsPayload } = require("../validators/store.validator");
+const { deleteFileFromS3 } = require("../lib/s3Utils");
 
 const getSettings = asyncHandler(async (req, res) => {
   const storeId = resolveTargetStoreId(req);
@@ -22,6 +23,8 @@ const getSettings = asyncHandler(async (req, res) => {
     slug: store.slug || "",
     description: store.description || "",
     logoUrl: settings?.branding?.logoUrl || "",
+    bannerUrl: settings?.branding?.bannerUrl || "",
+    bannerUploadedAt: settings?.branding?.bannerUploadedAt || null,
     contactEmail: store.contact?.email || "",
     contactPhone: store.contact?.phone || "",
     // Retain other nested settings objects so frontend doesn't break if accessed elsewhere
@@ -61,6 +64,14 @@ const updateSettings = asyncHandler(async (req, res) => {
   const settingsUpdates = { ...otherSettings };
   if (logoUrl !== undefined) settingsUpdates["branding.logoUrl"] = logoUrl;
   if (storeName !== undefined) settingsUpdates["branding.displayName"] = storeName;
+  if (req.file && req.file.location) {
+    const oldSettings = await StoreSettings.findOne({ store: storeId });
+    if (oldSettings?.branding?.bannerUrl) {
+      await deleteFileFromS3(oldSettings.branding.bannerUrl);
+    }
+    settingsUpdates["branding.bannerUrl"] = req.file.location;
+    settingsUpdates["branding.bannerUploadedAt"] = new Date();
+  }
 
   const updatedSettings = await StoreSettings.findOneAndUpdate(
     { store: storeId },

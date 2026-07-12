@@ -8,6 +8,7 @@ const {
   slugify,
   validateCategoryPayload,
 } = require("../validators/category.validator");
+const { deleteFileFromS3 } = require("../lib/s3Utils");
 
 const ensureUniqueSlug = async (storeId, baseSlug, ignoreId = null) => {
   let candidate = baseSlug;
@@ -73,7 +74,7 @@ const createCategory = asyncHandler(async (req, res) => {
   }
 
   let parentId = null;
-  if (req.body.parent) {
+  if (req.body.parent && req.body.parent !== "null" && req.body.parent !== "") {
     const parent = await findOwnedCategory(req.body.parent, storeId);
     if (!parent) {
       throw new ApiError(400, "Parent category does not belong to your store");
@@ -83,13 +84,18 @@ const createCategory = asyncHandler(async (req, res) => {
 
   const slug = await ensureUniqueSlug(storeId, baseSlug);
 
+  let image = req.body.image || "";
+  if (req.file && req.file.location) {
+    image = req.file.location;
+  }
+
   const category = await Category.create({
     store: storeId,
     name: req.body.name.trim(),
     slug,
     parent: parentId,
     description: req.body.description || "",
-    image: req.body.image || "",
+    image,
     isActive:
       req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,
   });
@@ -120,7 +126,7 @@ const updateCategory = asyncHandler(async (req, res) => {
   }
 
   if (req.body.parent !== undefined) {
-    if (req.body.parent === null || req.body.parent === "") {
+    if (req.body.parent === null || req.body.parent === "" || req.body.parent === "null") {
       category.parent = null;
     } else {
       if (String(req.body.parent) === String(category._id)) {
@@ -153,7 +159,12 @@ const updateCategory = asyncHandler(async (req, res) => {
   if (req.body.description !== undefined) {
     category.description = req.body.description || "";
   }
-  if (req.body.image !== undefined) {
+  if (req.file && req.file.location) {
+    if (category.image && category.image !== req.file.location) {
+      await deleteFileFromS3(category.image);
+    }
+    category.image = req.file.location;
+  } else if (req.body.image !== undefined) {
     category.image = req.body.image || "";
   }
   if (req.body.isActive !== undefined) {
@@ -186,6 +197,9 @@ const deleteCategory = asyncHandler(async (req, res) => {
     );
   }
 
+  if (category.image) {
+    await deleteFileFromS3(category.image);
+  }
   await category.deleteOne();
   res.status(200).json({ message: "Category deleted" });
 });

@@ -48,24 +48,46 @@ const parsePagination = (query) => {
 /**
  * Build the public-facing shape of a store document.
  */
-const formatStore = (store, distanceKm, status) => ({
-  id:               store._id,
-  name:             store.name,
-  slug:             store.slug,
-  status:           store.status,
-  contact:          store.contact,
-  address:          store.address,
-  deliveryRadiusKm: store.deliveryRadiusKm,
-  distanceKm,
-  isOpen:           status.isOpen,
-  statusLabel:      status.statusLabel,
-  opensAt:          status.opensAt,
-  closesAt:         status.closesAt,
-  nextOpenDay:      status.nextOpenDay,
-  nextOpenTime:     status.nextOpenTime,
-  todayHours:       status.todayHours,
-  branding:         store.branding || null,
-});
+const formatStore = (store, distanceKm, status, branding, reviewData = null, shippingMethod = null) => {
+  let deliveryFee = null;
+  let deliveryTime = null;
+
+  if (shippingMethod) {
+    deliveryFee = shippingMethod.fee;
+    if (shippingMethod.minDays === 0 && shippingMethod.maxDays === 0) {
+      deliveryTime = "Same day delivery";
+    } else if (shippingMethod.minDays === shippingMethod.maxDays) {
+      deliveryTime = `${shippingMethod.minDays} day${shippingMethod.minDays !== 1 ? 's' : ''}`;
+    } else {
+      deliveryTime = `${shippingMethod.minDays}-${shippingMethod.maxDays} days`;
+    }
+  }
+
+  return {
+    id:               store._id,
+    name:             store.name,
+    slug:             store.slug,
+    status:           store.status,
+    contact:          store.contact,
+    address:          store.address,
+    deliveryRadiusKm: store.deliveryRadiusKm,
+    distanceKm,
+    isOpen:           status.isOpen,
+    statusLabel:      status.statusLabel,
+    opensAt:          status.opensAt,
+    closesAt:         status.closesAt,
+    nextOpenDay:      status.nextOpenDay,
+    nextOpenTime:     status.nextOpenTime,
+    todayHours:       status.todayHours,
+    operatingHours:   store.operatingHours ? Object.fromEntries(store.operatingHours) : {},
+    location:         store.location,
+    branding:         branding || null,
+    averageRating:    reviewData ? reviewData.averageRating : 0,
+    ratingCount:      reviewData ? reviewData.ratingCount : 0,
+    deliveryFee,
+    deliveryTime,
+  };
+};
 
 // ── Controllers ───────────────────────────────────────────────────────────────
 
@@ -131,6 +153,11 @@ const getNearbyStores = asyncHandler(async (req, res) => {
   // Step 3 — post-filter by each store's own deliveryRadiusKm
   const { page, limit, skip } = parsePagination(req.query);
 
+  const StoreSettings = require("../models/StoreSettings");
+  const storeIds = candidates.map(c => c._id);
+  const settingsList = await StoreSettings.find({ store: { $in: storeIds } }).select("store branding");
+  const settingsMap = new Map(settingsList.map(s => [s.store.toString(), s.branding]));
+
   const eligible = [];
   for (const store of candidates) {
     const [storeLng, storeLat] = store.location.coordinates;
@@ -143,13 +170,35 @@ const getNearbyStores = asyncHandler(async (req, res) => {
 
     if (dist <= effectiveRadius) {
       const status = computeOpenStatus(store.operatingHours, timezone);
-      eligible.push({ store, dist, status });
+      const branding = settingsMap.get(store._id.toString());
+      eligible.push({ store, dist, status, branding });
     }
   }
 
   // Step 4 — paginate
   const total = eligible.length;
   const pageSlice = eligible.slice(skip, skip + limit);
+
+  const Review = require("../models/Review");
+  const ShippingMethod = require("../models/ShippingMethod");
+  const sliceStoreIds = pageSlice.map(item => item.store._id);
+
+  const [reviews, shippingMethods] = await Promise.all([
+    Review.aggregate([
+      { $match: { store: { $in: sliceStoreIds }, status: "approved" } },
+      { $group: { _id: "$store", averageRating: { $avg: "$rating" }, ratingCount: { $sum: 1 } } }
+    ]),
+    ShippingMethod.find({ store: { $in: sliceStoreIds }, isActive: true })
+  ]);
+
+  const reviewMap = new Map(reviews.map(r => [r._id.toString(), r]));
+  
+  const shippingMap = new Map();
+  for (const method of shippingMethods) {
+    const storeIdStr = method.store.toString();
+    if (!shippingMap.has(storeIdStr)) shippingMap.set(storeIdStr, []);
+    shippingMap.get(storeIdStr).push(method);
+  }
 
   res.status(200).json({
     data: {
@@ -159,9 +208,14 @@ const getNearbyStores = asyncHandler(async (req, res) => {
       page,
       limit,
       total,
-      stores: pageSlice.map(({ store, dist, status }) =>
-        formatStore(store, dist, status)
-      ),
+      stores: pageSlice.map(({ store, dist, status, branding }) => {
+        const storeIdStr = store._id.toString();
+        const reviewData = reviewMap.get(storeIdStr) || null;
+        const storeShipping = shippingMap.get(storeIdStr) || [];
+        const cheapestShipping = storeShipping.sort((a, b) => a.fee - b.fee)[0] || null;
+
+        return formatStore(store, dist, status, branding, reviewData, cheapestShipping);
+      }),
     },
   });
 });
@@ -181,12 +235,29 @@ const getStoreBySlug = asyncHandler(async (req, res) => {
 
   if (!store) throw new ApiError(404, "Store not found");
 
+  const StoreSettings = require("../models/StoreSettings");
+  const Review = require("../models/Review");
+  const ShippingMethod = require("../models/ShippingMethod");
+
+  const [settings, reviewAgg, shippingMethods] = await Promise.all([
+    StoreSettings.findOne({ store: store._id }).select("branding"),
+    Review.aggregate([
+      { $match: { store: store._id, status: "approved" } },
+      { $group: { _id: "$store", averageRating: { $avg: "$rating" }, ratingCount: { $sum: 1 } } }
+    ]),
+    ShippingMethod.find({ store: store._id, isActive: true }).sort({ fee: 1 })
+  ]);
+
+  const branding = settings ? settings.branding : null;
+  const reviewData = reviewAgg.length > 0 ? reviewAgg[0] : null;
+  const cheapestShipping = shippingMethods.length > 0 ? shippingMethods[0] : null;
+
   const timezone = req.query.timezone || "UTC";
   const status = computeOpenStatus(store.operatingHours, timezone);
 
   res.status(200).json({
     data: {
-      ...formatStore(store, null, status),
+      ...formatStore(store, null, status, branding, reviewData, cheapestShipping),
       weekSchedule: status.weekSchedule,
     },
   });
@@ -252,7 +323,7 @@ const getStoreProducts = asyncHandler(async (req, res) => {
       .sort(sortKey)
       .skip(skip)
       .limit(limit)
-      .populate("category", "name slug")
+      .populate("category", "name slug image")
       .select(
         "title slug price compareAtPrice stock images averageRating ratingCount isActive category variants"
       ),

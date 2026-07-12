@@ -126,10 +126,23 @@ export default function ProductsPage() {
   const handleOpenEdit = (product) => {
     setEditingProduct({
       ...product,
+      price: product.price !== undefined ? (product.price / 100).toFixed(2) : '',
+      compareAtPrice: product.compareAtPrice !== undefined && product.compareAtPrice !== null 
+        ? (product.compareAtPrice / 100).toFixed(2) 
+        : '',
       category: product.category?._id || '',
       images: product.images?.join(', ') || ''
     });
-    setLocalVariants(product.variants || []);
+    
+    // Also convert variant prices to pounds
+    const mappedVariants = (product.variants || []).map(v => ({
+      ...v,
+      price: v.price !== undefined ? (v.price / 100).toFixed(2) : '',
+      compareAtPrice: v.compareAtPrice !== undefined && v.compareAtPrice !== null 
+        ? (v.compareAtPrice / 100).toFixed(2) 
+        : ''
+    }));
+    setLocalVariants(mappedVariants);
     setDrawerOpen(true);
   };
 
@@ -142,20 +155,46 @@ export default function ProductsPage() {
     try {
       setSubmitting(true);
       
-      const payload = { ...values };
-      // Always convert string images to array, empty string becomes empty array
-      if (typeof payload.images === 'string') {
-        payload.images = payload.images ? payload.images.split(',').map(u => u.trim()).filter(Boolean) : [];
-      }
-      if (!payload.compareAtPrice) payload.compareAtPrice = null;
-      if (!payload.category) payload.category = null;
+      const payload = new FormData();
       
-      payload.variants = localVariants.map(v => ({
+      Object.keys(values).forEach(key => {
+        if (key === 'imageFiles') {
+          if (values.imageFiles) {
+            let files = Array.isArray(values.imageFiles) ? values.imageFiles : [values.imageFiles];
+            if (files instanceof FileList) {
+               files = Array.from(files);
+            }
+            files.forEach(f => payload.append('productImages', f));
+          }
+        } else if (key !== 'images' && key !== 'variants' && key !== 'options' && key !== 'price' && key !== 'compareAtPrice') {
+          if (values[key] !== null && values[key] !== undefined && values[key] !== "") {
+            payload.append(key, values[key]);
+          }
+        }
+      });
+
+      // Handle prices (convert pounds to pence)
+      if (values.price !== undefined && values.price !== "") {
+        payload.append('price', Math.round(Number(values.price) * 100));
+      }
+      if (values.compareAtPrice !== undefined) {
+        if (values.compareAtPrice === "" || values.compareAtPrice === null) {
+          payload.append('compareAtPrice', "");
+        } else {
+          payload.append('compareAtPrice', Math.round(Number(values.compareAtPrice) * 100));
+        }
+      }
+
+      let existingImages = typeof values.images === 'string' ? values.images.split(',').map(u => u.trim()).filter(Boolean) : (values.images || []);
+      payload.append('images', JSON.stringify(existingImages));
+
+      const variantsData = localVariants.map(v => ({
         ...v,
-        price: Number(v.price) || 0,
+        price: Math.round(Number(v.price || 0) * 100),
         stock: Number(v.stock) || 0,
-        compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : null
+        compareAtPrice: v.compareAtPrice ? Math.round(Number(v.compareAtPrice) * 100) : null
       }));
+      payload.append('variants', JSON.stringify(variantsData));
 
       if (editingProduct) {
         await vendorService.updateProduct(editingProduct._id, payload);
@@ -239,27 +278,30 @@ export default function ProductsPage() {
       sortable: true,
       render: (v, row) => (
         <div>
-          <strong style={{ color: 'var(--gray-900)' }}>£{Number(v).toFixed(2)}</strong>
+          <strong style={{ color: 'var(--gray-900)' }}>£{v / 100}</strong>
           {row.compareAtPrice && (
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)', textDecoration: 'line-through' }}>
-              £{Number(row.compareAtPrice).toFixed(2)}
+              £{row.compareAtPrice / 100}
             </div>
           )}
         </div>
       ),
     },
     {
-      key: 'stock',
+      key: 'totalStock',
       label: 'Stock',
       sortable: true,
-      render: (v) => (
-        <span style={{ 
-          color: v <= 5 ? 'var(--aa-red)' : 'inherit', 
-          fontWeight: v <= 5 ? '600' : 'normal' 
-        }}>
-          {v} {v <= 5 && <span style={{ fontSize: 'var(--text-xs)' }}>(Low)</span>}
-        </span>
-      ),
+      render: (v, row) => {
+        const stockVal = row.totalStock !== undefined ? row.totalStock : row.stock;
+        return (
+          <span style={{ 
+            color: stockVal <= 5 ? 'var(--aa-red)' : 'inherit', 
+            fontWeight: stockVal <= 5 ? '600' : 'normal' 
+          }}>
+            {stockVal} {stockVal <= 5 && <span style={{ fontSize: 'var(--text-xs)' }}>(Low)</span>}
+          </span>
+        );
+      },
     },
     {
       key: 'isActive',
@@ -305,7 +347,7 @@ export default function ProductsPage() {
               <tr key={v._id || i} style={{ borderBottom: '1px solid var(--gray-200)' }}>
                 <td style={{ padding: '8px' }}>{v.attributes?.description || `Variant #${i + 1}`}</td>
                 <td style={{ padding: '8px' }}>{v.sku || '-'}</td>
-                <td style={{ textAlign: 'right', padding: '8px' }}>£{Number(v.price).toFixed(2)}</td>
+                <td style={{ textAlign: 'right', padding: '8px' }}>£{v.price / 100}</td>
                 <td style={{ textAlign: 'right', padding: '8px' }}>{v.stock}</td>
               </tr>
             ))}
@@ -485,11 +527,20 @@ export default function ProductsPage() {
             },
             {
               name: 'images',
-              label: 'Product Images (URLs)',
+              label: 'Existing Images (URLs)',
               type: 'textarea',
               placeholder: 'https://example.com/image1.jpg, https://example.com/image2.jpg',
-              helpText: 'Enter image URLs separated by commas.',
+              helpText: 'Enter existing image URLs separated by commas.',
               rows: 3,
+            },
+            {
+              name: 'imageFiles',
+              label: 'Upload New Images',
+              type: 'file',
+              accept: 'image/*',
+              multiple: true,
+              helpText: 'Select up to 5 images to upload.',
+              previewUrls: editingProduct?.images ? editingProduct.images.split(',').map(u => u.trim()).filter(Boolean) : undefined,
             },
             {
               name: 'isActive',
@@ -589,6 +640,7 @@ export default function ProductsPage() {
                           style={{ fontSize: 'var(--text-sm)', height: 32 }}
                           min="0" step="0.01" required
                           value={v.price !== undefined ? v.price : ''}
+                          onWheel={(e) => e.target.blur()}
                           onChange={(e) => {
                             const updated = [...localVariants];
                             updated[i] = { ...updated[i], price: e.target.value };
@@ -604,6 +656,7 @@ export default function ProductsPage() {
                           style={{ fontSize: 'var(--text-sm)', height: 32 }}
                           min="0"
                           value={v.stock !== undefined ? v.stock : ''}
+                          onWheel={(e) => e.target.blur()}
                           onChange={(e) => {
                             const updated = [...localVariants];
                             updated[i] = { ...updated[i], stock: e.target.value };
