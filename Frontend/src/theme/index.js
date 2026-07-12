@@ -1,8 +1,8 @@
 // Snappy Shopper Design Tokens
 export const Colors = {
-  primary: '#2563EB',      // Snappy blue
-  primaryLight: '#3B82F6',
-  primaryDark: '#1D4ED8',
+  primary: '#50178E',      // Brand purple
+  primaryLight: '#7A3FB8',
+  primaryDark: '#3B0764',
   accent: '#EF4444',       // Action red
   accentLight: '#F87171',
   accentDark: '#DC2626',

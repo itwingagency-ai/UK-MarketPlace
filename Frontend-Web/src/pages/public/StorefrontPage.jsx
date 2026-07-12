@@ -63,7 +63,7 @@ export default function StorefrontPage() {
       {/* Header Banner */}
       <div style={{
         height: 250,
-        background: store.logoUrl ? `url(${store.logoUrl}) center/cover no-repeat` : 'var(--primary-600)',
+        background: store.branding?.logoUrl ? `url(${store.branding.logoUrl}) center/cover no-repeat` : 'var(--primary-600)',
         position: 'relative'
       }}>
         <div style={{

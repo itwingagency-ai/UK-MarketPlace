@@ -8,14 +8,13 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
-  KeyboardAvoidingView,
   ScrollView,
   Dimensions,
   Animated,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import Input from '../components/Input';
 import { Colors, Spacing, Typography, Radius } from '../theme';
 
 const { height } = Dimensions.get('window');
@@ -29,6 +28,7 @@ export default function RegisterScreen({ navigation }) {
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   const shake = () => {
@@ -54,9 +54,13 @@ export default function RegisterScreen({ navigation }) {
   const handleRegister = async () => {
     if (!validateForm()) { shake(); return; }
     setIsSubmitting(true);
-    const result = await register(name.trim(), email.trim().toLowerCase(), password);
+    const normalizedEmail = email.trim().toLowerCase();
+    const result = await register(name.trim(), normalizedEmail, password);
     setIsSubmitting(false);
-    if (!result.success) {
+    
+    if (result.success) {
+      navigation.navigate('OtpVerification', { email: normalizedEmail, mode: 'signup' });
+    } else {
       setEmailError(result.error ?? 'Registration failed. Please try again.');
       shake();
     }
@@ -77,81 +81,118 @@ export default function RegisterScreen({ navigation }) {
         </TouchableOpacity>
       </SafeAreaView>
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Animated.View style={[styles.content, { transform: [{ translateX: shakeAnim }] }]}>
-            <View style={styles.headerBlock}>
-              <Text style={styles.welcomeLabel}>Get started</Text>
-              <Text style={styles.title}>Create your account</Text>
-              <Text style={styles.tagline}>Sign up for Snappy Shopper today.</Text>
+        <Animated.View style={[styles.content, { transform: [{ translateX: shakeAnim }] }]}>
+          <View style={styles.headerBlock}>
+            <Text style={styles.welcomeLabel}>Get started</Text>
+            <Text style={styles.title}>Create your account</Text>
+            <Text style={styles.tagline}>Sign up for Snappy Shopper today.</Text>
+          </View>
+
+          {/* Full Name Input */}
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.label}>Full Name</Text>
+            <View style={[
+              styles.inputContainer,
+              nameError && styles.inputContainerError,
+            ]}>
+              <Text style={styles.inputIcon}>👤</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Your full name"
+                placeholderTextColor={Colors.muted}
+                value={name}
+                onChangeText={(t) => { setName(t); setNameError(''); }}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
             </View>
+            {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
+          </View>
 
-            <Input
-              label="Full Name"
-              placeholder="Your full name"
-              value={name}
-              onChangeText={(t) => { setName(t); setNameError(''); }}
-              autoCapitalize="words"
-              leftIcon={<Text style={styles.inputIcon}>👤</Text>}
-              error={nameError}
-            />
-            <Input
-              label="Email"
-              placeholder="youremail@example.com"
-              value={email}
-              onChangeText={(t) => { setEmail(t); setEmailError(''); }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              leftIcon={<Text style={styles.inputIcon}>✉️</Text>}
-              error={emailError}
-            />
-            <Input
-              label="Password"
-              placeholder="Create a password (8+ characters)"
-              value={password}
-              onChangeText={(t) => { setPassword(t); setPasswordError(''); }}
-              secureTextEntry
-              autoCapitalize="none"
-              leftIcon={<Text style={styles.inputIcon}>🔒</Text>}
-              error={passwordError}
-            />
+          {/* Email Input */}
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.label}>Email</Text>
+            <View style={[
+              styles.inputContainer,
+              emailError && styles.inputContainerError,
+            ]}>
+              <Text style={styles.inputIcon}>✉️</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="youremail@example.com"
+                placeholderTextColor={Colors.muted}
+                value={email}
+                onChangeText={(t) => { setEmail(t); setEmailError(''); }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+          </View>
 
-            <TouchableOpacity
-              style={[styles.registerBtn, isLoading && styles.btnDisabled]}
-              onPress={handleRegister}
-              disabled={isLoading}
-              activeOpacity={0.85}
-            >
-              {isLoading ? (
-                <ActivityIndicator color={Colors.white} size="small" />
-              ) : (
-                <Text style={styles.registerBtnText}>Create Account</Text>
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.loginRow}>
-              <Text style={styles.loginPrompt}>Already have an account? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
-                <Text style={styles.loginLink}>Log in</Text>
+          {/* Password Input */}
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.label}>Password</Text>
+            <View style={[
+              styles.inputContainer,
+              passwordError && styles.inputContainerError,
+            ]}>
+              <Text style={styles.inputIcon}>🔒</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Create a password (8+ characters)"
+                placeholderTextColor={Colors.muted}
+                value={password}
+                onChangeText={(t) => { setPassword(t); setPasswordError(''); }}
+                secureTextEntry={!isPasswordVisible}
+                autoCapitalize="none"
+                autoCorrect={false}
+                onSubmitEditing={handleRegister}
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setIsPasswordVisible((v) => !v)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.eyeIcon}>{isPasswordVisible ? '🙈' : '👁'}</Text>
               </TouchableOpacity>
             </View>
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+          </View>
+
+          <TouchableOpacity
+            style={[styles.registerBtn, isLoading && styles.btnDisabled]}
+            onPress={handleRegister}
+            disabled={isLoading}
+            activeOpacity={0.85}
+          >
+            {isLoading ? (
+              <ActivityIndicator color={Colors.white} size="small" />
+            ) : (
+              <Text style={styles.registerBtnText}>Create Account</Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.loginRow}>
+            <Text style={styles.loginPrompt}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
+              <Text style={styles.loginLink}>Log in</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.white },
-  flex: { flex: 1 },
   safeArea: {
     paddingHorizontal: Spacing['2xl'],
     paddingTop: Platform.OS === 'android' ? Spacing.lg : 0,
@@ -167,9 +208,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   backIcon: { fontSize: 20, color: Colors.text, fontWeight: '600', lineHeight: 22 },
-  scrollContent: { flexGrow: 1, paddingBottom: Spacing['3xl'] },
+  scrollContent: { flexGrow: 1, paddingBottom: Platform.OS === 'ios' ? 100 : 80 },
   content: {
-    flex: 1,
     paddingHorizontal: Spacing['2xl'],
     paddingTop: Spacing.xl,
   },
@@ -191,7 +231,59 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     color: Colors.textSecondary,
   },
-  inputIcon: { fontSize: 16 },
+  // Input field styles (matching ShopHomeScreen pattern)
+  fieldWrapper: {
+    marginBottom: Spacing.base,
+  },
+  label: {
+    fontSize: Typography.size.sm,
+    fontWeight: Typography.weight.semibold,
+    color: Colors.text,
+    marginBottom: Spacing.xs,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    minHeight: 52,
+  },
+  inputContainerFocused: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.white,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  inputContainerError: {
+    borderColor: Colors.error,
+  },
+  inputIcon: {
+    fontSize: 16,
+    marginRight: Spacing.sm,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: Typography.size.base,
+    color: Colors.text,
+    paddingVertical: Spacing.sm,
+  },
+  eyeButton: {
+    padding: Spacing.xs,
+  },
+  eyeIcon: {
+    fontSize: 16,
+  },
+  errorText: {
+    color: Colors.error,
+    fontSize: Typography.size.xs,
+    marginTop: Spacing.xs,
+  },
   registerBtn: {
     backgroundColor: Colors.accent,
     borderRadius: Radius.full,

@@ -177,6 +177,185 @@ const deleteAddress = asyncHandler(async (req, res) => {
   res.status(200).json({ message: "Address deleted" });
 });
 
+const getFavorites = asyncHandler(async (req, res) => {
+  const { lat, lng } = req.query;
+
+  const user = await User.findById(req.user.id)
+    .populate("favoriteStores")
+    .populate({
+      path: "favoriteProducts",
+      populate: { path: "store", select: "location locationSet deliveryRadiusKm" }
+    });
+  if (!user) throw new ApiError(404, "User not found");
+
+  const StoreSettings = require("../models/StoreSettings");
+  const Review = require("../models/Review");
+  const ShippingMethod = require("../models/ShippingMethod");
+  
+  let favoriteStores = user.favoriteStores || [];
+  let favoriteProducts = user.favoriteProducts || [];
+
+  const checkDelivery = (storeLat, storeLng, radius) => {
+    if (!lat || !lng) return true;
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat - storeLat) * (Math.PI / 180);
+    const dLon = (lng - storeLng) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(storeLat * (Math.PI / 180)) * Math.cos(lat * (Math.PI / 180)) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c; 
+    return distance <= radius;
+  };
+
+  if (favoriteStores.length > 0) {
+    const storeIds = favoriteStores.map(s => s._id);
+    
+    const [settingsList, reviews, shippingMethods] = await Promise.all([
+      StoreSettings.find({ store: { $in: storeIds } }).select("store branding"),
+      Review.aggregate([
+        { $match: { store: { $in: storeIds }, status: "approved" } },
+        { $group: { _id: "$store", averageRating: { $avg: "$rating" }, ratingCount: { $sum: 1 } } }
+      ]),
+      ShippingMethod.find({ store: { $in: storeIds }, isActive: true })
+    ]);
+
+    const settingsMap = new Map(settingsList.map(s => [s.store.toString(), s.branding]));
+    const reviewMap = new Map(reviews.map(r => [r._id.toString(), r]));
+    const shippingMap = new Map();
+    for (const method of shippingMethods) {
+      const storeIdStr = method.store.toString();
+      if (!shippingMap.has(storeIdStr)) shippingMap.set(storeIdStr, []);
+      shippingMap.get(storeIdStr).push(method);
+    }
+
+    favoriteStores = favoriteStores.map(store => {
+      const storeObj = store.toObject();
+      const storeIdStr = storeObj._id.toString();
+      
+      storeObj.branding = settingsMap.get(storeIdStr) || null;
+      
+      const reviewData = reviewMap.get(storeIdStr);
+      if (reviewData) {
+        storeObj.averageRating = reviewData.averageRating;
+        storeObj.ratingCount = reviewData.ratingCount;
+      }
+      
+      const storeShipping = shippingMap.get(storeIdStr) || [];
+      const cheapestShipping = storeShipping.sort((a, b) => a.fee - b.fee)[0];
+      
+      if (cheapestShipping) {
+        storeObj.deliveryFee = cheapestShipping.fee;
+        if (cheapestShipping.minDays === 0 && cheapestShipping.maxDays === 0) {
+          storeObj.deliveryTime = "Same day";
+        } else if (cheapestShipping.minDays === cheapestShipping.maxDays) {
+          storeObj.deliveryTime = `${cheapestShipping.minDays} day${cheapestShipping.minDays !== 1 ? 's' : ''}`;
+        } else {
+          storeObj.deliveryTime = `${cheapestShipping.minDays}-${cheapestShipping.maxDays} days`;
+        }
+      }
+
+      storeObj.deliversToLocation = true;
+      if (storeObj.location && storeObj.locationSet) {
+        storeObj.deliversToLocation = checkDelivery(
+          storeObj.location.coordinates[1],
+          storeObj.location.coordinates[0],
+          storeObj.deliveryRadiusKm
+        );
+      }
+      
+      return storeObj;
+    });
+  }
+
+  if (favoriteProducts.length > 0) {
+    favoriteProducts = favoriteProducts.map(product => {
+      const prodObj = product.toObject();
+      prodObj.deliversToLocation = true;
+      if (prodObj.store && prodObj.store.location && prodObj.store.locationSet) {
+        prodObj.deliversToLocation = checkDelivery(
+          prodObj.store.location.coordinates[1],
+          prodObj.store.location.coordinates[0],
+          prodObj.store.deliveryRadiusKm
+        );
+      }
+      return prodObj;
+    });
+  }
+
+  res.status(200).json({
+    data: {
+      favoriteStores,
+      favoriteProducts,
+    },
+  });
+});
+
+const addFavoriteStore = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, "Invalid store id");
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user) throw new ApiError(404, "User not found");
+
+  if (!user.favoriteStores.includes(id)) {
+    user.favoriteStores.push(id);
+    await user.save();
+  }
+
+  res.status(200).json({ message: "Store added to favorites", data: id });
+});
+
+const removeFavoriteStore = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, "Invalid store id");
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user) throw new ApiError(404, "User not found");
+
+  user.favoriteStores.pull(id);
+  await user.save();
+
+  res.status(200).json({ message: "Store removed from favorites" });
+});
+
+const addFavoriteProduct = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, "Invalid product id");
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user) throw new ApiError(404, "User not found");
+
+  if (!user.favoriteProducts.includes(id)) {
+    user.favoriteProducts.push(id);
+    await user.save();
+  }
+
+  res.status(200).json({ message: "Product added to favorites", data: id });
+});
+
+const removeFavoriteProduct = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, "Invalid product id");
+  }
+
+  const user = await User.findById(req.user.id);
+  if (!user) throw new ApiError(404, "User not found");
+
+  user.favoriteProducts.pull(id);
+  await user.save();
+
+  res.status(200).json({ message: "Product removed from favorites" });
+});
+
 module.exports = {
   getMe,
   updateMe,
@@ -185,4 +364,9 @@ module.exports = {
   addAddress,
   updateAddress,
   deleteAddress,
+  getFavorites,
+  addFavoriteStore,
+  removeFavoriteStore,
+  addFavoriteProduct,
+  removeFavoriteProduct,
 };

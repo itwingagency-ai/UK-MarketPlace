@@ -167,10 +167,9 @@ const updateProduct = asyncHandler(async (req, res) => {
     }
   }
 
-  if (req.files && Array.isArray(req.files)) {
+  if (req.files && Array.isArray(req.files) && req.files.length > 0) {
     const uploadedUrls = req.files.map((f) => f.location).filter(Boolean);
-    if (!Array.isArray(product.images)) product.images = [];
-    product.images = [...product.images, ...uploadedUrls];
+    product.images = uploadedUrls;
   }
 
   // Delete removed images from S3

@@ -17,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { getNearbyStores } from '../api/stores.api';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFavorites } from '../context/FavoritesContext';
 
 const { width } = Dimensions.get('window');
 const BOTTOM_TAB_HEIGHT = 70;
@@ -55,8 +57,8 @@ function SearchIcon({ size = 16, color = Colors.muted }) {
 
 const DEFAULT_STORE_IMAGE = 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800&auto=format&fit=crop';
 
-function StoreBanner({ store, onPress }) {
-  const imageUrl = store.branding?.bannerUrl || store.logoUrl || store.imageUrl || DEFAULT_STORE_IMAGE;
+function StoreBanner({ store, onPress, isFavorited, onToggleFavorite }) {
+  const imageUrl = store.branding?.bannerUrl || store.branding?.logoUrl || store.imageUrl || DEFAULT_STORE_IMAGE;
 
   // Build rating display — use exact data from backend or fallback to 0
   const rating = store.averageRating ?? 0;
@@ -115,6 +117,22 @@ function StoreBanner({ store, onPress }) {
               <Text style={bannerStyles.closedText}>{closedText}</Text>
             </View>
           )}
+
+          {/* Favorite Button */}
+          <TouchableOpacity
+            style={bannerStyles.heartBtn}
+            activeOpacity={0.8}
+            onPress={(e) => {
+              e.stopPropagation();
+              onToggleFavorite();
+            }}
+          >
+            <Ionicons
+              name={isFavorited ? "heart" : "heart-outline"}
+              size={20}
+              color={isFavorited ? '#50178E' : '#333'}
+            />
+          </TouchableOpacity>
         </ImageBackground>
       </View>
 
@@ -161,7 +179,7 @@ function StoreBanner({ store, onPress }) {
 function LoadingState({ postcode }) {
   return (
     <View style={styles.centeredState}>
-      <ActivityIndicator size="large" color={Colors.primary} />
+      <ActivityIndicator size="large" color="#50178E" />
       <Text style={styles.stateTitle}>Finding stores…</Text>
       <Text style={styles.stateSub}>Looking for stores near {postcode}</Text>
     </View>
@@ -196,17 +214,118 @@ function ErrorState({ onRetry }) {
   );
 }
 
+// ─── Promo Carousel ────────────────────────────────────────────────────────────
+
+const PROMO_BANNERS = [
+  {
+    id: '1',
+    title: 'SNAPPY SHOPPER',
+    subtitle: 'Shopping Made Effortless.',
+    bg: '#50178E', // Purple
+    textColor: '#FFFFFF',
+    icon1: 'shopping-outline',
+    icon2: 'ticket-percent-outline'
+  },
+  {
+    id: '2',
+    title: 'CRACK INTO PLEASURE',
+    subtitle: 'Exclusive deals',
+    bg: '#D81B60', // Pink/Red
+    textColor: '#FFFFFF',
+    icon1: 'gift-outline',
+    icon2: 'heart-outline'
+  },
+  {
+    id: '3',
+    title: 'FRESH & FAST',
+    subtitle: 'Groceries at your door in minutes',
+    bg: '#FFFFFF', // White
+    textColor: '#1E1B4B',
+    icon1: 'basket-outline',
+    icon2: 'clock-outline',
+    hasBorder: true,
+  }
+];
+
+function PromoCarousel() {
+  const flatListRef = React.useRef(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const bannerWidth = width - Spacing.base * 2;
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      let nextIndex = currentIndex + 1;
+      if (nextIndex >= PROMO_BANNERS.length) {
+        nextIndex = 0;
+      }
+      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+      setCurrentIndex(nextIndex);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [currentIndex]);
+
+  const onMomentumScrollEnd = (e) => {
+    const contentOffset = e.nativeEvent.contentOffset.x;
+    const index = Math.round(contentOffset / bannerWidth);
+    setCurrentIndex(index);
+  };
+
+  return (
+    <View style={carouselStyles.container}>
+      <FlatList
+        ref={flatListRef}
+        data={PROMO_BANNERS}
+        keyExtractor={item => item.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[
+              carouselStyles.promoBanner,
+              { backgroundColor: item.bg, width: bannerWidth },
+              item.hasBorder && carouselStyles.promoBannerBorder
+            ]}
+            activeOpacity={0.9}
+          >
+            <View style={carouselStyles.promoContent}>
+              <Text style={[carouselStyles.promoTitle, { color: item.textColor }]}>{item.title}</Text>
+              <View style={carouselStyles.promoActionRow}>
+                <Text style={{ color: item.textColor, opacity: 0.8, fontSize: 13, fontWeight: '600' }}>{item.subtitle}</Text>
+              </View>
+            </View>
+            <View style={carouselStyles.promoGraphicPlaceholder}>
+              <MaterialCommunityIcons name={item.icon1} size={60} color={item.textColor === '#FFFFFF' ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.06)"} />
+              <MaterialCommunityIcons name={item.icon2} size={35} color={item.textColor === '#FFFFFF' ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.08)"} style={carouselStyles.promoTicketIcon} />
+            </View>
+          </TouchableOpacity>
+        )}
+      />
+      <View style={carouselStyles.dotsRow}>
+        {PROMO_BANNERS.map((_, index) => (
+          <View
+            key={index}
+            style={[carouselStyles.dot, currentIndex === index && carouselStyles.dotActive]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ShopHomeScreen({ route, navigation }) {
   const { postcode = '', locationLabel = '' } = route.params ?? {};
   const initialStores = route.params?.stores ?? [];
-  const { logout } = useAuth();
+  const { isAuthenticated } = useAuth();
+  const { favoriteStores, toggleFavoriteStore } = useFavorites();
 
-  const [stores, setStores]           = useState(initialStores);
-  const [loading, setLoading]         = useState(initialStores.length === 0);
-  const [refreshing, setRefreshing]   = useState(false);
-  const [hasError, setHasError]       = useState(false);
+  const [stores, setStores] = useState(initialStores);
+  const [loading, setLoading] = useState(initialStores.length === 0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const displayLocation = locationLabel || postcode;
@@ -214,10 +333,10 @@ export default function ShopHomeScreen({ route, navigation }) {
   // ── Filter stores by search ───────────────────────────────────────────────
   const visibleStores = searchQuery.trim()
     ? stores.filter((s) =>
-        s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.address?.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.address?.line1?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.address?.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.address?.line1?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : stores;
 
   // ── Fetch from backend ────────────────────────────────────────────────────
@@ -253,16 +372,7 @@ export default function ShopHomeScreen({ route, navigation }) {
   // ── List header ───────────────────────────────────────────────────────────
   const ListHeader = () => (
     <View style={styles.listHeader}>
-      {/* Featured Banner */}
-      <View style={styles.featuredBanner}>
-        <Text style={styles.featuredEmoji}>🎉</Text>
-        <View style={styles.featuredContent}>
-          <Text style={styles.featuredTitle}>CRACK INTO PLEASURE</Text>
-          <TouchableOpacity style={styles.featuredBtn} activeOpacity={0.8}>
-            <Text style={styles.featuredBtnText}>Shop now</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <PromoCarousel />
 
       <Text style={styles.resultsCount}>
         {visibleStores.length}{' '}
@@ -342,7 +452,18 @@ export default function ShopHomeScreen({ route, navigation }) {
           data={visibleStores}
           keyExtractor={(item, i) => item._id ?? item.id ?? String(i)}
           renderItem={({ item }) => (
-            <StoreBanner store={item} onPress={() => handleStorePress(item)} />
+            <StoreBanner
+              store={item}
+              onPress={() => handleStorePress(item)}
+              isFavorited={favoriteStores.some(s => s._id === (item._id || item.id) || s === (item._id || item.id))}
+              onToggleFavorite={() => {
+                if (!isAuthenticated) {
+                  navigation.navigate('AccountTab');
+                } else {
+                  toggleFavoriteStore(item._id || item.id);
+                }
+              }}
+            />
           )}
           numColumns={1}
           contentContainerStyle={styles.list}
@@ -391,11 +512,11 @@ const styles = StyleSheet.create({
   },
   brand: { marginRight: 'auto' },
   brandLine1: {
-    fontSize: 13, fontWeight: '800', color: Colors.primary,
+    fontSize: 13, fontWeight: '800', color: '#50178E',
     lineHeight: 15, letterSpacing: -0.2,
   },
   brandLine2: {
-    fontSize: 17, fontWeight: '900', color: Colors.primary,
+    fontSize: 17, fontWeight: '900', color: '#50178E',
     lineHeight: 18, letterSpacing: -0.3,
   },
   locationPill: {
@@ -466,43 +587,8 @@ const styles = StyleSheet.create({
     paddingBottom: BOTTOM_TAB_HEIGHT + 20,
   },
   listHeader: { marginBottom: Spacing.lg },
-  featuredBanner: {
-    backgroundColor: '#1E1B4B',
-    borderRadius: 16,
-    padding: Spacing.xl,
-    marginBottom: Spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  featuredContent: { flex: 1, zIndex: 2 },
-  featuredTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#FBBF24',
-    marginBottom: Spacing.md,
-    textTransform: 'uppercase',
-  },
-  featuredBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.white,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: Radius.full,
-  },
-  featuredBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#1E1B4B',
-  },
-  featuredEmoji: {
-    position: 'absolute',
-    right: -10,
-    bottom: -20,
-    fontSize: 110,
-    opacity: 0.9,
-    zIndex: 1,
-  },
+
+  // Carousel
   resultsCount: {
     fontSize: Typography.size.lg,
     fontWeight: Typography.weight.extrabold,
@@ -597,6 +683,23 @@ const bannerStyles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 16,
   },
+  heartBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: Colors.white,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    zIndex: 20,
+  },
 
   // Carousel dots
   dotsRow: {
@@ -685,6 +788,79 @@ const bannerStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: Colors.textSecondary,
+  },
+});
+
+// ─── Carousel Styles ───────────────────────────────────────────────────────────
+
+const carouselStyles = StyleSheet.create({
+  container: {
+    marginBottom: Spacing.xl,
+  },
+  promoBanner: {
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+    height: 120, // fixed height for consistency
+  },
+  promoBannerBorder: {
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  promoContent: {
+    flex: 1,
+    paddingRight: Spacing.md,
+    zIndex: 2,
+    justifyContent: 'center',
+  },
+  promoTitle: {
+    fontSize: Typography.size.lg,
+    fontWeight: '800',
+    lineHeight: 24,
+    marginBottom: Spacing.sm,
+    textTransform: 'uppercase',
+  },
+  promoActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  promoGraphicPlaceholder: {
+    position: 'absolute',
+    right: -20,
+    bottom: -15,
+    width: 120,
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  promoTicketIcon: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    transform: [{ rotate: '-15deg' }]
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 10,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.border,
+  },
+  dotActive: {
+    width: 18,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
   },
 });
 

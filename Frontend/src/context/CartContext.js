@@ -22,15 +22,17 @@ const CART_ACTIONS = {
 function cartReducer(state, action) {
   switch (action.type) {
     case CART_ACTIONS.SET_CART: {
-      const cart = action.payload;
-      const total = cart.items?.reduce((sum, item) => sum + item.price * item.quantity, 0) ?? 0;
-      const itemCount = cart.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+      const cart = action.payload || {};
+      const flattenedItems = cart.byStore ? cart.byStore.flatMap(store => store.items || []) : (cart.items || []);
+      const total = cart.grandTotal ?? cart.subtotal ?? flattenedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+      const itemCount = cart.totalItems ?? flattenedItems.reduce((sum, item) => sum + item.quantity, 0);
       return {
         ...state,
-        items: cart.items ?? [],
+        items: flattenedItems,
         total,
         itemCount,
-        storeId: cart.store ?? null,
+        storeId: cart.byStore?.[0]?.storeId ?? cart.store ?? null,
+        defaultShippingMethod: cart.byStore?.[0]?.defaultShippingMethod ?? null,
         isLoading: false,
         error: null,
       };
@@ -117,6 +119,7 @@ export const CartProvider = ({ children }) => {
         total: state.total,
         itemCount: state.itemCount,
         storeId: state.storeId,
+        defaultShippingMethod: state.defaultShippingMethod,
         isLoading: state.isLoading,
         error: state.error,
         fetchCart,

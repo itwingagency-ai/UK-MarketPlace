@@ -40,6 +40,7 @@ export default function StoreSettingsPage() {
     slug: '',
     description: '',
     logoUrl: '',
+    logoFile: null,
     bannerUrl: '',
     bannerFile: null,
     contactEmail: '',
@@ -91,6 +92,14 @@ export default function StoreSettingsPage() {
     }
   };
 
+  const handleLogoFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData((prev) => ({ ...prev, logoFile: file }));
+      setIsDirty(true);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -99,7 +108,9 @@ export default function StoreSettingsPage() {
       Object.keys(formData).forEach(key => {
         if (key === 'bannerFile') {
           if (formData.bannerFile) payload.append('bannerImage', formData.bannerFile);
-        } else if (key !== 'bannerUrl' || formData[key]) {
+        } else if (key === 'logoFile') {
+          if (formData.logoFile) payload.append('logoImage', formData.logoFile);
+        } else if (key !== 'bannerUrl' && key !== 'logoUrl' || formData[key]) {
           payload.append(key, formData[key]);
         }
       });
@@ -156,31 +167,28 @@ export default function StoreSettingsPage() {
                   background: 'var(--surface-50)',
                   flexShrink: 0,
                 }}>
-                  {formData.logoUrl ? (
-                    <a href={formData.logoUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '100%', height: '100%' }} title="Click to view full image">
+                  {(formData.logoFile || formData.logoUrl) ? (
+                    <a href={formData.logoFile ? URL.createObjectURL(formData.logoFile) : formData.logoUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '100%', height: '100%' }} title="Click to view full image">
                       <img
-                        src={formData.logoUrl}
+                        src={formData.logoFile ? URL.createObjectURL(formData.logoFile) : formData.logoUrl}
                         alt="Store Logo"
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         onError={(e) => { e.target.parentElement.style.display = 'none'; e.target.parentElement.nextSibling && (e.target.parentElement.nextSibling.style.display = 'flex'); }}
                       />
                     </a>
-                  ) : null}
-                  {!formData.logoUrl && (
+                  ) : (
                     <Image size={24} style={{ color: 'var(--text-tertiary)' }} />
                   )}
                 </div>
                 <div style={{ flex: 1 }}>
                   <input
-                    type="url"
+                    type="file"
+                    accept="image/*"
                     className="form-input"
-                    name="logoUrl"
-                    value={formData.logoUrl}
-                    onChange={handleChange}
-                    placeholder="https://example.com/logo.png"
+                    onChange={handleLogoFileChange}
                   />
                   <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '0.375rem' }}>
-                    Provide a URL to your store logo. Recommended size: 200×200px.
+                    Upload a high-quality logo for your store profile. Recommended size: 200×200px.
                   </p>
                 </div>
               </div>

@@ -59,6 +59,7 @@ const env = {
   },
   // Google Maps Geocoding API — optional but required for address-based store discovery
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || "",
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
 };
 
 module.exports = env;

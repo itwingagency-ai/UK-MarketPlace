@@ -7,9 +7,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ukmarketplace.app"
     },
     "android": {
+      "package": "com.ukmarketplace.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -19,6 +21,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "@react-native-google-signin/google-signin"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "91d2d940-c963-4b29-8158-2e9ccc95d479"
+      }
     }
   }
 }

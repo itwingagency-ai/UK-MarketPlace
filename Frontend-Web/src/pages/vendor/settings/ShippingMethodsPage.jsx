@@ -228,7 +228,7 @@ export default function ShippingMethodsPage() {
                     </td>
                     <td>
                       <span style={{ color: 'var(--text-secondary)' }}>
-                        {method.minDays} - {method.maxDays} days
+                        {method.minDays} - {method.maxDays} mins
                       </span>
                     </td>
                     <td>
@@ -324,7 +324,7 @@ export default function ShippingMethodsPage() {
 
           <div className="grid grid-cols-2" style={{ gap: 'var(--space-4)' }}>
             <div className="form-group">
-              <label className="form-label">Min Days</label>
+              <label className="form-label">Min Minutes</label>
               <input
                 type="number"
                 min="0"
@@ -337,7 +337,7 @@ export default function ShippingMethodsPage() {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Max Days</label>
+              <label className="form-label">Max Minutes</label>
               <input
                 type="number"
                 min="0"

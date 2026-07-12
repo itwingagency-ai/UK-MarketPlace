@@ -21,6 +21,7 @@ import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
 
 const { width } = Dimensions.get('window');
 const PRODUCT_CARD_W = (width - Spacing.lg * 2 - Spacing.md) / 2;
@@ -30,24 +31,35 @@ const PRODUCT_CARD_W = (width - Spacing.lg * 2 - Spacing.md) / 2;
 function ProductCard({ product, navigation, onRequireLogin }) {
   const { addItem } = useCart();
   const { isAuthenticated } = useAuth();
+  const { favoriteProducts, toggleFavoriteProduct } = useFavorites();
   const [adding, setAdding] = useState(false);
+
+  const productId = product._id || product.id;
+  const isFavorited = favoriteProducts.some(p => p._id === productId || p === productId);
+
+  const handleFavoriteToggle = () => {
+    if (!isAuthenticated) {
+      onRequireLogin();
+      return;
+    }
+    toggleFavoriteProduct(productId);
+  };
 
   const handleAddToCart = async () => {
     if (adding) return;
-    
+
     if (!isAuthenticated) {
       onRequireLogin();
       return;
     }
 
-    // Prevent adding products with variants directly
     if (product.variants && product.variants.length > 0) {
       Alert.alert('Select Variant', 'This product has multiple options. Please view details to select one.');
       return;
     }
 
     setAdding(true);
-    const res = await addItem(product._id || product.id, 1);
+    const res = await addItem(productId, 1);
     setAdding(false);
 
     if (!res.success) {
@@ -67,7 +79,11 @@ function ProductCard({ product, navigation, onRequireLogin }) {
   const imageUrl = product.images?.[0] || 'https://images.unsplash.com/photo-1550508117-a006c00661ff?q=80&w=400&auto=format&fit=crop';
 
   return (
-    <View style={productStyles.card}>
+    <TouchableOpacity
+      style={productStyles.card}
+      activeOpacity={0.9}
+      onPress={() => navigation.navigate('ProductDetail', { product })}
+    >
       <View style={productStyles.imgWrapper}>
         <Image source={{ uri: imageUrl }} style={productStyles.image} resizeMode="contain" />
         {hasDiscount && (
@@ -75,8 +91,12 @@ function ProductCard({ product, navigation, onRequireLogin }) {
             <Text style={productStyles.discountText}>-{discountPct}%</Text>
           </View>
         )}
-        <TouchableOpacity style={productStyles.heartBtn} activeOpacity={0.7} onPress={handleAddToCart}>
-          <Ionicons name="heart-outline" size={18} color={Colors.text} />
+        <TouchableOpacity style={productStyles.heartBtn} activeOpacity={0.7} onPress={handleFavoriteToggle}>
+          <Ionicons
+            name={isFavorited ? "heart" : "heart-outline"}
+            size={18}
+            color={isFavorited ? '#50178E' : Colors.text}
+          />
         </TouchableOpacity>
       </View>
 
@@ -85,7 +105,6 @@ function ProductCard({ product, navigation, onRequireLogin }) {
           {product.title}
         </Text>
         <View style={productStyles.nutritionRow}>
-          <Feather name="target" size={12} color="#10B981" style={{ marginRight: 4 }} />
           <Text style={productStyles.nutritionText}>{product.description || "200 kcal/100ml"}</Text>
         </View>
 
@@ -104,7 +123,7 @@ function ProductCard({ product, navigation, onRequireLogin }) {
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -258,20 +277,13 @@ export default function StoreProductsScreen({ route, navigation }) {
           >
             <Text style={[styles.filterPillText, filterOffer && styles.filterPillTextActive]}>On offer</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.filterPill, filterInStock && styles.filterPillActive]}
-            activeOpacity={0.8}
-            onPress={() => setFilterInStock(!filterInStock)}
-          >
-            <Text style={[styles.filterPillText, filterInStock && styles.filterPillTextActive]}>In stock</Text>
-          </TouchableOpacity>
         </ScrollView>
       </View>
 
       {/* Products Grid */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" color="#50178E" />
         </View>
       ) : (
         <FlatList
@@ -356,15 +368,15 @@ export default function StoreProductsScreen({ route, navigation }) {
               Please log in or create an account to add items to your basket.
             </Text>
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.modalBtnSecondary]} 
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnSecondary]}
                 activeOpacity={0.8}
                 onPress={() => setLoginModalVisible(false)}
               >
                 <Text style={styles.modalBtnTextSecondary}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.modalBtnPrimary]} 
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnPrimary]}
                 activeOpacity={0.8}
                 onPress={() => {
                   setLoginModalVisible(false);
@@ -497,7 +509,7 @@ const styles = StyleSheet.create({
   floatingCartBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 79, 79, 0.90)', // translucent red from figma
+    backgroundColor: '#D81B60', // solid pink/red from figma
     paddingHorizontal: Spacing.xl,
     paddingVertical: 14,
     borderRadius: Radius.full,

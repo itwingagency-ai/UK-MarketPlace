@@ -6,7 +6,15 @@ import React, {
   useReducer,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { login as apiLogin, logout as apiLogout, register as apiRegister } from '../api/auth.api';
+import { 
+  login as apiLogin, 
+  logout as apiLogout, 
+  register as apiRegister,
+  verifySignup as apiVerifySignup,
+  forgotPassword as apiForgotPassword,
+  resetPassword as apiResetPassword,
+  googleLogin as apiGoogleLogin,
+} from '../api/auth.api';
 import { STORAGE_KEYS } from '../constants';
 
 // ─── State & Reducer ──────────────────────────────────────────────────────
@@ -119,11 +127,60 @@ export const AuthProvider = ({ children }) => {
     try {
       dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
       const data = await apiRegister(name, email, password);
+      // Wait for OTP verification before persisting tokens
+      return { success: true, requiresOtp: data.requiresOtp };
+    } catch (err) {
+      const message = err.response?.data?.message || 'Registration failed. Please try again.';
+      dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: message });
+      return { success: false, error: message };
+    }
+  }, []);
+
+  const verifySignup = useCallback(async (email, otp) => {
+    try {
+      dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
+      const data = await apiVerifySignup(email, otp);
       await persistTokens(data.accessToken, data.refreshToken, data.user);
       dispatch({ type: AUTH_ACTIONS.LOGIN_SUCCESS, payload: data });
       return { success: true };
     } catch (err) {
-      const message = err.response?.data?.message || 'Registration failed. Please try again.';
+      const message = err.response?.data?.message || 'Verification failed. Please check your OTP.';
+      dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: message });
+      return { success: false, error: message };
+    }
+  }, []);
+
+  const forgotPassword = useCallback(async (email) => {
+    try {
+      dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
+      await apiForgotPassword(email);
+      return { success: true };
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to send OTP.';
+      return { success: false, error: message };
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (email, otp, newPassword) => {
+    try {
+      dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
+      await apiResetPassword(email, otp, newPassword);
+      return { success: true };
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to reset password.';
+      return { success: false, error: message };
+    }
+  }, []);
+
+  const googleLogin = useCallback(async (idToken) => {
+    try {
+      dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
+      const data = await apiGoogleLogin(idToken);
+      await persistTokens(data.accessToken, data.refreshToken, data.user);
+      dispatch({ type: AUTH_ACTIONS.LOGIN_SUCCESS, payload: data });
+      return { success: true };
+    } catch (err) {
+      const message = err.response?.data?.message || 'Google Login failed.';
       dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: message });
       return { success: false, error: message };
     }
@@ -150,6 +207,23 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
   }, []);
 
+  const updateUserContext = useCallback(async (newUserData) => {
+    try {
+      const updatedUser = { ...state.user, ...newUserData };
+      await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+      dispatch({
+        type: AUTH_ACTIONS.LOGIN_SUCCESS,
+        payload: {
+          user: updatedUser,
+          accessToken: state.accessToken,
+          refreshToken: state.refreshToken,
+        },
+      });
+    } catch (err) {
+      console.error('Failed to update user context', err);
+    }
+  }, [state.user, state.accessToken, state.refreshToken]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -160,8 +234,13 @@ export const AuthProvider = ({ children }) => {
         error: state.error,
         login,
         register,
+        verifySignup,
+        forgotPassword,
+        resetPassword,
+        googleLogin,
         logout,
         clearError,
+        updateUserContext,
       }}
     >
       {children}
