@@ -131,12 +131,42 @@ export default function FormBuilder({
             type="number"
             value={val}
             onChange={(e) => handleChange(fieldKey, e.target.value)}
+            onWheel={(e) => e.target.blur()}
             placeholder={f.placeholder || ''}
             disabled={f.disabled || submitting}
             min={f.min}
             max={f.max}
             step={f.step}
           />
+        );
+
+      case 'file':
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {f.previewUrls && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                {(Array.isArray(f.previewUrls) ? f.previewUrls : [f.previewUrls]).map((url, i) => (
+                  url ? (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: 64, height: 64, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', overflow: 'hidden', flexShrink: 0 }} title="Click to view full image">
+                      <img src={url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </a>
+                  ) : null
+                ))}
+              </div>
+            )}
+            <input
+              id={fieldId}
+              className={`form-input${err ? ' form-input-error' : ''}`}
+              type="file"
+              accept={f.accept}
+              multiple={f.multiple}
+              onChange={(e) => {
+                const files = f.multiple ? Array.from(e.target.files) : e.target.files[0];
+                handleChange(fieldKey, files);
+              }}
+              disabled={f.disabled || submitting}
+            />
+          </div>
         );
 
       default:

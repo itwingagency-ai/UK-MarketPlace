@@ -9,83 +9,69 @@ import {
   Dimensions,
   ActivityIndicator,
   RefreshControl,
+  ImageBackground,
+  Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStoreProducts } from '../api/stores.api';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 
 const { width } = Dimensions.get('window');
-const CAT_COLUMNS = 4;
-const CAT_WIDTH = (width - Spacing['2xl'] * 2 - Spacing.md * (CAT_COLUMNS - 1)) / CAT_COLUMNS;
+const CAT_COLUMNS = 1;
+const DEFAULT_CATEGORY_IMAGE = 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=800&auto=format&fit=crop';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getCategoryEmoji(slug) {
-  const map = {
-    'fruit-veg': '🍎', fruit: '🍎', vegetables: '🥦',
-    drinks: '🥤', beverages: '🥤',
-    bakery: '🥐', bread: '🍞',
-    frozen: '❄️',
-    snacks: '🍿', crisps: '🍟',
-    alcohol: '🍺', beer: '🍺', wine: '🍷', spirits: '🥃',
-    dairy: '🥛', milk: '🥛', cheese: '🧀',
-    meat: '🥩', poultry: '🍗',
-    household: '🧹', cleaning: '🧴',
-    personal: '🧴', health: '💊',
-    confectionery: '🍫', chocolate: '🍫', sweets: '🍬',
-  };
-  return slug ? (map[slug] || '🛒') : '🛒';
-}
-
-function getCategoryColor(index) {
-  const colors = ['#E0F2FE', '#DCFCE7', '#FEF3C7', '#FEE2E2', '#F3E8FF', '#FFEDD5', '#E0E7FF', '#FAFAFA'];
-  return colors[index % colors.length];
-}
+import { Ionicons, Feather, SimpleLineIcons } from '@expo/vector-icons';
 
 // ─── Store Header ─────────────────────────────────────────────────────────────
 
-function StoreHeader({ store, onBack }) {
-  const isOpen = store.isOpen ?? store.status === 'open';
-  const address = [store.address?.line1, store.address?.city]
-    .filter(Boolean)
-    .join(', ');
+function StoreHeader({ store, onBack, onInfo }) {
+  const insets = useSafeAreaInsets();
+  const bannerUrl = store.branding?.bannerUrl || store.imageUrl || DEFAULT_CATEGORY_IMAGE;
+  const logoUrl = store.logoUrl || store.imageUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=200&auto=format&fit=crop';
+  const city = store.address?.city || '';
+  const storeName = `${store.name}${city ? ` - ${city}` : ''}`;
+  const rating = store.averageRating ?? 0;
+  const ratingCount = store.ratingCount ?? 0;
+  const ratingDisplay = rating > 0 ? Number(rating).toFixed(1) : '0';
 
   return (
     <View style={headerStyles.container}>
-      {/* Top row */}
-      <View style={headerStyles.topRow}>
-        <TouchableOpacity style={headerStyles.backBtn} onPress={onBack} activeOpacity={0.8}>
-          <Text style={headerStyles.backIcon}>←</Text>
-        </TouchableOpacity>
-        <View style={headerStyles.storeIconWrapper}>
-          <Text style={headerStyles.storeIcon}>🏪</Text>
+      {/* Banner */}
+      <ImageBackground source={{ uri: bannerUrl }} style={headerStyles.banner}>
+        <View style={[headerStyles.topBar, { paddingTop: Math.max(insets.top, 16) }]}>
+          {/* Back Button */}
+          <TouchableOpacity style={headerStyles.iconBtn} onPress={onBack} activeOpacity={0.8}>
+            <Ionicons name="arrow-back-outline" size={24} color="#333" />
+          </TouchableOpacity>
+
+          {/* Right Action Icons */}
+          <View style={headerStyles.rightIconsContainer}>
+            <TouchableOpacity
+              style={headerStyles.iconBtn}
+              activeOpacity={0.8}
+              onPress={onInfo}
+            >
+              <Feather name="info" size={22} color={Colors.text} />
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={headerStyles.topInfo}>
-          <Text style={headerStyles.storeName} numberOfLines={1}>{store.name}</Text>
-          {address ? (
-            <Text style={headerStyles.storeAddress} numberOfLines={1}>{address}</Text>
-          ) : null}
-        </View>
-        <View style={[headerStyles.statusBadge, isOpen ? headerStyles.statusOpen : headerStyles.statusClosed]}>
-          <View style={[headerStyles.statusDot, isOpen ? headerStyles.dotOpen : headerStyles.dotClosed]} />
-          <Text style={[headerStyles.statusText, isOpen ? headerStyles.statusOpenText : headerStyles.statusClosedText]}>
-            {isOpen ? 'Open' : 'Closed'}
-          </Text>
-        </View>
+      </ImageBackground>
+
+      {/* Overlapping Logo */}
+      <View style={headerStyles.logoWrapper}>
+        <Image source={{ uri: logoUrl }} style={headerStyles.logo} />
       </View>
 
-      {/* Meta pills */}
-      <View style={headerStyles.metaRow}>
-        {store.deliveryRadiusKm != null && (
-          <View style={headerStyles.metaPill}>
-            <Text style={headerStyles.metaPillText}>🚐 {store.deliveryRadiusKm} km delivery zone</Text>
-          </View>
-        )}
-        {store.distanceKm != null && (
-          <View style={headerStyles.metaPill}>
-            <Text style={headerStyles.metaPillText}>📍 {store.distanceKm.toFixed(1)} km away</Text>
-          </View>
-        )}
+      {/* Info */}
+      <View style={headerStyles.infoContainer}>
+        <Text style={headerStyles.storeName} numberOfLines={1}>{storeName}</Text>
+        <Text style={headerStyles.ratingText}>
+          <Text style={headerStyles.starIcon}>⭐ </Text>
+          {ratingDisplay}{' '}
+          <Text style={headerStyles.ratingCount}>
+            ({ratingCount > 100 ? '100+' : ratingCount} ratings)
+          </Text>
+        </Text>
       </View>
     </View>
   );
@@ -95,7 +81,7 @@ function StoreHeader({ store, onBack }) {
 
 export default function StoreCategoriesScreen({ route, navigation }) {
   const { store } = route.params ?? {};
-  
+
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -110,20 +96,19 @@ export default function StoreCategoriesScreen({ route, navigation }) {
     setError(false);
 
     try {
-      // Fetch a large page of products just to extract categories
       const data = await getStoreProducts(storeSlug, { page: 1, limit: 100 });
       const fetched = data?.data?.products ?? data?.products ?? [];
-      
+
       const seen = new Set();
-      const cats = [{ id: 'all', label: 'All Products', slug: 'all' }];
-      
+      const cats = [];
+
       fetched.forEach((p) => {
         if (p.category && !seen.has(p.category.slug)) {
           seen.add(p.category.slug);
-          cats.push({ id: p.category.slug, label: p.category.name, slug: p.category.slug });
+          cats.push({ id: p.category.slug, label: p.category.name, slug: p.category.slug, image: p.category.image });
         }
       });
-      
+
       setCategories(cats);
     } catch (err) {
       setError(true);
@@ -141,25 +126,31 @@ export default function StoreCategoriesScreen({ route, navigation }) {
     navigation.navigate('StoreProducts', { store, category });
   };
 
-  const renderCategory = ({ item, index }) => (
-    <TouchableOpacity 
-      style={styles.categoryItem} 
-      onPress={() => handleCategoryPress(item)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.circle, { backgroundColor: getCategoryColor(index) }]}>
-        <Text style={styles.circleEmoji}>{getCategoryEmoji(item.slug)}</Text>
-      </View>
-      <Text style={styles.categoryLabel} numberOfLines={2}>{item.label}</Text>
-    </TouchableOpacity>
-  );
+  const renderCategory = ({ item }) => {
+    const imageUrl = item.image || item.imageUrl || DEFAULT_CATEGORY_IMAGE;
+    return (
+      <TouchableOpacity
+        style={bannerStyles.card}
+        onPress={() => handleCategoryPress(item)}
+        activeOpacity={0.9}
+      >
+        <ImageBackground
+          source={{ uri: imageUrl }}
+          style={bannerStyles.bgImage}
+          resizeMode="cover"
+        />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <StoreHeader store={store} onBack={() => navigation.goBack()} />
-      </SafeAreaView>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      <StoreHeader
+        store={store}
+        onBack={() => navigation.goBack()}
+        onInfo={() => navigation.navigate('StoreInfo', { store })}
+      />
 
       {loading ? (
         <View style={styles.stateContainer}>
@@ -180,12 +171,8 @@ export default function StoreCategoriesScreen({ route, navigation }) {
           keyExtractor={(item) => item.id}
           renderItem={renderCategory}
           numColumns={CAT_COLUMNS}
-          columnWrapperStyle={styles.columnWrapper}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <Text style={styles.sectionTitle}>Shop by category</Text>
-          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -202,9 +189,9 @@ export default function StoreCategoriesScreen({ route, navigation }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.surface },
-  safeArea: { backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  
+  root: { flex: 1, backgroundColor: Colors.white },
+  safeArea: { backgroundColor: Colors.white },
+
   stateContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing['3xl'] },
   stateEmoji: { fontSize: 48, marginBottom: Spacing.sm },
   stateTitle: { fontSize: Typography.size.lg, fontWeight: '800', color: Colors.text, marginBottom: Spacing.lg },
@@ -212,71 +199,133 @@ const styles = StyleSheet.create({
   retryBtn: { backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: Radius.full },
   retryBtnText: { color: Colors.white, fontWeight: '700' },
 
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '900',
+  searchSection: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.surface, // Matches Snappy Shopper light grey background behind search
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md || 8,
+    paddingHorizontal: Spacing.md,
+    height: 48,
+    ...Shadow.sm,
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: Spacing.sm,
+    color: '#999',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
     color: Colors.text,
-    marginBottom: Spacing.lg,
-    marginTop: Spacing.sm,
-    letterSpacing: -0.5,
   },
 
   listContainer: {
-    paddingHorizontal: Spacing['2xl'],
-    paddingVertical: Spacing.xl,
-    paddingBottom: Spacing['3xl'],
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: 90,
   },
-  columnWrapper: {
-    justifyContent: 'flex-start',
-    gap: Spacing.md,
-    marginBottom: Spacing.xl,
-  },
+});
 
-  categoryItem: {
-    width: CAT_WIDTH,
-    alignItems: 'center',
+const bannerStyles = StyleSheet.create({
+  card: {
+    width: '100%',
+    height: 160,
+    marginBottom: Spacing.md,
+    overflow: 'hidden',
   },
-  circle: {
-    width: CAT_WIDTH,
-    height: CAT_WIDTH,
-    borderRadius: CAT_WIDTH / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
-    ...Shadow.sm,
-  },
-  circleEmoji: {
-    fontSize: CAT_WIDTH * 0.45,
-  },
-  categoryLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 14,
+  bgImage: {
+    width: '100%',
+    height: '100%',
   },
 });
 
 const headerStyles = StyleSheet.create({
-  container: { paddingHorizontal: Spacing['2xl'], paddingVertical: Spacing.base },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.md },
-  backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
-  backIcon: { fontSize: 20, color: Colors.text, fontWeight: '600', lineHeight: 22 },
-  storeIconWrapper: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#BFDBFE' },
-  storeIcon: { fontSize: 24 },
-  topInfo: { flex: 1 },
-  storeName: { fontSize: Typography.size.md, fontWeight: Typography.weight.extrabold, color: Colors.text, letterSpacing: -0.3 },
-  storeAddress: { fontSize: Typography.size.xs, color: Colors.muted, marginTop: 2 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.full, gap: 5, alignSelf: 'flex-start' },
-  statusOpen: { backgroundColor: '#DCFCE7' },
-  statusClosed: { backgroundColor: Colors.surfaceSecondary },
-  statusDot: { width: 7, height: 7, borderRadius: 3.5 },
-  dotOpen: { backgroundColor: '#16A34A' },
-  dotClosed: { backgroundColor: Colors.muted },
-  statusText: { fontSize: 12, fontWeight: '700' },
-  statusOpenText: { color: '#16A34A' },
-  statusClosedText: { color: Colors.muted },
-  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  metaPill: { paddingHorizontal: 10, paddingVertical: 5, backgroundColor: Colors.surface, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border },
-  metaPillText: { fontSize: 11, color: Colors.textSecondary, fontWeight: '600' },
+  container: {
+    backgroundColor: Colors.white,
+    paddingBottom: Spacing.xl,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  banner: {
+    width: '100%',
+    height: 180,
+    backgroundColor: Colors.surface,
+  },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadow.sm,
+  },
+  rightIconsContainer: {
+    flexDirection: 'row',
+    gap: 12, // Space between right icons
+  },
+  iconText: {
+    fontSize: 24,
+    color: Colors.text,
+    fontWeight: '600',
+    lineHeight: 26
+  },
+  smallIconText: {
+    fontSize: 18,
+    color: Colors.text,
+  },
+  logoWrapper: {
+    alignSelf: 'center',
+    marginTop: -35, // Pull up to overlap banner
+    width: 70,
+    height: 70,
+    borderRadius: 16, // Rounded square like Papa Johns
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadow.md,
+  },
+  logo: {
+    width: 60, // Slightly smaller than wrapper to leave a white border effect
+    height: 60,
+    borderRadius: 12,
+    resizeMode: 'cover',
+  },
+  infoContainer: {
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+  },
+  storeName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+  ratingText: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+    marginTop: 6,
+  },
+  starIcon: { color: '#FF4500' }, // Changed to an orange-red to match Papa Johns style
+  ratingCount: {
+    color: Colors.textSecondary || '#555',
+    fontWeight: '400',
+    textDecorationLine: 'underline', // Matches the Papa Johns rating format
+  },
 });

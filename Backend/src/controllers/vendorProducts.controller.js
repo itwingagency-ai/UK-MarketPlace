@@ -5,6 +5,7 @@ const { resolveTargetStoreId } = require("../middleware/storeScope.middleware");
 const Category = require("../models/Category");
 const Product = require("../models/Product");
 const { validateProductPayload } = require("../validators/product.validator");
+const { deleteFileFromS3 } = require("../lib/s3Utils");
 
 const ensureCategoryInStore = async (categoryId, storeId) => {
   if (!categoryId) return null;
@@ -68,6 +69,21 @@ const getProductById = asyncHandler(async (req, res) => {
 });
 
 const createProduct = asyncHandler(async (req, res) => {
+  let options = req.body.options;
+  if (typeof options === "string") {
+    if (!options.trim()) options = [];
+    else try { options = JSON.parse(options); } catch (e) { options = []; }
+  }
+  let variants = req.body.variants;
+  if (typeof variants === "string") {
+    if (!variants.trim()) variants = [];
+    else try { variants = JSON.parse(variants); } catch (e) { variants = []; }
+  }
+
+  // To ensure validator passes since it modifies req.body in place
+  req.body.options = options;
+  req.body.variants = variants;
+
   validateProductPayload(req.body);
 
   const targetStoreId = resolveTargetStoreId(req);
@@ -75,6 +91,16 @@ const createProduct = asyncHandler(async (req, res) => {
     req.body.category,
     targetStoreId
   );
+
+  let images = Array.isArray(req.body.images) ? req.body.images : [];
+  if (typeof req.body.images === "string") {
+    try { images = JSON.parse(req.body.images); } catch (e) { images = [req.body.images]; }
+  }
+  
+  if (req.files && Array.isArray(req.files)) {
+    const uploadedUrls = req.files.map((f) => f.location).filter(Boolean);
+    images = [...images, ...uploadedUrls];
+  }
 
   const product = await Product.create({
     store: targetStoreId,
@@ -87,9 +113,9 @@ const createProduct = asyncHandler(async (req, res) => {
         : Number(req.body.compareAtPrice),
     stock: Number(req.body.stock),
     category: categoryId,
-    images: Array.isArray(req.body.images) ? req.body.images : [],
-    options: Array.isArray(req.body.options) ? req.body.options : [],
-    variants: Array.isArray(req.body.variants) ? req.body.variants : [],
+    images,
+    options: Array.isArray(options) ? options : [],
+    variants: Array.isArray(variants) ? variants : [],
     isActive:
       req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,
   });
@@ -101,6 +127,26 @@ const createProduct = asyncHandler(async (req, res) => {
 });
 
 const updateProduct = asyncHandler(async (req, res) => {
+  let options = req.body.options;
+  if (typeof options === "string") {
+    if (!options.trim()) options = [];
+    else try { options = JSON.parse(options); } catch (e) { }
+  }
+  let variants = req.body.variants;
+  if (typeof variants === "string") {
+    if (!variants.trim()) variants = [];
+    else try { variants = JSON.parse(variants); } catch (e) { }
+  }
+  let images = req.body.images;
+  if (typeof images === "string") {
+    if (!images.trim()) images = [];
+    else try { images = JSON.parse(images); } catch (e) { images = [images]; }
+  }
+
+  if (options !== undefined) req.body.options = options;
+  if (variants !== undefined) req.body.variants = variants;
+  if (images !== undefined) req.body.images = images;
+
   validateProductPayload(req.body, true);
 
   const product = req.scopedResource;
@@ -113,15 +159,30 @@ const updateProduct = asyncHandler(async (req, res) => {
     product.title = req.body.title.trim();
   }
 
+  const oldImages = Array.isArray(product.images) ? [...product.images] : [];
+
   for (const key of directFields) {
     if (req.body[key] !== undefined) {
       product[key] = req.body[key];
     }
   }
 
+  if (req.files && Array.isArray(req.files)) {
+    const uploadedUrls = req.files.map((f) => f.location).filter(Boolean);
+    if (!Array.isArray(product.images)) product.images = [];
+    product.images = [...product.images, ...uploadedUrls];
+  }
+
+  // Delete removed images from S3
+  const newImages = Array.isArray(product.images) ? product.images : [];
+  const removedImages = oldImages.filter(img => !newImages.includes(img));
+  for (const img of removedImages) {
+    await deleteFileFromS3(img);
+  }
+
   for (const key of numericFields) {
     if (req.body[key] === undefined) continue;
-    product[key] = req.body[key] === null ? null : Number(req.body[key]);
+    product[key] = (req.body[key] === null || req.body[key] === "") ? null : Number(req.body[key]);
   }
 
   if (req.body.isActive !== undefined) {
@@ -153,6 +214,11 @@ const deleteProduct = asyncHandler(async (req, res) => {
   if (!product) throw new ApiError(404, "Product not found");
 
   if (req.query.hard === "true") {
+    if (Array.isArray(product.images)) {
+      for (const img of product.images) {
+        await deleteFileFromS3(img);
+      }
+    }
     await product.deleteOne();
     return res.status(200).json({ message: "Product deleted permanently" });
   }

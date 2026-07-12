@@ -60,11 +60,20 @@ export default function CategoriesPage() {
   const handleSave = async (values) => {
     try {
       setSubmitting(true);
+      const payload = new FormData();
+      Object.keys(values).forEach((key) => {
+        if (key === 'imageFile') {
+          if (values.imageFile) payload.append('categoryImage', values.imageFile);
+        } else {
+          payload.append(key, values[key]);
+        }
+      });
+
       if (editingCategory) {
-        await vendorService.updateCategory(editingCategory._id, values);
+        await vendorService.updateCategory(editingCategory._id, payload);
         toast.success('Category updated successfully');
       } else {
-        await vendorService.createCategory(values);
+        await vendorService.createCategory(payload);
         toast.success('Category created successfully');
       }
       handleCloseDrawer();
@@ -97,6 +106,20 @@ export default function CategoriesPage() {
   };
 
   const columns = [
+    {
+      key: 'image',
+      label: 'Image',
+      width: 60,
+      render: (v) => (
+        <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-sm)', background: 'var(--gray-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          {v ? (
+            <img src={v} alt="Category" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <Tag size={20} color="var(--gray-400)" />
+          )}
+        </div>
+      )
+    },
     {
       key: 'name',
       label: 'Category Name',
@@ -224,6 +247,14 @@ export default function CategoriesPage() {
               name: 'isActive',
               label: 'Active (Visible to customers)',
               type: 'switch',
+            },
+            {
+              name: 'imageFile',
+              label: 'Category Image',
+              type: 'file',
+              accept: 'image/*',
+              helpText: 'Upload a banner for this category',
+              previewUrls: editingCategory?.image ? [editingCategory.image] : undefined,
             },
           ]}
           initialValues={

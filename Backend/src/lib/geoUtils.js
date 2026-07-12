@@ -175,11 +175,20 @@ const DAY_DISPLAY = {
   thursday: "Thursday", friday: "Friday", saturday: "Saturday", sunday: "Sunday",
 };
 
-/**
- * Parse "HH:mm" → total minutes since midnight.
- */
 const toMinutes = (timeStr) => {
-  const [h, m] = (timeStr || "00:00").split(":").map(Number);
+  if (!timeStr) return 0;
+  
+  // Parse "HH:mm AM/PM" or "HH:mm"
+  const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+  if (!match) return 0;
+  
+  let h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const ampm = match[3] ? match[3].toUpperCase() : null;
+  
+  if (ampm === "PM" && h < 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  
   return h * 60 + m;
 };
 

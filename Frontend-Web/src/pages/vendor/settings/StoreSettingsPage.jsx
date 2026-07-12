@@ -40,6 +40,8 @@ export default function StoreSettingsPage() {
     slug: '',
     description: '',
     logoUrl: '',
+    bannerUrl: '',
+    bannerFile: null,
     contactEmail: '',
     contactPhone: '',
   });
@@ -58,6 +60,7 @@ export default function StoreSettingsPage() {
         slug: data.slug || '',
         description: data.description || '',
         logoUrl: data.logoUrl || '',
+        bannerUrl: data.bannerUrl || '',
         contactEmail: data.contactEmail || '',
         contactPhone: data.contactPhone || '',
       };
@@ -80,11 +83,27 @@ export default function StoreSettingsPage() {
     });
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData((prev) => ({ ...prev, bannerFile: file }));
+      setIsDirty(true);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setSaving(true);
-      await vendorService.updateStoreSettings(formData);
+      const payload = new FormData();
+      Object.keys(formData).forEach(key => {
+        if (key === 'bannerFile') {
+          if (formData.bannerFile) payload.append('bannerImage', formData.bannerFile);
+        } else if (key !== 'bannerUrl' || formData[key]) {
+          payload.append(key, formData[key]);
+        }
+      });
+      await vendorService.updateStoreSettings(payload);
       initialData.current = JSON.stringify(formData);
       setIsDirty(false);
       toast.success('Store settings updated successfully');
@@ -138,12 +157,14 @@ export default function StoreSettingsPage() {
                   flexShrink: 0,
                 }}>
                   {formData.logoUrl ? (
-                    <img
-                      src={formData.logoUrl}
-                      alt="Store Logo"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }}
-                    />
+                    <a href={formData.logoUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '100%', height: '100%' }} title="Click to view full image">
+                      <img
+                        src={formData.logoUrl}
+                        alt="Store Logo"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => { e.target.parentElement.style.display = 'none'; e.target.parentElement.nextSibling && (e.target.parentElement.nextSibling.style.display = 'flex'); }}
+                      />
+                    </a>
                   ) : null}
                   {!formData.logoUrl && (
                     <Image size={24} style={{ color: 'var(--text-tertiary)' }} />
@@ -160,6 +181,44 @@ export default function StoreSettingsPage() {
                   />
                   <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '0.375rem' }}>
                     Provide a URL to your store logo. Recommended size: 200×200px.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Store Banner</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  width: 144, height: 72,
+                  borderRadius: 'var(--radius-lg)',
+                  border: '2px dashed var(--aa-panel-border)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  overflow: 'hidden',
+                  background: 'var(--surface-50)',
+                  flexShrink: 0,
+                }}>
+                  {(formData.bannerFile || formData.bannerUrl) ? (
+                    <a href={formData.bannerFile ? URL.createObjectURL(formData.bannerFile) : formData.bannerUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '100%', height: '100%' }} title="Click to view full image">
+                      <img
+                        src={formData.bannerFile ? URL.createObjectURL(formData.bannerFile) : formData.bannerUrl}
+                        alt="Store Banner"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </a>
+                  ) : (
+                    <Image size={24} style={{ color: 'var(--text-tertiary)' }} />
+                  )}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="form-input"
+                    onChange={handleFileChange}
+                  />
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '0.375rem' }}>
+                    Upload a high-quality banner for your store profile.
                   </p>
                 </div>
               </div>

@@ -76,15 +76,16 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const Review = require("../models/Review");
 const ShippingMethod = require("../models/ShippingMethod");
+const upload = require("../middleware/upload.middleware");
 
 const router = express.Router();
 
 router.get("/overview", getOverview);
 
 router.get("/products", listProducts);
-router.post("/products", createProduct);
+router.post("/products", upload.array("productImages", 5), createProduct);
 router.get("/products/:id", requireResourceInScope(Product), getProductById);
-router.patch("/products/:id", requireResourceInScope(Product), updateProduct);
+router.patch("/products/:id", requireResourceInScope(Product), upload.array("productImages", 5), updateProduct);
 router.delete("/products/:id", requireResourceInScope(Product), deleteProduct);
 router.patch(
   "/products/:id/restore",
@@ -93,7 +94,7 @@ router.patch(
 );
 
 router.get("/categories", listCategories);
-router.post("/categories", createCategory);
+router.post("/categories", upload.single("categoryImage"), createCategory);
 router.get(
   "/categories/:id",
   requireResourceInScope(Category),
@@ -102,6 +103,7 @@ router.get(
 router.patch(
   "/categories/:id",
   requireResourceInScope(Category),
+  upload.single("categoryImage"),
   updateCategory
 );
 router.delete(
@@ -157,7 +159,7 @@ router.delete(
 );
 
 router.get("/settings", getSettings);
-router.patch("/settings", updateSettings);
+router.patch("/settings", upload.single("bannerImage"), updateSettings);
 
 router.get("/commission/summary", getCommissionSummary);
 router.get("/commission/ledger", getCommissionLedger);

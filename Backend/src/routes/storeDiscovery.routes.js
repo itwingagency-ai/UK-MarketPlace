@@ -34,7 +34,7 @@ const router = express.Router();
 router.get("/nearby", getNearbyStores);
 router.get("/:slug/status", getStoreStatus);
 router.get("/:slug/delivers", checkDeliverability);
-router.get("/:slug/products", getStoreProducts);
+router.get("/:storeId/products", getStoreProducts);
 router.get("/:slug", getStoreBySlug);
 
 module.exports = router;

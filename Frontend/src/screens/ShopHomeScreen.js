@@ -11,6 +11,7 @@ import {
   Dimensions,
   RefreshControl,
   ActivityIndicator,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -18,43 +19,138 @@ import { getNearbyStores } from '../api/stores.api';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 
 const { width } = Dimensions.get('window');
+const BOTTOM_TAB_HEIGHT = 70;
 
-// ─── Store Banner ─────────────────────────────────────────────────────────────
+// ─── Simple Search Icon (pure View) ──────────────────────────────────────────
 
-const BG_COLORS = ['#4A148C', '#2E7D32', '#0D47A1', '#E65100', '#C2185B', '#006064'];
+function SearchIcon({ size = 16, color = Colors.muted }) {
+  return (
+    <View style={{ width: size, height: size, position: 'relative' }}>
+      <View
+        style={{
+          width: size * 0.65,
+          height: size * 0.65,
+          borderRadius: size * 0.325,
+          borderWidth: 2,
+          borderColor: color,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          right: 0,
+          width: size * 0.38,
+          height: 2,
+          backgroundColor: color,
+          borderRadius: 1,
+          transform: [{ rotate: '45deg' }],
+        }}
+      />
+    </View>
+  );
+}
 
-function StoreBanner({ store, onPress, index }) {
-  const isOpen = store.isOpen ?? store.status === 'open';
-  const bgColor = BG_COLORS[index % BG_COLORS.length];
+// ─── Store Banner (Foodpanda Style) ───────────────────────────────────────────
+
+const DEFAULT_STORE_IMAGE = 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800&auto=format&fit=crop';
+
+function StoreBanner({ store, onPress }) {
+  const imageUrl = store.branding?.bannerUrl || store.logoUrl || store.imageUrl || DEFAULT_STORE_IMAGE;
+
+  // Build rating display — use exact data from backend or fallback to 0
+  const rating = store.averageRating ?? 0;
+  const ratingCount = store.ratingCount ?? 0;
+  const ratingDisplay = rating > 0 ? Number(rating).toFixed(1) : '0';
+
+  // Delivery time estimate (from shipping methods if available, else derive from distance)
+  const deliveryTime = store.deliveryTime
+    || (store.distanceKm != null
+      ? `From ${Math.max(10, Math.round(store.distanceKm * 5))} min`
+      : 'From 15 min');
+
+  // Delivery fee
+  const deliveryFee = store.deliveryFee ?? store.shippingFee ?? null;
+
+  // Category / type label
+  const categoryLabel = store.category || store.storeType || 'Grocery';
+
+  let closedText = null;
+  if (store.isOpen === false) {
+    if (store.nextOpenDay && store.nextOpenTime) {
+      if (store.nextOpenDay === 'Today' || store.nextOpenDay === 'Tomorrow') {
+        closedText = `Opens at ${store.nextOpenTime}`;
+      } else {
+        closedText = `Opens at ${store.nextOpenDay}, ${store.nextOpenTime}`;
+      }
+    } else {
+      closedText = 'Currently Closed';
+    }
+  }
 
   return (
     <TouchableOpacity
-      style={[bannerStyles.card, { backgroundColor: bgColor }]}
+      style={bannerStyles.card}
       onPress={onPress}
-      activeOpacity={0.9}
+      activeOpacity={0.95}
     >
-      <View style={bannerStyles.content}>
-        <Text style={bannerStyles.name} numberOfLines={2}>
-          {store.name}
-        </Text>
-        {store.statusLabel && (
-          <Text style={bannerStyles.status} numberOfLines={2}>
-            {store.statusLabel}
+      {/* ── Banner Image ── */}
+      <View style={bannerStyles.imageContainer}>
+        <ImageBackground
+          source={{ uri: imageUrl }}
+          style={bannerStyles.bgImage}
+          imageStyle={bannerStyles.imageRounded}
+        >
+          {/* Carousel dots (visual only) */}
+          <View style={bannerStyles.dotsRow}>
+            <View style={[bannerStyles.dot, bannerStyles.dotActive]} />
+            <View style={bannerStyles.dot} />
+            <View style={bannerStyles.dot} />
+            <View style={bannerStyles.dot} />
+          </View>
+
+          {/* Closed Overlay (rendered last to cover dots) */}
+          {store.isOpen === false && closedText && (
+            <View style={bannerStyles.closedOverlay}>
+              <Text style={bannerStyles.closedText}>{closedText}</Text>
+            </View>
+          )}
+        </ImageBackground>
+      </View>
+
+      {/* ── Store Info Section ── */}
+      <View style={bannerStyles.infoSection}>
+        {/* Row 1: Store name + Rating */}
+        <View style={bannerStyles.nameRow}>
+          <Text style={bannerStyles.storeName} numberOfLines={1}>
+            {store.name}
           </Text>
-        )}
-        <View style={bannerStyles.btn}>
-          <Text style={bannerStyles.btnText}>Shop now</Text>
+          <View style={bannerStyles.ratingBadge}>
+            <Text style={bannerStyles.ratingStar}>⭐</Text>
+            <Text style={bannerStyles.ratingValue}>{ratingDisplay}</Text>
+            <Text style={bannerStyles.ratingCount}>({ratingCount})</Text>
+          </View>
         </View>
-      </View>
-      {/* Decorative icon on right */}
-      <View style={bannerStyles.iconWrapper}>
-        <Text style={bannerStyles.icon}>🏪</Text>
-      </View>
-      
-      {/* Open/Closed indicator */}
-      <View style={[bannerStyles.indicator, isOpen ? bannerStyles.indicatorOpen : bannerStyles.indicatorClosed]}>
-        <View style={[bannerStyles.dot, isOpen ? bannerStyles.dotOpen : bannerStyles.dotClosed]} />
-        <Text style={bannerStyles.indicatorText}>{isOpen ? 'Open' : 'Closed'}</Text>
+
+        {/* Row 2: Delivery time · distance · category */}
+        <Text style={bannerStyles.metaText} numberOfLines={1}>
+          {deliveryTime}
+          {store.distanceKm != null ? ` · ${store.distanceKm.toFixed(1)} km` : ''}
+          {` · ${categoryLabel}`}
+        </Text>
+
+        {/* Row 3: Delivery charges */}
+        {deliveryFee != null ? (
+          <View style={bannerStyles.deliveryRow}>
+            <Text style={bannerStyles.bikeIcon}>🛵</Text>
+            <Text style={bannerStyles.deliveryFee}>£{Number(deliveryFee).toFixed(2)}</Text>
+          </View>
+        ) : store.deliveryRadiusKm != null ? (
+          <View style={bannerStyles.deliveryRow}>
+            <Text style={bannerStyles.bikeIcon}>🛵</Text>
+            <Text style={bannerStyles.deliveryFee}>Free delivery</Text>
+          </View>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -207,7 +303,7 @@ export default function ShopHomeScreen({ route, navigation }) {
           {/* Change postcode */}
           <TouchableOpacity
             style={styles.changeBtn}
-            onPress={() => navigation.navigate('Home')}
+            onPress={() => navigation.getParent()?.getParent()?.navigate('Home')}
             activeOpacity={0.8}
           >
             <Text style={styles.changeBtnText}>Change</Text>
@@ -216,10 +312,10 @@ export default function ShopHomeScreen({ route, navigation }) {
 
         {/* ── Search bar ── */}
         <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <SearchIcon size={18} color={Colors.muted} />
           <TextInput
             style={styles.searchInput}
-            placeholder={`Search stores near ${postcode}…`}
+            placeholder="Search Stores"
             placeholderTextColor={Colors.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -245,17 +341,18 @@ export default function ShopHomeScreen({ route, navigation }) {
         <FlatList
           data={visibleStores}
           keyExtractor={(item, i) => item._id ?? item.id ?? String(i)}
-          renderItem={({ item, index }) => (
-            <StoreBanner store={item} index={index} onPress={() => handleStorePress(item)} />
+          renderItem={({ item }) => (
+            <StoreBanner store={item} onPress={() => handleStorePress(item)} />
           )}
-          numColumns={2}
-          columnWrapperStyle={styles.columnWrapper}
+          numColumns={1}
           contentContainerStyle={styles.list}
           ListHeaderComponent={<ListHeader />}
           ListEmptyComponent={
             searchQuery ? (
               <View style={styles.centeredState}>
-                <Text style={styles.stateEmoji}>🔍</Text>
+                <View style={styles.searchEmptyIcon}>
+                  <SearchIcon size={28} color={Colors.muted} />
+                </View>
                 <Text style={styles.stateTitle}>No matching stores</Text>
                 <Text style={styles.stateSub}>Try a different search term</Text>
               </View>
@@ -279,18 +376,16 @@ export default function ShopHomeScreen({ route, navigation }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.surface },
+  root: { flex: 1, backgroundColor: Colors.white },
   safeArea: {
     backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
 
   // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing['2xl'],
+    paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
     gap: Spacing.sm,
   },
@@ -340,18 +435,17 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: Spacing['2xl'],
+    marginHorizontal: Spacing.base,
     marginTop: Spacing.sm,
     marginBottom: Spacing.md,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.full,
     borderWidth: 1.5,
     borderColor: Colors.border,
     paddingHorizontal: Spacing.base,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 7,
+    paddingVertical: Platform.OS === 'ios' ? 11 : 8,
     gap: Spacing.sm,
   },
-  searchIcon: { fontSize: 15, color: Colors.muted },
   searchInput: {
     flex: 1,
     fontSize: Typography.size.sm,
@@ -367,19 +461,14 @@ const styles = StyleSheet.create({
 
   // List
   list: {
-    paddingHorizontal: Spacing['2xl'],
+    paddingHorizontal: Spacing.base,
     paddingTop: Spacing.base,
-    paddingBottom: Spacing['3xl'],
-  },
-  columnWrapper: {
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-    marginBottom: Spacing.md,
+    paddingBottom: BOTTOM_TAB_HEIGHT + 20,
   },
   listHeader: { marginBottom: Spacing.lg },
   featuredBanner: {
     backgroundColor: '#1E1B4B',
-    borderRadius: Radius.xl,
+    borderRadius: 16,
     padding: Spacing.xl,
     marginBottom: Spacing.xl,
     flexDirection: 'row',
@@ -434,6 +523,9 @@ const styles = StyleSheet.create({
     padding: Spacing['3xl'],
     gap: Spacing.sm,
   },
+  searchEmptyIcon: {
+    marginBottom: Spacing.md,
+  },
   stateEmoji: { fontSize: 56, marginBottom: Spacing.sm },
   stateTitle: {
     fontSize: Typography.size.xl, fontWeight: Typography.weight.extrabold,
@@ -461,78 +553,138 @@ const styles = StyleSheet.create({
   },
 });
 
-// ─── Store Banner Styles ──────────────────────────────────────────────────────
+// ─── Store Banner Styles (Foodpanda Style) ────────────────────────────────────
 
 const bannerStyles = StyleSheet.create({
   card: {
-    flex: 1,
-    height: 140,
-    borderRadius: Radius.xl,
+    width: '100%',
+    marginBottom: Spacing.lg,
+    paddingBottom: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+    backgroundColor: 'transparent',
+  },
+
+  // Image section
+  imageContainer: {
+    width: '100%',
+    height: 180,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
     overflow: 'hidden',
-    padding: Spacing.md,
-    position: 'relative',
-    ...Shadow.md,
   },
-  content: {
-    flex: 1,
-    zIndex: 2,
-    justifyContent: 'flex-start',
+  bgImage: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'flex-end',
   },
-  name: {
-    fontSize: Typography.size.lg,
-    fontWeight: Typography.weight.extrabold,
+  imageRounded: {
+    borderRadius: 16,
+  },
+  closedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  closedText: {
     color: Colors.white,
-    textTransform: 'uppercase',
-    letterSpacing: -0.5,
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
-  status: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.85)',
-    fontWeight: '500',
-    marginBottom: Spacing.sm,
-  },
-  btn: {
-    marginTop: 'auto',
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.white,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+
+  // Carousel dots
+  dotsRow: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 12,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: Radius.full,
   },
-  btnText: {
-    fontSize: 11,
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  dotActive: {
+    width: 18,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.white,
+  },
+
+  // Info section (below image)
+  infoSection: {
+    paddingHorizontal: 2, // Tiny padding so it's not flush to the absolute edge if the image has a border
+    paddingVertical: Spacing.sm,
+  },
+
+  // Name + Rating row
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  storeName: {
+    flex: 1,
+    fontSize: 16,
     fontWeight: '800',
     color: Colors.text,
+    letterSpacing: -0.2,
+    marginRight: Spacing.sm,
   },
-  iconWrapper: {
-    position: 'absolute',
-    right: -10,
-    bottom: -10,
-    opacity: 0.8,
-    transform: [{ scale: 1.5 }],
-    zIndex: 1,
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
-  icon: {
-    fontSize: 60,
+  ratingStar: {
+    fontSize: 13,
   },
-  indicator: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
+  ratingValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  ratingCount: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: Colors.muted,
+  },
+
+  // Meta row
+  metaText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+
+  // Delivery row
+  deliveryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
-    zIndex: 3,
+    marginTop: 2,
   },
-  indicatorOpen: {},
-  indicatorClosed: {},
-  dot: { width: 6, height: 6, borderRadius: 3 },
-  dotOpen: { backgroundColor: '#4ADE80' },
-  dotClosed: { backgroundColor: '#F87171' },
-  indicatorText: { fontSize: 9, fontWeight: '700', color: Colors.white },
+  bikeIcon: {
+    fontSize: 14,
+  },
+  deliveryFee: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
 });
+

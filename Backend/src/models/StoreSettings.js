@@ -12,6 +12,8 @@ const storeSettingsSchema = new mongoose.Schema(
     branding: {
       displayName: { type: String, default: "" },
       logoUrl: { type: String, default: "" },
+      bannerUrl: { type: String, default: "" },
+      bannerUploadedAt: { type: Date },
       themeColor: { type: String, default: "" },
     },
     businessHours: {

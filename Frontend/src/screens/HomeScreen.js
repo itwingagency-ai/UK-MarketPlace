@@ -159,10 +159,13 @@ export default function HomeScreen({ navigation }) {
         locationLabel = apiData.data.resolvedLocation.formattedAddress;
       }
 
-      navigation.navigate('ShopHome', {
-        stores,
-        postcode: trimmed,
-        locationLabel,
+      navigation.navigate('MainTabs', {
+        screen: 'ShopHomeTab',
+        params: { screen: 'ShopHome', params: {
+          stores,
+          postcode: trimmed,
+          locationLabel,
+        }},
       });
     } catch (err) {
       // API or network error — show coming soon modal
@@ -194,10 +197,13 @@ export default function HomeScreen({ navigation }) {
         return;
       }
 
-      navigation.navigate('ShopHome', {
-        stores,
-        postcode: 'My Location',
-        locationLabel: 'Your Location',
+      navigation.navigate('MainTabs', {
+        screen: 'ShopHomeTab',
+        params: { screen: 'ShopHome', params: {
+          stores,
+          postcode: 'My Location',
+          locationLabel: 'Your Location',
+        }},
       });
     } catch (err) {
       Alert.alert('Location error', 'Unable to get your location. Please try entering a postcode.');
