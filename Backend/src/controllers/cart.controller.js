@@ -51,6 +51,7 @@ const addItem = asyncHandler(async (req, res) => {
   if (existing) {
     existing.quantity = targetQty;
     existing.unitPrice = resolved.unitPrice;
+    existing.compareAtPrice = resolved.compareAtPrice;
     existing.title = resolved.title;
     existing.sku = resolved.sku;
     existing.attributes = resolved.attributes;
@@ -65,6 +66,7 @@ const addItem = asyncHandler(async (req, res) => {
       attributes: resolved.attributes,
       image: resolved.image,
       unitPrice: resolved.unitPrice,
+      compareAtPrice: resolved.compareAtPrice,
       quantity,
     });
   }
@@ -108,6 +110,7 @@ const updateItemQuantity = asyncHandler(async (req, res) => {
 
   item.quantity = quantity;
   item.unitPrice = resolved.unitPrice;
+  item.compareAtPrice = resolved.compareAtPrice;
   item.title = resolved.title;
   item.sku = resolved.sku;
   item.attributes = resolved.attributes;

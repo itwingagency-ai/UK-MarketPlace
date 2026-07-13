@@ -41,6 +41,11 @@ const cartItemSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    compareAtPrice: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
     quantity: {
       type: Number,
       required: true,

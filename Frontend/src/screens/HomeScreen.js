@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   Dimensions,
   Modal,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -113,7 +114,7 @@ function ComingSoonModal({ visible, postcode, onClose }) {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation }) {
   const { isAuthenticated, logout } = useAuth();
-  const { updateLocation } = useLocation();
+  const { location, updateLocation } = useLocation();
   const [postcode, setPostcode] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -121,8 +122,42 @@ export default function HomeScreen({ navigation }) {
   const [notFoundPostcode, setNotFoundPostcode] = useState('');
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const { itemCount, clearCart } = useCart();
+  const { itemCount, clearCart, storeId } = useCart();
   const { showAlert } = useCustomAlert();
+
+  const proceedToShopHome = (stores, trimmed, locationLabel, lat, lng) => {
+    if (lat && lng) {
+      updateLocation(trimmed, locationLabel, lat, lng);
+    }
+    navigation.navigate('MainTabs', {
+      screen: 'ShopHomeTab',
+      params: { screen: 'ShopHome', params: {
+        stores,
+        postcode: trimmed,
+        locationLabel,
+      }},
+    });
+  };
+
+  const checkCartAndProceed = (stores, trimmed, locationLabel, lat, lng) => {
+    if (itemCount > 0 && storeId) {
+      const storeDelivers = stores.some(s => String(s.id) === String(storeId) || String(s._id) === String(storeId));
+      if (!storeDelivers) {
+        showAlert({
+          title: 'Change Location?',
+          message: 'The store in your current basket does not deliver to this new location. Changing location will clear your basket. Do you want to continue?',
+          isDestructive: true,
+          confirmText: 'Clear & Change',
+          onConfirm: async () => {
+            await clearCart();
+            proceedToShopHome(stores, trimmed, locationLabel, lat, lng);
+          }
+        });
+        return;
+      }
+    }
+    proceedToShopHome(stores, trimmed, locationLabel, lat, lng);
+  };
 
   const executeSearch = async (trimmed) => {
     setIsSearching(true);
@@ -155,17 +190,16 @@ export default function HomeScreen({ navigation }) {
       }
 
       if (apiData?.data?.resolvedLocation?.lat) {
-        updateLocation(trimmed, locationLabel, apiData.data.resolvedLocation.lat, apiData.data.resolvedLocation.lng);
+        checkCartAndProceed(
+          stores, 
+          trimmed, 
+          locationLabel, 
+          apiData.data.resolvedLocation.lat, 
+          apiData.data.resolvedLocation.lng
+        );
+      } else {
+        checkCartAndProceed(stores, trimmed, locationLabel, null, null);
       }
-
-      navigation.navigate('MainTabs', {
-        screen: 'ShopHomeTab',
-        params: { screen: 'ShopHome', params: {
-          stores,
-          postcode: trimmed,
-          locationLabel,
-        }},
-      });
     } catch (err) {
       setNotFoundPostcode(trimmed);
       setShowComingSoon(true);
@@ -192,21 +226,7 @@ export default function HomeScreen({ navigation }) {
     ]).start();
 
     const trimmed = postcode.trim().toUpperCase();
-
-    if (itemCount > 0) {
-      showAlert({
-        title: 'Change Location?',
-        message: 'Changing your location will clear your current basket. Do you want to continue?',
-        isDestructive: true,
-        confirmText: 'Clear & Change',
-        onConfirm: async () => {
-          await clearCart();
-          executeSearch(trimmed);
-        }
-      });
-    } else {
-      executeSearch(trimmed);
-    }
+    executeSearch(trimmed);
   };
 
   const executeLocationSearch = async () => {
@@ -236,16 +256,7 @@ export default function HomeScreen({ navigation }) {
         return;
       }
 
-      updateLocation('My Location', 'Your Location', latitude, longitude);
-
-      navigation.navigate('MainTabs', {
-        screen: 'ShopHomeTab',
-        params: { screen: 'ShopHome', params: {
-          stores,
-          postcode: 'My Location',
-          locationLabel: 'Your Location',
-        }},
-      });
+      checkCartAndProceed(stores, 'My Location', 'Your Location', latitude, longitude);
     } catch (err) {
       showAlert({
         title: 'Location error',
@@ -260,20 +271,7 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleUseLocation = async () => {
-    if (itemCount > 0) {
-      showAlert({
-        title: 'Change Location?',
-        message: 'Changing your location will clear your current basket. Do you want to continue?',
-        isDestructive: true,
-        confirmText: 'Clear & Change',
-        onConfirm: async () => {
-          await clearCart();
-          executeLocationSearch();
-        }
-      });
-    } else {
-      executeLocationSearch();
-    }
+    executeLocationSearch();
   };
 
   const handleLogout = async () => {
@@ -300,24 +298,23 @@ export default function HomeScreen({ navigation }) {
 
       {/* Overlay so the bottom white section is clear */}
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Log out button — top right */}
-        {isAuthenticated && (
-          <TouchableOpacity
-            style={styles.logoutBtn}
-            onPress={handleLogout}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.logoutText}>Log out  →</Text>
-          </TouchableOpacity>
-        )}
       </SafeAreaView>
 
-      {/* Bottom card */}
+      {/* Scrollable content for keyboard avoidance */}
       <KeyboardAvoidingView
-        style={styles.cardWrapper}
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.card}>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Spacer to push card down to CARD_TOP */}
+          <View style={{ height: CARD_TOP }} />
+
+          <View style={styles.card}>
           {/* Brand */}
           <View style={styles.brandBlock}>
             <Text style={styles.brandLine1}>snappy</Text>
@@ -372,13 +369,14 @@ export default function HomeScreen({ navigation }) {
             activeOpacity={0.7}
           >
             {isLocating ? (
-              <ActivityIndicator color={Colors.primary} size="small" style={{ marginRight: 8 }} />
+              <ActivityIndicator color={Colors.white} size="small" style={{ marginRight: 8 }} />
             ) : (
               <Text style={styles.locationIconText}>✈️</Text>
             )}
             <Text style={styles.locationText}> Use my current location</Text>
           </TouchableOpacity>
         </View>
+        </ScrollView>
       </KeyboardAvoidingView>
 
       {/* Coming Soon Modal */}
@@ -434,16 +432,9 @@ const styles = StyleSheet.create({
     color: Colors.text,
     letterSpacing: 0.2,
   },
-  cardWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    top: CARD_TOP,
-  },
   card: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.primary,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     paddingHorizontal: Spacing['2xl'],
@@ -467,14 +458,14 @@ const styles = StyleSheet.create({
   brandLine1: {
     fontSize: 36,
     fontWeight: '800',
-    color: Colors.text,
+    color: Colors.white,
     letterSpacing: -0.8,
     lineHeight: 40,
   },
   brandLine2: {
     fontSize: 36,
     fontWeight: '800',
-    color: Colors.text,
+    color: Colors.white,
     letterSpacing: -0.8,
     lineHeight: 40,
   },
@@ -484,7 +475,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: Typography.size.base,
-    color: Colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.9)',
     marginBottom: Spacing.lg,
     textAlign: 'center',
   },
@@ -493,17 +484,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.white,
     borderRadius: Radius.full,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderWidth: 0,
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
     width: '100%',
     marginBottom: Spacing.md,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
   },
   pinIcon: {
     fontSize: 18,
@@ -554,7 +544,7 @@ const styles = StyleSheet.create({
   locationText: {
     fontSize: Typography.size.sm,
     fontWeight: Typography.weight.semibold,
-    color: Colors.primary,
+    color: Colors.white,
   },
 
   // ── Coming Soon Modal ──────────────────────────────────────────────────────

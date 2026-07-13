@@ -140,13 +140,13 @@ const DEFAULT_TEMPLATES = {
       body:
         "Hi {{name}},\n\n" +
         "Welcome to {{appName}}! Your account ({{email}}) is ready to use.\n\n" +
-        "You can sign in any time at {{loginUrl}}.\n\n" +
+        // "You can sign in any time at {{loginUrl}}.\n\n" +
         "— The {{appName}} team",
     },
-    sms: { body: "Welcome to {{appName}}, {{name}}! Your account is ready." },
-    whatsapp: {
-      body: "Welcome to {{appName}}, {{name}}! Your account is ready.",
-    },
+    // sms: { body: "Welcome to {{appName}}, {{name}}! Your account is ready." },
+    // whatsapp: {
+    //   body: "Welcome to {{appName}}, {{name}}! Your account is ready.",
+    // },
   },
   "account.password_changed": {
     email: {
@@ -157,16 +157,16 @@ const DEFAULT_TEMPLATES = {
         "If this wasn't you, please contact support immediately.\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body:
-        "{{appName}}: your password was just changed. " +
-        "If this wasn't you, contact support.",
-    },
-    whatsapp: {
-      body:
-        "{{appName}}: your password was just changed. " +
-        "If this wasn't you, contact support.",
-    },
+    // sms: {
+    //   body:
+    //     "{{appName}}: your password was just changed. " +
+    //     "If this wasn't you, contact support.",
+    // },
+    // whatsapp: {
+    //   body:
+    //     "{{appName}}: your password was just changed. " +
+    //     "If this wasn't you, contact support.",
+    // },
   },
   "order.placed.customer": {
     email: {
@@ -177,19 +177,19 @@ const DEFAULT_TEMPLATES = {
         "Order number: {{orderNumber}}\n" +
         "Total: {{total}} {{currency}}\n" +
         "Payment: {{paymentMethod}}\n\n" +
-        "Track your order: {{trackUrl}}\n\n" +
+        // "Track your order: {{trackUrl}}\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body:
-        "Order {{orderNumber}} placed at {{storeName}}. " +
-        "Total {{total}} {{currency}}. Track: {{trackUrl}}",
-    },
-    whatsapp: {
-      body:
-        "Hi {{name}}! Your {{appName}} order {{orderNumber}} from {{storeName}} " +
-        "is confirmed. Total {{total}} {{currency}}. Track: {{trackUrl}}",
-    },
+    // sms: {
+    //   body:
+    //     "Order {{orderNumber}} placed at {{storeName}}. " +
+    //     "Total {{total}} {{currency}}. Track: {{trackUrl}}",
+    // },
+    // whatsapp: {
+    //   body:
+    //     "Hi {{name}}! Your {{appName}} order {{orderNumber}} from {{storeName}} " +
+    //     "is confirmed. Total {{total}} {{currency}}. Track: {{trackUrl}}",
+    // },
   },
   "order.placed.vendor": {
     email: {
@@ -203,16 +203,16 @@ const DEFAULT_TEMPLATES = {
         "Manage it here: {{dashboardUrl}}\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body:
-        "New order {{orderNumber}} at {{storeName}}: {{total}} {{currency}}. " +
-        "Open dashboard.",
-    },
-    whatsapp: {
-      body:
-        "New {{appName}} order {{orderNumber}} at {{storeName}} from " +
-        "{{customerName}}. Total {{total}} {{currency}}.",
-    },
+    // sms: {
+    //   body:
+    //     "New order {{orderNumber}} at {{storeName}}: {{total}} {{currency}}. " +
+    //     "Open dashboard.",
+    // },
+    // whatsapp: {
+    //   body:
+    //     "New {{appName}} order {{orderNumber}} at {{storeName}} from " +
+    //     "{{customerName}}. Total {{total}} {{currency}}.",
+    // },
   },
   "order.payment_succeeded": {
     email: {
@@ -221,19 +221,19 @@ const DEFAULT_TEMPLATES = {
         "Hi {{name}},\n\n" +
         "We've received your payment of {{total}} {{currency}} " +
         "for order {{orderNumber}}.\n\n" +
-        "Track your order: {{trackUrl}}\n\n" +
+        // "Track your order: {{trackUrl}}\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body:
-        "Payment of {{total}} {{currency}} received for order {{orderNumber}}. " +
-        "Track: {{trackUrl}}",
-    },
-    whatsapp: {
-      body:
-        "Payment received for {{appName}} order {{orderNumber}}: " +
-        "{{total}} {{currency}}.",
-    },
+    // sms: {
+    //   body:
+    //     "Payment of {{total}} {{currency}} received for order {{orderNumber}}. " +
+    //     "Track: {{trackUrl}}",
+    // },
+    // whatsapp: {
+    //   body:
+    //     "Payment received for {{appName}} order {{orderNumber}}: " +
+    //     "{{total}} {{currency}}.",
+    // },
   },
   "order.payment_failed": {
     email: {
@@ -242,19 +242,19 @@ const DEFAULT_TEMPLATES = {
         "Hi {{name}},\n\n" +
         "We couldn't complete payment for order {{orderNumber}}.\n" +
         "Reason: {{reason}}\n\n" +
-        "You can retry payment here: {{retryUrl}}\n\n" +
+        // "You can retry payment here: {{retryUrl}}\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body:
-        "Payment failed for order {{orderNumber}}: {{reason}}. " +
-        "Retry: {{retryUrl}}",
-    },
-    whatsapp: {
-      body:
-        "Payment failed for {{appName}} order {{orderNumber}}: {{reason}}. " +
-        "Retry payment in your account.",
-    },
+    // sms: {
+    //   body:
+    //     "Payment failed for order {{orderNumber}}: {{reason}}. " +
+    //     "Retry: {{retryUrl}}",
+    // },
+    // whatsapp: {
+    //   body:
+    //     "Payment failed for {{appName}} order {{orderNumber}}: {{reason}}. " +
+    //     "Retry payment in your account.",
+    // },
   },
   "order.shipped": {
     email: {
@@ -263,22 +263,21 @@ const DEFAULT_TEMPLATES = {
         "Hi {{name}},\n\n" +
         "Your order {{orderNumber}} is on its way!\n\n" +
         "Carrier: {{carrier}}\n" +
-        "Tracking number: {{trackingNumber}}\n" +
-        "Carrier link: {{trackingUrl}}\n" +
-        "Estimated delivery: {{etaMin}} - {{etaMax}}\n\n" +
-        "Track here: {{trackUrl}}\n\n" +
+        // "Carrier link: {{trackingUrl}}\n" +
+        // "Estimated delivery: {{etaMin}} - {{etaMax}}\n\n" +
+        // "Track here: {{trackUrl}}\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body:
-        "Order {{orderNumber}} shipped via {{carrier}} ({{trackingNumber}}). " +
-        "Track: {{trackUrl}}",
-    },
-    whatsapp: {
-      body:
-        "Your {{appName}} order {{orderNumber}} has shipped via {{carrier}}. " +
-        "Tracking: {{trackingNumber}}. Track: {{trackUrl}}",
-    },
+    // sms: {
+    //   body:
+    //     "Order {{orderNumber}} shipped via {{carrier}} ({{trackingNumber}}). " +
+    //     "Track: {{trackUrl}}",
+    // },
+    // whatsapp: {
+    //   body:
+    //     "Your {{appName}} order {{orderNumber}} has shipped via {{carrier}}. " +
+    //     "Tracking: {{trackingNumber}}. Track: {{trackUrl}}",
+    // },
   },
   "order.delivered": {
     email: {
@@ -289,12 +288,12 @@ const DEFAULT_TEMPLATES = {
         "If anything's wrong, just reply to this email.\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body: "Order {{orderNumber}} was delivered. Thanks for shopping with {{appName}}!",
-    },
-    whatsapp: {
-      body: "Order {{orderNumber}} was delivered. Thanks for shopping with {{appName}}!",
-    },
+    // sms: {
+    //   body: "Order {{orderNumber}} was delivered. Thanks for shopping with {{appName}}!",
+    // },
+    // whatsapp: {
+    //   body: "Order {{orderNumber}} was delivered. Thanks for shopping with {{appName}}!",
+    // },
   },
   "order.cancelled": {
     email: {
@@ -306,12 +305,12 @@ const DEFAULT_TEMPLATES = {
         "If you've already paid, your refund will be issued shortly.\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body: "Order {{orderNumber}} cancelled: {{reason}}",
-    },
-    whatsapp: {
-      body: "{{appName}} order {{orderNumber}} cancelled: {{reason}}",
-    },
+    // sms: {
+    //   body: "Order {{orderNumber}} cancelled: {{reason}}",
+    // },
+    // whatsapp: {
+    //   body: "{{appName}} order {{orderNumber}} cancelled: {{reason}}",
+    // },
   },
   "order.shipment_event": {
     email: {
@@ -322,19 +321,19 @@ const DEFAULT_TEMPLATES = {
         "Status: {{eventStatus}}\n" +
         "Location: {{location}}\n" +
         "Note: {{note}}\n\n" +
-        "Track here: {{trackUrl}}\n\n" +
+        // "Track here: {{trackUrl}}\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body:
-        "Order {{orderNumber}} update: {{eventStatus}} {{location}}. " +
-        "Track: {{trackUrl}}",
-    },
-    whatsapp: {
-      body:
-        "{{appName}} order {{orderNumber}} update: {{eventStatus}} " +
-        "{{location}}. {{note}}",
-    },
+    // sms: {
+    //   body:
+    //     "Order {{orderNumber}} update: {{eventStatus}} {{location}}. " +
+    //     "Track: {{trackUrl}}",
+    // },
+    // whatsapp: {
+    //   body:
+    //     "{{appName}} order {{orderNumber}} update: {{eventStatus}} " +
+    //     "{{location}}. {{note}}",
+    // },
   },
   "vendor.application_approved": {
     email: {
@@ -346,16 +345,16 @@ const DEFAULT_TEMPLATES = {
         "Open your vendor dashboard: {{dashboardUrl}}\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body:
-        "{{appName}}: your store {{storeName}} is approved! " +
-        "Open dashboard: {{dashboardUrl}}",
-    },
-    whatsapp: {
-      body:
-        "{{appName}}: your store {{storeName}} is approved. " +
-        "Visit your dashboard to get started.",
-    },
+    // sms: {
+    //   body:
+    //     "{{appName}}: your store {{storeName}} is approved! " +
+    //     "Open dashboard: {{dashboardUrl}}",
+    // },
+    // whatsapp: {
+    //   body:
+    //     "{{appName}}: your store {{storeName}} is approved. " +
+    //     "Visit your dashboard to get started.",
+    // },
   },
   "vendor.application_rejected": {
     email: {
@@ -368,12 +367,12 @@ const DEFAULT_TEMPLATES = {
         "Feel free to reapply once the issues above are addressed.\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body: "{{appName}}: your store application was not approved. {{reason}}",
-    },
-    whatsapp: {
-      body: "{{appName}}: your store application was not approved. {{reason}}",
-    },
+    // sms: {
+    //   body: "{{appName}}: your store application was not approved. {{reason}}",
+    // },
+    // whatsapp: {
+    //   body: "{{appName}}: your store application was not approved. {{reason}}",
+    // },
   },
   "review.submitted.vendor": {
     email: {
@@ -385,16 +384,16 @@ const DEFAULT_TEMPLATES = {
         "Manage and respond from your dashboard: {{dashboardUrl}}\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body:
-        "New {{rating}}★ review for {{productTitle}} at {{storeName}}. " +
-        "Open your dashboard to respond.",
-    },
-    whatsapp: {
-      body:
-        "New {{rating}}★ review for {{productTitle}} from {{customerName}} " +
-        "at {{storeName}}.",
-    },
+    // sms: {
+    //   body:
+    //     "New {{rating}}★ review for {{productTitle}} at {{storeName}}. " +
+    //     "Open your dashboard to respond.",
+    // },
+    // whatsapp: {
+    //   body:
+    //     "New {{rating}}★ review for {{productTitle}} from {{customerName}} " +
+    //     "at {{storeName}}.",
+    // },
   },
   "review.responded.customer": {
     email: {
@@ -403,19 +402,19 @@ const DEFAULT_TEMPLATES = {
         "Hi {{name}},\n\n" +
         "{{storeName}} replied to your review of \"{{productTitle}}\":\n\n" +
         "\"{{responseSnippet}}\"\n\n" +
-        "See the full response: {{reviewUrl}}\n\n" +
+        // "See the full response: {{reviewUrl}}\n\n" +
         "— The {{appName}} team",
     },
-    sms: {
-      body:
-        "{{storeName}} replied to your review of {{productTitle}}: " +
-        "\"{{responseSnippet}}\"",
-    },
-    whatsapp: {
-      body:
-        "{{storeName}} replied to your review of {{productTitle}}: " +
-        "\"{{responseSnippet}}\"",
-    },
+    // sms: {
+    //   body:
+    //     "{{storeName}} replied to your review of {{productTitle}}: " +
+    //     "\"{{responseSnippet}}\"",
+    // },
+    // whatsapp: {
+    //   body:
+    //     "{{storeName}} replied to your review of {{productTitle}}: " +
+    //     "\"{{responseSnippet}}\"",
+    // },
   },
 };
 
@@ -427,13 +426,13 @@ const renderTemplate = (template, context) => {
   const replace = (text) =>
     typeof text === "string"
       ? text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key) => {
-          if (Object.prototype.hasOwnProperty.call(ctx, key)) {
-            const value = ctx[key];
-            if (value === null || value === undefined) return "";
-            return String(value);
-          }
-          return "";
-        })
+        if (Object.prototype.hasOwnProperty.call(ctx, key)) {
+          const value = ctx[key];
+          if (value === null || value === undefined) return "";
+          return String(value);
+        }
+        return "";
+      })
       : "";
 
   return {
@@ -497,12 +496,12 @@ const listAllTemplates = async () => {
         defaultBody: def.body || "",
         override: override
           ? {
-              subject: override.subject || "",
-              body: override.body || "",
-              isActive: override.isActive,
-              updatedAt: override.updatedAt,
-              updatedBy: override.updatedBy,
-            }
+            subject: override.subject || "",
+            body: override.body || "",
+            isActive: override.isActive,
+            updatedAt: override.updatedAt,
+            updatedBy: override.updatedBy,
+          }
           : null,
       });
     }

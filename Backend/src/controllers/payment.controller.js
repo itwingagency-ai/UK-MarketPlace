@@ -83,7 +83,7 @@ const retryPayment = asyncHandler(async (req, res) => {
         quantity: Number(item.quantity),
         price_data: {
           currency: tx.currency,
-          unit_amount: Math.round(Number(item.unitPrice) * 100),
+          unit_amount: Math.round(Number(item.unitPrice)),
           product_data: { name: item.title },
         },
       });
@@ -93,7 +93,7 @@ const retryPayment = asyncHandler(async (req, res) => {
         quantity: 1,
         price_data: {
           currency: tx.currency,
-          unit_amount: Math.round(Number(order.shippingFee) * 100),
+          unit_amount: Math.round(Number(order.shippingFee)),
           product_data: { name: `Shipping (${order.orderNumber})` },
         },
       });
@@ -135,6 +135,119 @@ const retryPayment = asyncHandler(async (req, res) => {
       url: session.url,
     },
   });
+});
+
+const confirmTransaction = asyncHandler(async (req, res) => {
+  const tx = await findUserTransaction(req.user.id, req.params.transactionId);
+
+  if (tx.status === "succeeded") {
+    return res.status(200).json({ message: "Transaction already completed" });
+  }
+
+  if (tx.provider === "stripe") {
+    const stripe = getStripeClient();
+    let isSucceeded = false;
+    let paymentIntentId = tx.providerIntentId;
+
+    if (tx.providerSessionId) {
+      try {
+        const session = await stripe.checkout.sessions.retrieve(tx.providerSessionId);
+        if (session.payment_status === "paid") {
+          isSucceeded = true;
+          paymentIntentId = session.payment_intent || paymentIntentId;
+        }
+      } catch (err) {
+        // ignore
+      }
+    } else if (tx.providerIntentId) {
+      try {
+        const intent = await stripe.paymentIntents.retrieve(tx.providerIntentId);
+        if (intent.status === "succeeded") {
+          isSucceeded = true;
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    if (isSucceeded) {
+      await finalizeTransaction(tx, {
+        status: "succeeded",
+        providerIntentId: paymentIntentId,
+        paidAt: new Date(),
+      });
+      await recordTransactionEvent(tx, {
+        type: "client.confirmation",
+        status: "succeeded",
+        note: "Frontend confirmed payment success",
+      });
+
+      await markOrdersPaid({
+        orderIds: tx.orders,
+        provider: "stripe",
+        providerRef: paymentIntentId || tx.providerSessionId,
+        paidAt: new Date(),
+        note: "Stripe payment captured (client verified)",
+      });
+
+      return res.status(200).json({ message: "Transaction confirmed and orders paid" });
+    } else {
+      throw new ApiError(400, "Payment is not completely successful in Stripe yet.");
+    }
+  }
+
+  throw new ApiError(400, "Only stripe transactions can be confirmed this way");
+});
+
+const cancelTransaction = asyncHandler(async (req, res) => {
+  const tx = await findUserTransaction(req.user.id, req.params.transactionId);
+
+  if (["succeeded", "refunded"].includes(tx.status)) {
+    throw new ApiError(409, "Completed transactions cannot be cancelled");
+  }
+
+  // Cancel orders and restore stock
+  await cancelOrdersAndRestoreStock({
+    orderIds: tx.orders,
+    reason: "User cancelled payment",
+    provider: tx.provider,
+  });
+
+  tx.status = "failed";
+  tx.failureReason = "User cancelled payment";
+  await tx.save();
+
+  // Re-populate the user's cart
+  const orders = await Order.find({ _id: { $in: tx.orders } });
+  const Cart = require("../models/Cart");
+  const cart = await Cart.findOne({ user: req.user.id });
+  if (cart) {
+    const itemsToAdd = [];
+    for (const order of orders) {
+      for (const item of order.items) {
+        itemsToAdd.push({
+          product: item.product,
+          store: order.store,
+          variantId: item.variantId || null,
+          title: item.title,
+          sku: item.sku,
+          attributes: item.attributes,
+          image: item.image,
+          unitPrice: item.unitPrice,
+          compareAtPrice: item.compareAtPrice,
+          quantity: item.quantity,
+        });
+      }
+    }
+    if (cart.items.length === 0) {
+      cart.items = itemsToAdd;
+    } else {
+      cart.items.push(...itemsToAdd);
+    }
+    await cart.save();
+  }
+
+  res.status(200).json({ message: "Transaction cancelled and cart restored" });
 });
 
 const markCodCollected = asyncHandler(async (req, res) => {
@@ -265,6 +378,45 @@ const handleStripeWebhook = asyncHandler(async (req, res) => {
         break;
       }
 
+      case "payment_intent.succeeded": {
+        const intent = event.data.object;
+        const transactionId = intent?.metadata?.transactionId;
+        
+        let tx = null;
+        if (transactionId) {
+          tx = await PaymentTransaction.findById(transactionId);
+        }
+        if (!tx) {
+          tx = await PaymentTransaction.findOne({
+            providerIntentId: intent.id,
+          });
+        }
+        
+        if (!tx) break;
+        if (tx.status === "succeeded") break;
+
+        await finalizeTransaction(tx, {
+          status: "succeeded",
+          providerIntentId: intent.id,
+          paidAt: new Date(),
+        });
+        await recordTransactionEvent(tx, {
+          type: event.type,
+          status: "succeeded",
+          note: "Stripe payment intent succeeded",
+          raw: { id: intent.id },
+        });
+
+        await markOrdersPaid({
+          orderIds: tx.orders,
+          provider: "stripe",
+          providerRef: intent.id,
+          paidAt: new Date(),
+          note: "Stripe payment captured (PaymentIntent)",
+        });
+        break;
+      }
+
       case "payment_intent.payment_failed": {
         const intent = event.data.object;
         const transactionId = intent?.metadata?.transactionId;
@@ -352,6 +504,8 @@ const handleStripeWebhook = asyncHandler(async (req, res) => {
 module.exports = {
   getMyTransaction,
   retryPayment,
+  cancelTransaction,
+  confirmTransaction,
   markCodCollected,
   handleStripeWebhook,
 };

@@ -38,11 +38,11 @@ function StoreCard({ store, onPress }) {
       {store.deliveryFee != null && (
         <View style={styles.cardFooter}>
           <Text style={styles.footerLabel}>
-            🚐 Delivery from £{(store.deliveryFee / 100).toFixed(2)}
+            🚐 Delivery from £{Number(store.deliveryFee).toFixed(2)}
           </Text>
           {store.minOrder != null && (
             <Text style={styles.footerLabel}>
-              · Min order £{(store.minOrder / 100).toFixed(2)}
+              · Min order £{Number(store.minOrder).toFixed(2)}
             </Text>
           )}
         </View>

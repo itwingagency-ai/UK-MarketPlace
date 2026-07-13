@@ -63,7 +63,7 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
   const handleStatusUpdate = async (nextStatus) => {
     try {
       setUpdating(true);
-      const payload = { nextStatus, note: note.trim() || undefined };
+      const payload = { orderStatus: nextStatus, note: note.trim() || undefined };
 
       if (nextStatus === 'shipped') {
         payload.tracking = {};

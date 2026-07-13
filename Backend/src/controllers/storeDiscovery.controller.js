@@ -144,7 +144,7 @@ const getNearbyStores = asyncHandler(async (req, res) => {
     status: "active",
     locationSet: true,
   }).select(
-    "name slug status contact address location deliveryRadiusKm operatingHours branding"
+    "name slug status contact address location deliveryRadiusKm operatingHours branding timezone"
   );
   // Note: skip/limit cannot be used with $nearSphere in all MongoDB drivers reliably
   // for large sets; we post-filter and paginate in memory (candidate count is small
@@ -169,7 +169,8 @@ const getNearbyStores = asyncHandler(async (req, res) => {
       : store.deliveryRadiusKm;
 
     if (dist <= effectiveRadius) {
-      const status = computeOpenStatus(store.operatingHours, timezone);
+      const storeTimezone = store.timezone || timezone;
+      const status = computeOpenStatus(store.operatingHours, storeTimezone);
       const branding = settingsMap.get(store._id.toString());
       eligible.push({ store, dist, status, branding });
     }
@@ -230,7 +231,7 @@ const getStoreBySlug = asyncHandler(async (req, res) => {
   const { slug } = req.params;
 
   const store = await Store.findOne({ slug: slug.toLowerCase(), status: "active" }).select(
-    "name slug status contact address location deliveryRadiusKm operatingHours branding"
+    "name slug status contact address location deliveryRadiusKm operatingHours branding timezone"
   );
 
   if (!store) throw new ApiError(404, "Store not found");
@@ -252,7 +253,7 @@ const getStoreBySlug = asyncHandler(async (req, res) => {
   const reviewData = reviewAgg.length > 0 ? reviewAgg[0] : null;
   const cheapestShipping = shippingMethods.length > 0 ? shippingMethods[0] : null;
 
-  const timezone = req.query.timezone || "UTC";
+  const timezone = store.timezone || req.query.timezone || "UTC";
   const status = computeOpenStatus(store.operatingHours, timezone);
 
   res.status(200).json({
@@ -351,8 +352,14 @@ const getStoreProducts = asyncHandler(async (req, res) => {
 const getStoreStatus = asyncHandler(async (req, res) => {
   const { slug } = req.params;
 
-  const store = await Store.findOne({ slug: slug.toLowerCase(), status: "active" })
-    .select("name slug operatingHours timezone");
+  let store;
+  if (/^[a-f\d]{24}$/i.test(slug)) {
+    store = await Store.findOne({ _id: slug, status: "active" })
+      .select("name slug operatingHours timezone");
+  } else {
+    store = await Store.findOne({ slug: slug.toLowerCase(), status: "active" })
+      .select("name slug operatingHours timezone");
+  }
 
   if (!store) throw new ApiError(404, "Store not found");
 

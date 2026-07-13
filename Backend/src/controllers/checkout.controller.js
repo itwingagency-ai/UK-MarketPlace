@@ -501,7 +501,7 @@ const buildStripeLineItems = (orders, currency) => {
         quantity: Number(item.quantity),
         price_data: {
           currency,
-          unit_amount: Math.round(Number(item.unitPrice) * 100),
+          unit_amount: Math.round(Number(item.unitPrice)),
           product_data: {
             name: item.title,
             metadata: {
@@ -519,7 +519,7 @@ const buildStripeLineItems = (orders, currency) => {
         quantity: 1,
         price_data: {
           currency,
-          unit_amount: Math.round(Number(order.shippingFee) * 100),
+          unit_amount: Math.round(Number(order.shippingFee)),
           product_data: {
             name: `Shipping (${order.orderNumber})`,
           },
@@ -550,6 +550,27 @@ const createStripeSessionForOrders = async ({ orders, user, transactionId }) => 
   });
 
   return session;
+};
+
+const createStripePaymentIntentForOrders = async ({ orders, user, transactionId }) => {
+  const stripe = getStripeClient();
+  const currency = env.platformCurrency;
+  const orderNumbers = orders.map((o) => o.orderNumber).join(",");
+  const totalAmount = orders.reduce((acc, o) => acc + Number(o.total), 0);
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: Math.round(totalAmount),
+    currency,
+    payment_method_types: ["card"],
+    receipt_email: user.email,
+    metadata: {
+      transactionId: String(transactionId),
+      userId: String(user._id),
+      orderNumbers,
+    },
+  });
+
+  return paymentIntent;
 };
 
 const placeOrder = asyncHandler(async (req, res) => {
@@ -649,9 +670,11 @@ const placeOrder = asyncHandler(async (req, res) => {
 
   // Fire-and-forget notifications: customer confirmation + per-store vendor alert
   for (const order of orders) {
-    onOrderPlacedToCustomer(order, user);
-    // No await — onOrderPlacedToVendor schedules its own async dispatch
-    onOrderPlacedToVendor(order, user);
+    if (req.body.paymentMethod === "cod") {
+      onOrderPlacedToCustomer(order, user);
+      // No await — onOrderPlacedToVendor schedules its own async dispatch
+      onOrderPlacedToVendor(order, user);
+    }
   }
 
   let paymentPayload = null;
@@ -669,38 +692,68 @@ const placeOrder = asyncHandler(async (req, res) => {
     });
 
     try {
-      const session = await createStripeSessionForOrders({
-        orders,
-        user,
-        transactionId: transaction._id,
-      });
+      if (req.body.clientType === "mobile") {
+        const paymentIntent = await createStripePaymentIntentForOrders({
+          orders,
+          user,
+          transactionId: transaction._id,
+        });
 
-      transaction.providerSessionId = session.id;
-      transaction.checkoutUrl = session.url;
-      transaction.status = "processing";
-      transaction.events.push({
-        type: "stripe.checkout.session.created",
-        status: "processing",
-        at: new Date(),
-      });
-      await transaction.save();
+        transaction.providerIntentId = paymentIntent.id;
+        transaction.status = "processing";
+        transaction.events.push({
+          type: "stripe.payment_intent.created",
+          status: "processing",
+          at: new Date(),
+        });
+        await transaction.save();
 
-      await Order.updateMany(
-        { _id: { $in: orders.map((o) => o._id) } },
-        { $set: { paymentTransaction: transaction._id } }
-      );
+        await Order.updateMany(
+          { _id: { $in: orders.map((o) => o._id) } },
+          { $set: { paymentTransaction: transaction._id } }
+        );
 
-      paymentPayload = {
-        provider: "stripe",
-        transactionId: transaction._id,
-        sessionId: session.id,
-        url: session.url,
-        amount: totalAmount,
-        currency: env.platformCurrency,
-        expiresAt: session.expires_at
-          ? new Date(session.expires_at * 1000)
-          : null,
-      };
+        paymentPayload = {
+          provider: "stripe",
+          transactionId: transaction._id,
+          clientSecret: paymentIntent.client_secret,
+          amount: totalAmount,
+          currency: env.platformCurrency,
+        };
+      } else {
+        const session = await createStripeSessionForOrders({
+          orders,
+          user,
+          transactionId: transaction._id,
+        });
+
+        transaction.providerSessionId = session.id;
+        transaction.checkoutUrl = session.url;
+        transaction.status = "processing";
+        transaction.events.push({
+          type: "stripe.checkout.session.created",
+          status: "processing",
+          at: new Date(),
+        });
+        await transaction.save();
+
+        await Order.updateMany(
+          { _id: { $in: orders.map((o) => o._id) } },
+          { $set: { paymentTransaction: transaction._id } }
+        );
+
+        paymentPayload = {
+          provider: "stripe",
+          transactionId: transaction._id,
+          sessionId: session.id,
+          url: session.url,
+          amount: totalAmount,
+          currency: env.platformCurrency,
+          expiresAt: session.expires_at
+            ? new Date(session.expires_at * 1000)
+            : null,
+        };
+      }
     } catch (err) {
       transaction.status = "failed";
       transaction.failureReason =
@@ -719,19 +772,28 @@ const placeOrder = asyncHandler(async (req, res) => {
     }
   }
 
+  const storeIds = [...new Set(orders.map((o) => o.store.toString()))];
+  const stores = await require("../models/Store").find({ _id: { $in: storeIds } });
+  const storeMap = new Map(stores.map(s => [s._id.toString(), s]));
+
   res.status(201).json({
     message: "Order placed",
     data: {
-      orders: orders.map((o) => ({
-        id: o._id,
-        orderNumber: o.orderNumber,
-        store: o.store,
-        total: o.total,
-        orderStatus: o.orderStatus,
-        paymentStatus: o.paymentStatus,
-        paymentMethod: o.paymentMethod,
-        createdAt: o.createdAt,
-      })),
+      orders: orders.map((o) => {
+        const storeInfo = storeMap.get(o.store.toString());
+        return {
+          id: o._id,
+          orderNumber: o.orderNumber,
+          store: o.store,
+          storeName: storeInfo?.name || "Store",
+          storeContact: storeInfo?.contact?.phone || "",
+          total: o.total,
+          orderStatus: o.orderStatus,
+          paymentStatus: o.paymentStatus,
+          paymentMethod: o.paymentMethod,
+          createdAt: o.createdAt,
+        };
+      }),
       payment: paymentPayload,
     },
   });

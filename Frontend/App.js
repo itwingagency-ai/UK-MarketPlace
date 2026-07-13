@@ -6,6 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
+import { StripeProvider } from '@stripe/stripe-react-native';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { CartProvider, useCart } from './src/context/CartContext';
@@ -28,8 +29,12 @@ import BasketScreen from './src/screens/BasketScreen';
 import AccountScreen from './src/screens/AccountScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import FavouritesScreen from './src/screens/FavouritesScreen';
+import OrdersScreen from './src/screens/OrdersScreen';
+import OrderDetailScreen from './src/screens/OrderDetailScreen';
 import MoreScreen from './src/screens/MoreScreen';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
+import CheckoutScreen from './src/screens/CheckoutScreen';
+import OrderSuccessScreen from './src/screens/OrderSuccessScreen';
 import BottomTabBar from './src/components/BottomTabBar';
 
 import { Colors } from './src/theme';
@@ -95,6 +100,8 @@ function AccountStack() {
           <Stack.Screen name="Account" component={AccountScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="Favourites" component={FavouritesScreen} />
+          <Stack.Screen name="Orders" component={OrdersScreen} />
+          <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
         </>
       )}
     </Stack.Navigator>
@@ -116,6 +123,8 @@ function RootStack() {
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
       <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <Stack.Screen name="Checkout" component={CheckoutScreen} />
+      <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} options={{ gestureEnabled: false }} />
     </Stack.Navigator>
   );
 }
@@ -152,8 +161,12 @@ export default function App() {
             <AuthProvider>
               <FavoritesProvider>
                 <CartProvider>
-                  <StatusBar style="auto" />
-                  <RootNavigator />
+                  <StripeProvider
+                    publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''}
+                  >
+                    <StatusBar style="auto" />
+                    <RootNavigator />
+                  </StripeProvider>
                 </CartProvider>
               </FavoritesProvider>
             </AuthProvider>
