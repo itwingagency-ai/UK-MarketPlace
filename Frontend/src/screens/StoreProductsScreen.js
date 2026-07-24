@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, TouchableWithoutFeedback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Modal,
   Keyboard,
   Alert,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getStoreProducts } from '../api/stores.api';
@@ -39,7 +40,7 @@ function ProductCard({ product, navigation, onRequireLogin }) {
 
   const handleFavoriteToggle = () => {
     if (!isAuthenticated) {
-      onRequireLogin();
+      onRequireLogin('favorite');
       return;
     }
     toggleFavoriteProduct(productId);
@@ -49,7 +50,7 @@ function ProductCard({ product, navigation, onRequireLogin }) {
     if (adding) return;
 
     if (!isAuthenticated) {
-      onRequireLogin();
+      onRequireLogin('cart');
       return;
     }
 
@@ -135,6 +136,8 @@ export default function StoreProductsScreen({ route, navigation }) {
   const cart = useCart();
   const itemCount = cart?.itemCount ?? 0;
   const total = cart?.total ?? 0;
+  const subtotal = cart?.subtotal ?? 0;
+  const shippingFee = cart?.shippingFee ?? 0;
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -149,6 +152,7 @@ export default function StoreProductsScreen({ route, navigation }) {
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [loginModalVisible, setLoginModalVisible] = useState(false);
+  const [loginModalType, setLoginModalType] = useState('cart');
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
@@ -211,7 +215,7 @@ export default function StoreProductsScreen({ route, navigation }) {
     return result;
   }, [products, searchQuery, filterUnder5, filterOffer, filterInStock, sortPrice]);
 
-  const renderProduct = ({ item }) => <ProductCard product={item} navigation={navigation} onRequireLogin={() => setLoginModalVisible(true)} />;
+  const renderProduct = ({ item }) => <ProductCard product={item} navigation={navigation} onRequireLogin={(type) => { setLoginModalType(type); setLoginModalVisible(true); }} />;
 
   return (
     <View style={styles.root}>
@@ -311,9 +315,14 @@ export default function StoreProductsScreen({ route, navigation }) {
             onPress={() => navigation.navigate('BasketTab')}
           >
             <Ionicons name="cart-outline" size={22} color={Colors.white} />
-            <Text style={styles.floatingCartText}>
-              View basket • {itemCount} items • £{(total / 100).toFixed(2)}
-            </Text>
+            <View style={styles.floatingCartTextContainer}>
+              <Text style={styles.floatingCartText}>
+                View basket • {itemCount} item{itemCount !== 1 ? 's' : ''} • £{(subtotal / 100).toFixed(2)}
+              </Text>
+              <Text style={styles.floatingCartSubText}>
+                + Delivery £{(shippingFee / 100).toFixed(2)}
+              </Text>
+            </View>
             <Feather name="chevron-right" size={20} color={Colors.white} />
           </TouchableOpacity>
         </View>
@@ -365,7 +374,9 @@ export default function StoreProductsScreen({ route, navigation }) {
             </View>
             <Text style={styles.centerModalTitle}>Login Required</Text>
             <Text style={styles.centerModalText}>
-              Please log in or create an account to add items to your basket.
+              {loginModalType === 'favorite'
+                ? 'Please log in or create an account to favorite products.'
+                : 'Please log in or create an account to add items to your basket.'}
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -509,21 +520,30 @@ const styles = StyleSheet.create({
   floatingCartBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#D81B60', // solid pink/red from figma
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: 14,
+    backgroundColor: '#D81B60',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 10,
     borderRadius: Radius.full,
-    gap: Spacing.sm,
+    gap: Spacing.xs,
     shadowColor: '#FF4F4F',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
   },
+  floatingCartTextContainer: {
+    marginLeft: Spacing.sm,
+    marginRight: Spacing.sm,
+  },
   floatingCartText: {
     color: Colors.white,
     fontSize: 15,
     fontWeight: '700',
+  },
+  floatingCartSubText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    marginTop: 1,
   },
 
   modalOverlay: {

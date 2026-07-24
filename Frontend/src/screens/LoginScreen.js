@@ -230,7 +230,7 @@ export default function LoginScreen({ navigation }) {
 
           {/* Social buttons */}
           <TouchableOpacity
-            style={styles.socialBtn}
+            style={[styles.socialBtn, { marginBottom: Spacing['4xl'] }]}
             onPress={() => handleSocialPress('Google')}
             activeOpacity={0.8}
           >
@@ -239,42 +239,10 @@ export default function LoginScreen({ navigation }) {
             </View>
             <Text style={styles.socialBtnText}>Continue with Google</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.socialBtn, { marginTop: Spacing.sm }]}
-            onPress={() => handleSocialPress('Facebook')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.facebookIconWrapper}>
-              <Text style={styles.facebookF}>f</Text>
-            </View>
-            <Text style={styles.socialBtnText}>Continue with Facebook</Text>
-          </TouchableOpacity>
-
-          {/* Deals checkbox */}
-          <TouchableOpacity
-            style={styles.dealsRow}
-            onPress={() => setDealsChecked((v) => !v)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.checkbox, dealsChecked && styles.checkboxChecked]}>
-              {dealsChecked && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-            <Text style={styles.dealsText}>Send me deals &amp; offers</Text>
-          </TouchableOpacity>
         </Animated.View>
       </ScrollView>
 
-      {/* Back button fixed at top */}
-      <SafeAreaView style={styles.backArea} edges={['top']} pointerEvents="box-none">
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.canGoBack() ? navigation.goBack() : null}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
+
     </View>
   );
 }

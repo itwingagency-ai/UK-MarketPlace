@@ -5,12 +5,15 @@ const {
 const {
   onOrderPaymentFailed,
   onOrderPaymentSucceeded,
+  onOrderPlacedToCustomer,
+  onOrderPlacedToVendor,
 } = require("./notificationHooks");
 const Order = require("../models/Order");
 const PlatformSettings = require("../models/PlatformSettings");
 const Product = require("../models/Product");
 const PaymentTransaction = require("../models/PaymentTransaction");
 const Store = require("../models/Store");
+const User = require("../models/User");
 
 const restoreStockForOrder = async (order) => {
   for (const item of order.items || []) {
@@ -89,6 +92,15 @@ const markOrdersPaid = async ({
     // eslint-disable-next-line no-await-in-loop
     await order.save();
     onOrderPaymentSucceeded(order);
+
+    if (order.paymentMethod === "online") {
+      User.findById(order.customer).then((user) => {
+        if (user) {
+          onOrderPlacedToCustomer(order, user);
+          onOrderPlacedToVendor(order, user);
+        }
+      }).catch(() => {});
+    }
   }
 };
 

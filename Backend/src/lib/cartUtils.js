@@ -81,6 +81,7 @@ const resolveProductForCart = async ({ productId, variantId }) => {
     product,
     variant,
     unitPrice: variant ? Number(variant.price) : Number(product.price),
+    compareAtPrice: variant ? (variant.compareAtPrice ? Number(variant.compareAtPrice) : null) : (product.compareAtPrice ? Number(product.compareAtPrice) : null),
     availableStock: variant ? Number(variant.stock) : Number(product.stock),
     title: product.title,
     sku: variant ? variant.sku || "" : "",
@@ -176,6 +177,7 @@ const buildCartSummary = async (cart) => {
       attributes: item.attributes,
       image: item.image,
       unitPrice: item.unitPrice,
+      compareAtPrice: item.compareAtPrice,
       quantity: item.quantity,
       lineTotal,
     });

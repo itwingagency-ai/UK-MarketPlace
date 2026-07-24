@@ -55,6 +55,12 @@ const validateCheckoutPayload = (payload) => {
     }
   }
 
+  if (payload.clientType !== undefined && payload.clientType !== null) {
+    if (typeof payload.clientType !== "string") {
+      throw new ApiError(400, "clientType must be a string");
+    }
+  }
+
   if (payload.shippingSelections !== undefined && payload.shippingSelections !== null) {
     if (!Array.isArray(payload.shippingSelections)) {
       throw new ApiError(400, "shippingSelections must be an array");

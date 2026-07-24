@@ -18,13 +18,13 @@ const findActiveShippingMethodsByStores = async (storeIds) => {
 };
 
 const computeShippingFeeForStore = ({ method, settings, subtotal }) => {
-  const threshold = Number(settings?.shipping?.freeShippingThreshold || 0);
+  const threshold = Number(settings?.shipping?.freeShippingThreshold || 0) * 100;
   if (threshold > 0 && subtotal >= threshold) return 0;
 
-  if (method) return Number(method.fee || 0);
+  if (method) return Number(method.fee || 0) * 100;
 
   // Backwards-compatible fallback for stores that haven't configured methods yet
-  return Number(settings?.shipping?.flatFee || 0);
+  return Number(settings?.shipping?.flatFee || 0) * 100;
 };
 
 const buildMethodSnapshot = (method) => {
@@ -34,7 +34,7 @@ const buildMethodSnapshot = (method) => {
     code: method.code,
     name: method.name,
     description: method.description || "",
-    fee: Number(method.fee || 0),
+    fee: Number(method.fee || 0) * 100,
     minDays: Number(method.minDays || 0),
     maxDays: Number(method.maxDays || 0),
   };

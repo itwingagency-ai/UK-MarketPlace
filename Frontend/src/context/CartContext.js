@@ -25,11 +25,15 @@ function cartReducer(state, action) {
       const cart = action.payload || {};
       const flattenedItems = cart.byStore ? cart.byStore.flatMap(store => store.items || []) : (cart.items || []);
       const total = cart.grandTotal ?? cart.subtotal ?? flattenedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+      const subtotal = cart.subtotal ?? flattenedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+      const shippingFee = cart.shippingFee ?? 0;
       const itemCount = cart.totalItems ?? flattenedItems.reduce((sum, item) => sum + item.quantity, 0);
       return {
         ...state,
         items: flattenedItems,
         total,
+        subtotal,
+        shippingFee,
         itemCount,
         storeId: cart.byStore?.[0]?.storeId ?? cart.store ?? null,
         defaultShippingMethod: cart.byStore?.[0]?.defaultShippingMethod ?? null,
@@ -117,6 +121,8 @@ export const CartProvider = ({ children }) => {
       value={{
         items: state.items,
         total: state.total,
+        subtotal: state.subtotal,
+        shippingFee: state.shippingFee,
         itemCount: state.itemCount,
         storeId: state.storeId,
         defaultShippingMethod: state.defaultShippingMethod,

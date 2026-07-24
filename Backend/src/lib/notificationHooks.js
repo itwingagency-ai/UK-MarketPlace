@@ -4,7 +4,7 @@ const User = require("../models/User");
 const { notifyAsync } = require("./notificationDispatcher");
 
 const formatMoney = (value, currency) => {
-  const n = Number(value || 0);
+  const n = Number(value || 0) / 100;
   const formatted = Number.isFinite(n) ? n.toFixed(2) : "0.00";
   return currency ? `${formatted}` : formatted;
 };

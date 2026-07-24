@@ -71,15 +71,7 @@ export default function RegisterScreen({ navigation }) {
   return (
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.canGoBack() ? navigation.goBack() : null}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
+      <SafeAreaView style={styles.safeArea} edges={['top']} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}

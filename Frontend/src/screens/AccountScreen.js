@@ -47,7 +47,7 @@ export default function AccountScreen({ navigation }) {
 
         {/* Action Grid */}
         <View style={styles.actionGrid}>
-          <TouchableOpacity style={styles.actionCard} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.actionCard} activeOpacity={0.7} onPress={() => navigation.navigate('Orders')}>
             <Ionicons name="receipt-outline" size={28} color={Colors.text} />
             <Text style={styles.actionCardText}>Orders</Text>
           </TouchableOpacity>

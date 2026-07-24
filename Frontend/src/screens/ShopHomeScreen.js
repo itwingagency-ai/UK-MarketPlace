@@ -12,12 +12,14 @@ import {
   RefreshControl,
   ActivityIndicator,
   ImageBackground,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from '../context/LocationContext';
 import { getNearbyStores } from '../api/stores.api';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useFavorites } from '../context/FavoritesContext';
 
 const { width } = Dimensions.get('window');
@@ -317,7 +319,9 @@ function PromoCarousel() {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ShopHomeScreen({ route, navigation }) {
-  const { postcode = '', locationLabel = '' } = route.params ?? {};
+  const { location } = useLocation();
+  const postcode = route.params?.postcode || location?.postcode || '';
+  const locationLabel = route.params?.locationLabel || location?.label || '';
   const initialStores = route.params?.stores ?? [];
   const { isAuthenticated } = useAuth();
   const { favoriteStores, toggleFavoriteStore } = useFavorites();
@@ -327,6 +331,7 @@ export default function ShopHomeScreen({ route, navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loginModalVisible, setLoginModalVisible] = useState(false);
 
   const displayLocation = locationLabel || postcode;
 
@@ -458,7 +463,7 @@ export default function ShopHomeScreen({ route, navigation }) {
               isFavorited={favoriteStores.some(s => s._id === (item._id || item.id) || s === (item._id || item.id))}
               onToggleFavorite={() => {
                 if (!isAuthenticated) {
-                  navigation.navigate('AccountTab');
+                  setLoginModalVisible(true);
                 } else {
                   toggleFavoriteStore(item._id || item.id);
                 }
@@ -490,6 +495,40 @@ export default function ShopHomeScreen({ route, navigation }) {
           }
         />
       )}
+
+      {/* Login Required Modal */}
+      <Modal visible={loginModalVisible} transparent animationType="fade">
+        <View style={styles.centerModalOverlay}>
+          <View style={styles.centerModalContent}>
+            <View style={styles.modalIconWrapper}>
+              <Feather name="lock" size={28} color={Colors.primary} />
+            </View>
+            <Text style={styles.centerModalTitle}>Login Required</Text>
+            <Text style={styles.centerModalText}>
+              Please log in or create an account to favorite stores.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnSecondary]}
+                activeOpacity={0.8}
+                onPress={() => setLoginModalVisible(false)}
+              >
+                <Text style={styles.modalBtnTextSecondary}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnPrimary]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setLoginModalVisible(false);
+                  navigation.navigate('Login');
+                }}
+              >
+                <Text style={styles.modalBtnTextPrimary}>Log In</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -636,6 +675,78 @@ const styles = StyleSheet.create({
   retryBtnText: {
     fontSize: Typography.size.base, fontWeight: Typography.weight.bold,
     color: Colors.white,
+  },
+  centerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  centerModalContent: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.xl,
+    padding: Spacing.xl,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalIconWrapper: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  centerModalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  centerModalText: {
+    fontSize: 15,
+    color: Colors.muted,
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
+    lineHeight: 22,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    width: '100%',
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnSecondary: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  modalBtnTextSecondary: {
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  modalBtnPrimary: {
+    backgroundColor: Colors.primary,
+  },
+  modalBtnTextPrimary: {
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
 

@@ -6,7 +6,7 @@ export function formatCurrency(amount, currency = 'GBP') {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
-  }).format(amount);
+  }).format((amount || 0) / 100);
 }
 
 /**

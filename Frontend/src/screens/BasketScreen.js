@@ -13,6 +13,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useCart } from '../context/CartContext';
+import { getStoreStatus } from '../api/stores.api';
+import { useCustomAlert } from '../context/AlertContext';
 
 // Progress Step component
 function ProgressStep({ step, currentStep, label, isLast }) {
@@ -36,7 +38,7 @@ function ProgressStep({ step, currentStep, label, isLast }) {
   );
 }
 
-function CartItem({ item, onUpdate, onRemove }) {
+function CartItem({ item, onUpdate, onRemove, navigation }) {
   const [updating, setUpdating] = useState(false);
 
   const handleIncrement = async () => {
@@ -68,10 +70,14 @@ function CartItem({ item, onUpdate, onRemove }) {
 
   return (
     <View style={styles.cartItemRow}>
-      <Image source={{ uri: imageUrl }} style={styles.itemImage} />
+      <TouchableOpacity onPress={() => navigation.navigate('ProductDetail', { product: { _id: item.product, title: item.title, price: item.unitPrice, images: item.image ? [item.image] : [] } })}>
+        <Image source={{ uri: imageUrl }} style={styles.itemImage} />
+      </TouchableOpacity>
 
       <View style={styles.itemDetails}>
-        <Text style={styles.itemName} numberOfLines={2}>{item.title || item.product?.title || 'Product'}</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('ProductDetail', { product: { _id: item.product, title: item.title, price: item.unitPrice, images: item.image ? [item.image] : [] } })}>
+          <Text style={styles.itemName} numberOfLines={2}>{item.title || item.product?.title || 'Product'}</Text>
+        </TouchableOpacity>
 
         <View style={styles.controlsRow}>
           <View style={styles.quantityControl}>
@@ -105,7 +111,9 @@ function CartItem({ item, onUpdate, onRemove }) {
 }
 
 export default function BasketScreen({ navigation }) {
-  const { items, total, itemCount, defaultShippingMethod, updateItem, removeItem, isLoading } = useCart();
+  const { items, total, subtotal, shippingFee, itemCount, storeId, defaultShippingMethod, updateItem, removeItem, isLoading } = useCart();
+  const { showAlert } = useCustomAlert();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   const insets = useSafeAreaInsets();
 
@@ -124,7 +132,44 @@ export default function BasketScreen({ navigation }) {
   const storeName = items[0]?.product?.store?.name || 'Snappy Store';
 
   const totalInPounds = (total / 100).toFixed(2);
-  const originalTotal = (total / 100 * 1.2).toFixed(2); // Mock original total
+  const subtotalInPounds = (subtotal / 100).toFixed(2);
+  const shippingFeeInPounds = (shippingFee / 100).toFixed(2);
+
+  const originalSubtotal = items.reduce((acc, item) => {
+    const unitPrice = item.unitPrice ?? item.price ?? 0;
+    const comparePrice = item.compareAtPrice && item.compareAtPrice > unitPrice ? item.compareAtPrice : unitPrice;
+    return acc + (comparePrice * item.quantity);
+  }, 0);
+  
+  const hasDiscount = originalSubtotal > subtotal;
+  const originalTotal = hasDiscount ? ((originalSubtotal + shippingFee) / 100).toFixed(2) : null;
+
+  const handleCheckout = async () => {
+    if (!storeId) return;
+    setIsCheckingOut(true);
+    try {
+      const res = await getStoreStatus(storeId);
+      const statusData = res?.data ?? res;
+      if (statusData && statusData.isOpen === false) {
+        showAlert({
+          title: 'Store Closed',
+          message: `Sorry, this store is currently closed. ${statusData.statusLabel || ''}`,
+          icon: 'clock',
+          showCancel: false,
+          confirmText: 'Okay',
+        });
+        setIsCheckingOut(false);
+        return;
+      }
+
+      // Proceed with checkout logic
+      navigation.navigate('Checkout');
+    } catch (err) {
+      console.log('Error checking store status', err);
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
 
   if (itemCount === 0) {
     return (
@@ -132,7 +177,7 @@ export default function BasketScreen({ navigation }) {
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           <View style={styles.header}>
             <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
-              <Feather name="x" size={24} color={Colors.text} />
+              <Feather name="arrow-left" size={24} color={Colors.text} />
             </TouchableOpacity>
             <View style={styles.headerTitles}>
               <Text style={styles.headerTitle}>Cart</Text>
@@ -160,7 +205,7 @@ export default function BasketScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
-            <Feather name="x" size={24} color={Colors.text} />
+            <Feather name="arrow-left" size={24} color={Colors.text} />
           </TouchableOpacity>
           <View style={styles.headerTitles}>
             <Text style={styles.headerTitle}>Cart</Text>
@@ -198,6 +243,7 @@ export default function BasketScreen({ navigation }) {
               item={item}
               onUpdate={updateItem}
               onRemove={removeItem}
+              navigation={navigation}
             />
           ))}
 
@@ -210,23 +256,37 @@ export default function BasketScreen({ navigation }) {
         {/* Total Summary */}
         <View style={styles.summarySection}>
           <View style={styles.summaryRow}>
+            <Text style={styles.summarySubLabel}>Items Subtotal</Text>
+            <Text style={styles.summarySubPrice}>£{subtotalInPounds}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summarySubLabel}>Delivery Fee</Text>
+            <Text style={styles.summarySubPrice}>£{shippingFeeInPounds}</Text>
+          </View>
+          <View style={[styles.summaryRow, { marginTop: Spacing.sm, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.border }]}>
             <View>
-              <Text style={styles.summaryTotalLabel}>Total <Text style={styles.summaryTaxLabel}>(incl. fees and tax)</Text></Text>
-              <TouchableOpacity>
-                <Text style={styles.seeSummaryText}>See summary</Text>
-              </TouchableOpacity>
+              <Text style={styles.summaryTotalLabel}>Total <Text style={styles.summaryTaxLabel}>(incl. tax)</Text></Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={styles.summaryTotalPrice}>£{totalInPounds}</Text>
-              <Text style={styles.summaryOriginalPrice}>£{originalTotal}</Text>
+              {originalTotal && <Text style={styles.summaryOriginalPrice}>£{originalTotal}</Text>}
             </View>
           </View>
         </View>
 
         {/* Action Button */}
         <View style={styles.bottomFooter}>
-          <TouchableOpacity style={styles.confirmBtn} activeOpacity={0.8}>
-            <Text style={styles.confirmBtnText}>Confirm payment and address</Text>
+          <TouchableOpacity
+            style={styles.confirmBtn}
+            activeOpacity={0.8}
+            onPress={handleCheckout}
+            disabled={isCheckingOut}
+          >
+            {isCheckingOut ? (
+              <ActivityIndicator color={Colors.white} size="small" />
+            ) : (
+              <Text style={styles.confirmBtnText}>Confirm payment and address</Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -321,7 +381,7 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingBottom: Spacing.xl, // normal padding instead of huge gap for absolute footer
+    paddingBottom: Spacing.xl + 40, // add more space so the button doesn't get hidden behind bottom tabs
   },
 
   // Toggle Switch
@@ -458,6 +518,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  summarySubLabel: {
+    fontSize: 15,
+    color: Colors.text,
+  },
+  summarySubPrice: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text,
   },
   summaryTotalLabel: {
     fontSize: 18,
@@ -496,14 +566,14 @@ const styles = StyleSheet.create({
   },
   confirmBtn: {
     backgroundColor: '#D81B60', // Pink from figma
-    paddingVertical: 16,
-    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.full,
     alignItems: 'center',
   },
   confirmBtnText: {
     color: Colors.white,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 16, // matches Typography.subtitle1
+    fontWeight: '600',
   },
 
   // Empty state
