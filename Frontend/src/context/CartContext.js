@@ -77,6 +77,7 @@ export const CartProvider = ({ children }) => {
   }, [isAuthenticated, fetchCart]);
 
   const addItem = useCallback(async (productId, quantity = 1) => {
+    if (!isAuthenticated) return { success: false, error: 'Please login to add items to your cart' };
     try {
       const data = await CartAPI.addItem(productId, quantity);
       dispatch({ type: CART_ACTIONS.SET_CART, payload: data.cart ?? data });
@@ -84,9 +85,10 @@ export const CartProvider = ({ children }) => {
     } catch (err) {
       return { success: false, error: err.response?.data?.message ?? 'Failed to add item' };
     }
-  }, []);
+  }, [isAuthenticated]);
 
   const updateItem = useCallback(async (itemId, quantity) => {
+    if (!isAuthenticated) return { success: false, error: 'Please login to update cart' };
     try {
       const data = await CartAPI.updateItemQuantity(itemId, quantity);
       dispatch({ type: CART_ACTIONS.SET_CART, payload: data.cart ?? data });
@@ -94,9 +96,10 @@ export const CartProvider = ({ children }) => {
     } catch (err) {
       return { success: false, error: err.response?.data?.message ?? 'Failed to update item' };
     }
-  }, []);
+  }, [isAuthenticated]);
 
   const removeItem = useCallback(async (itemId) => {
+    if (!isAuthenticated) return { success: false, error: 'Please login to modify cart' };
     try {
       const data = await CartAPI.removeItem(itemId);
       dispatch({ type: CART_ACTIONS.SET_CART, payload: data.cart ?? data });
@@ -104,9 +107,10 @@ export const CartProvider = ({ children }) => {
     } catch (err) {
       return { success: false, error: err.response?.data?.message ?? 'Failed to remove item' };
     }
-  }, []);
+  }, [isAuthenticated]);
 
   const clearCart = useCallback(async () => {
+    if (!isAuthenticated) return { success: false, error: 'Please login to clear cart' };
     try {
       await CartAPI.clearCart();
       dispatch({ type: CART_ACTIONS.CLEAR });
@@ -114,7 +118,7 @@ export const CartProvider = ({ children }) => {
     } catch (err) {
       return { success: false, error: err.response?.data?.message ?? 'Failed to clear cart' };
     }
-  }, []);
+  }, [isAuthenticated]);
 
   return (
     <CartContext.Provider

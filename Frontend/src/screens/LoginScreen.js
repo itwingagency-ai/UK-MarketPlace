@@ -15,6 +15,7 @@ import {
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Spacing, Typography, Radius } from '../theme';
 // IMPORT COMMENTED OUT FOR EXPO GO COMPATIBILITY
@@ -148,7 +149,7 @@ export default function LoginScreen({ navigation }) {
               styles.inputContainer,
               emailError && styles.inputContainerError,
             ]}>
-              <Text style={styles.inputIcon}>✉️</Text>
+              <Feather name="mail" size={18} color={Colors.muted} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 placeholder="youremail@example.com"
@@ -171,7 +172,7 @@ export default function LoginScreen({ navigation }) {
               styles.inputContainer,
               passwordError && styles.inputContainerError,
             ]}>
-              <Text style={styles.inputIcon}>🔒</Text>
+              <Feather name="lock" size={18} color={Colors.muted} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 placeholder="Enter your password"
@@ -188,7 +189,7 @@ export default function LoginScreen({ navigation }) {
                 onPress={() => setIsPasswordVisible((v) => !v)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={styles.eyeIcon}>{isPasswordVisible ? '🙈' : '👁'}</Text>
+                <Feather name={isPasswordVisible ? 'eye' : 'eye-off'} size={18} color={Colors.muted} />
               </TouchableOpacity>
             </View>
             {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
@@ -360,7 +361,6 @@ const styles = StyleSheet.create({
     borderColor: Colors.error,
   },
   inputIcon: {
-    fontSize: 16,
     marginRight: Spacing.sm,
   },
   textInput: {
@@ -371,9 +371,6 @@ const styles = StyleSheet.create({
   },
   eyeButton: {
     padding: Spacing.xs,
-  },
-  eyeIcon: {
-    fontSize: 16,
   },
   errorText: {
     color: Colors.error,

@@ -10,10 +10,12 @@ import {
   StatusBar,
   Alert,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { Colors, Spacing, Typography, Radius } from '../theme';
+import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 
 export default function ResetPasswordScreen({ route, navigation }) {
   const { email, otp } = route.params;
@@ -24,6 +26,11 @@ export default function ResetPasswordScreen({ route, navigation }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isConfirmVisible, setIsConfirmVisible] = useState(false);
+  
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [isConfirmFocused, setIsConfirmFocused] = useState(false);
+  
+  const isFormValid = password.length >= 8 && password === confirmPassword;
 
   const handleReset = async () => {
     if (password.length < 8) {
@@ -52,19 +59,27 @@ export default function ResetPasswordScreen({ route, navigation }) {
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.canGoBack() ? navigation.goBack() : null}
-        >
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.canGoBack() ? navigation.goBack() : null}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <View style={styles.headerTitles}>
+            <Text style={styles.headerTitle}>New Password</Text>
+            <Text style={styles.headerSubtitle}>Secure Account</Text>
+          </View>
+        </View>
       </SafeAreaView>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.content}>
           <View style={styles.headerBlock}>
-            <Text style={styles.welcomeLabel}>Secure Account</Text>
-            <Text style={styles.title}>New Password</Text>
             <Text style={styles.tagline}>
               Create a new, strong password for your account.
             </Text>
@@ -74,25 +89,29 @@ export default function ResetPasswordScreen({ route, navigation }) {
             <Text style={styles.label}>New Password</Text>
             <View style={[
               styles.inputContainer,
+              isPasswordFocused ? styles.inputContainerFocused : null,
               error ? styles.inputContainerError : null,
             ]}>
-              <Text style={styles.inputIcon}>🔒</Text>
+              <Feather name="lock" size={20} color={isPasswordFocused ? Colors.primary : Colors.muted} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 placeholder="Enter new password"
                 placeholderTextColor={Colors.muted}
                 value={password}
                 onChangeText={(t) => { setPassword(t); setError(''); }}
+                onFocus={() => setIsPasswordFocused(true)}
+                onBlur={() => setIsPasswordFocused(false)}
                 secureTextEntry={!isPasswordVisible}
                 autoCapitalize="none"
                 autoCorrect={false}
+                autoFocus={true}
               />
               <TouchableOpacity
                 style={styles.eyeButton}
                 onPress={() => setIsPasswordVisible((v) => !v)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={styles.eyeIcon}>{isPasswordVisible ? '🙈' : '👁'}</Text>
+                <Feather name={isPasswordVisible ? 'eye' : 'eye-off'} size={20} color={Colors.muted} />
               </TouchableOpacity>
             </View>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -100,14 +119,19 @@ export default function ResetPasswordScreen({ route, navigation }) {
 
           <View style={styles.fieldWrapper}>
             <Text style={styles.label}>Confirm Password</Text>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputIcon}>🔒</Text>
+            <View style={[
+              styles.inputContainer,
+              isConfirmFocused ? styles.inputContainerFocused : null,
+            ]}>
+              <Feather name="lock" size={20} color={isConfirmFocused ? Colors.primary : Colors.muted} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 placeholder="Re-enter new password"
                 placeholderTextColor={Colors.muted}
                 value={confirmPassword}
                 onChangeText={(t) => { setConfirmPassword(t); setError(''); }}
+                onFocus={() => setIsConfirmFocused(true)}
+                onBlur={() => setIsConfirmFocused(false)}
                 secureTextEntry={!isConfirmVisible}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -117,15 +141,15 @@ export default function ResetPasswordScreen({ route, navigation }) {
                 onPress={() => setIsConfirmVisible((v) => !v)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={styles.eyeIcon}>{isConfirmVisible ? '🙈' : '👁'}</Text>
+                <Feather name={isConfirmVisible ? 'eye' : 'eye-off'} size={20} color={Colors.muted} />
               </TouchableOpacity>
             </View>
           </View>
 
           <TouchableOpacity
-            style={[styles.btn, isSubmitting && styles.btnDisabled]}
+            style={[styles.btn, (!isFormValid || isSubmitting) && styles.btnDisabled]}
             onPress={handleReset}
-            disabled={isSubmitting}
+            disabled={!isFormValid || isSubmitting}
           >
             {isSubmitting ? (
               <ActivityIndicator color={Colors.white} size="small" />
@@ -135,7 +159,8 @@ export default function ResetPasswordScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
+  </View>
   );
 }
 
@@ -149,13 +174,30 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
+    ...Shadow.sm,
   },
-  backIcon: { fontSize: 20, color: Colors.text, fontWeight: '600' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+  },
+  headerTitles: {
+    flex: 1,
+    paddingHorizontal: Spacing.md,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
   scrollContent: { flexGrow: 1, paddingBottom: 40 },
   content: {
     flex: 1,
@@ -200,11 +242,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     minHeight: 52,
   },
+  inputContainerFocused: {
+    borderColor: Colors.primary,
+  },
   inputContainerError: {
     borderColor: Colors.error,
   },
   inputIcon: {
-    fontSize: 16,
     marginRight: Spacing.sm,
   },
   textInput: {
@@ -215,9 +259,6 @@ const styles = StyleSheet.create({
   },
   eyeButton: {
     padding: Spacing.xs,
-  },
-  eyeIcon: {
-    fontSize: 16,
   },
   errorText: {
     color: Colors.error,
@@ -233,7 +274,9 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: Spacing.lg,
   },
-  btnDisabled: { opacity: 0.7 },
+  btnDisabled: { 
+    backgroundColor: Colors.surfaceSecondary || '#E5E7EB',
+  },
   btnText: {
     fontSize: Typography.size.md,
     fontWeight: Typography.weight.bold,

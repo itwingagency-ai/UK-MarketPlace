@@ -25,10 +25,21 @@ export default function OrderSuccessScreen({ route, navigation }) {
   };
 
   const handleViewOrders = () => {
-    navigation.navigate('MainTabs', { 
-      screen: 'AccountTab', 
-      params: { screen: 'Orders' } 
-    });
+    const orderId = orders?.[0]?._id || orders?.[0]?.id;
+    if (orderId) {
+      navigation.navigate('MainTabs', { 
+        screen: 'AccountTab', 
+        params: { 
+          screen: 'Orders',
+          params: { autoOpenOrderId: orderId }
+        } 
+      });
+    } else {
+      navigation.navigate('MainTabs', { 
+        screen: 'AccountTab', 
+        params: { screen: 'Orders' } 
+      });
+    }
   };
 
   return (

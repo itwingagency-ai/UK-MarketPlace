@@ -11,7 +11,9 @@ import {
   logout as apiLogout, 
   register as apiRegister,
   verifySignup as apiVerifySignup,
+  resendSignupOtp as apiResendSignupOtp,
   forgotPassword as apiForgotPassword,
+  verifyResetOtp as apiVerifyResetOtp,
   resetPassword as apiResetPassword,
   googleLogin as apiGoogleLogin,
 } from '../api/auth.api';
@@ -84,12 +86,23 @@ export const AuthProvider = ({ children }) => {
         ]);
 
         const user = userJson[1] ? JSON.parse(userJson[1]) : null;
+        const token = accessToken[1];
+
+        if (user && !token) {
+          await AsyncStorage.multiRemove([
+            STORAGE_KEYS.ACCESS_TOKEN,
+            STORAGE_KEYS.REFRESH_TOKEN,
+            STORAGE_KEYS.USER,
+          ]);
+          dispatch({ type: AUTH_ACTIONS.HYDRATE, payload: { user: null, accessToken: null, refreshToken: null } });
+          return;
+        }
 
         dispatch({
           type: AUTH_ACTIONS.HYDRATE,
           payload: {
             user,
-            accessToken: accessToken[1],
+            accessToken: token,
             refreshToken: refreshToken[1],
           },
         });
@@ -150,6 +163,17 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const resendSignupOtp = useCallback(async (email) => {
+    try {
+      dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
+      await apiResendSignupOtp(email);
+      return { success: true };
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to resend OTP.';
+      return { success: false, error: message };
+    }
+  }, []);
+
   const forgotPassword = useCallback(async (email) => {
     try {
       dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
@@ -157,6 +181,17 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
     } catch (err) {
       const message = err.response?.data?.message || 'Failed to send OTP.';
+      return { success: false, error: message };
+    }
+  }, []);
+
+  const verifyResetOtp = useCallback(async (email, otp) => {
+    try {
+      dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
+      await apiVerifyResetOtp(email, otp);
+      return { success: true };
+    } catch (err) {
+      const message = err.response?.data?.message || 'Invalid or expired OTP.';
       return { success: false, error: message };
     }
   }, []);
@@ -229,13 +264,15 @@ export const AuthProvider = ({ children }) => {
       value={{
         user: state.user,
         accessToken: state.accessToken,
-        isAuthenticated: !!state.user,
+        isAuthenticated: !!(state.user && state.accessToken),
         isLoading: state.isLoading,
         error: state.error,
         login,
         register,
         verifySignup,
+        resendSignupOtp,
         forgotPassword,
+        verifyResetOtp,
         resetPassword,
         googleLogin,
         logout,

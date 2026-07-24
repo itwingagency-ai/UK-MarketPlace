@@ -14,6 +14,7 @@ import {
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Spacing, Typography, Radius } from '../theme';
 
@@ -57,7 +58,7 @@ export default function RegisterScreen({ navigation }) {
     const normalizedEmail = email.trim().toLowerCase();
     const result = await register(name.trim(), normalizedEmail, password);
     setIsSubmitting(false);
-    
+
     if (result.success) {
       navigation.navigate('OtpVerification', { email: normalizedEmail, mode: 'signup' });
     } else {
@@ -92,7 +93,7 @@ export default function RegisterScreen({ navigation }) {
               styles.inputContainer,
               nameError && styles.inputContainerError,
             ]}>
-              <Text style={styles.inputIcon}>👤</Text>
+              <Feather name="user" size={18} color={Colors.muted} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 placeholder="Your full name"
@@ -113,7 +114,7 @@ export default function RegisterScreen({ navigation }) {
               styles.inputContainer,
               emailError && styles.inputContainerError,
             ]}>
-              <Text style={styles.inputIcon}>✉️</Text>
+              <Feather name="mail" size={18} color={Colors.muted} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 placeholder="youremail@example.com"
@@ -135,10 +136,10 @@ export default function RegisterScreen({ navigation }) {
               styles.inputContainer,
               passwordError && styles.inputContainerError,
             ]}>
-              <Text style={styles.inputIcon}>🔒</Text>
+              <Feather name="lock" size={18} color={Colors.muted} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
-                placeholder="Create a password (8+ characters)"
+                placeholder="Create a password"
                 placeholderTextColor={Colors.muted}
                 value={password}
                 onChangeText={(t) => { setPassword(t); setPasswordError(''); }}
@@ -152,7 +153,7 @@ export default function RegisterScreen({ navigation }) {
                 onPress={() => setIsPasswordVisible((v) => !v)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={styles.eyeIcon}>{isPasswordVisible ? '🙈' : '👁'}</Text>
+                <Feather name={isPasswordVisible ? 'eye' : 'eye-off'} size={18} color={Colors.muted} />
               </TouchableOpacity>
             </View>
             {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
@@ -256,7 +257,6 @@ const styles = StyleSheet.create({
     borderColor: Colors.error,
   },
   inputIcon: {
-    fontSize: 16,
     marginRight: Spacing.sm,
   },
   textInput: {
@@ -267,9 +267,6 @@ const styles = StyleSheet.create({
   },
   eyeButton: {
     padding: Spacing.xs,
-  },
-  eyeIcon: {
-    fontSize: 16,
   },
   errorText: {
     color: Colors.error,
