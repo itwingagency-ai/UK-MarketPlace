@@ -64,7 +64,7 @@ export default function AccountScreen({ navigation }) {
         {/* General Section */}
         <Text style={[styles.sectionTitle, { marginTop: Spacing.xl }]}>General</Text>
         <View style={styles.generalList}>
-          <TouchableOpacity style={styles.generalItem} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.generalItem} activeOpacity={0.7} onPress={() => navigation.navigate('HelpCenter')}>
             <View style={styles.generalItemLeft}>
               <Feather name="help-circle" size={22} color={Colors.text} />
               <Text style={styles.generalItemText}>Help center</Text>
@@ -74,9 +74,7 @@ export default function AccountScreen({ navigation }) {
 
           <View style={styles.divider} />
 
-          <View style={styles.divider} />
-
-          <TouchableOpacity style={styles.generalItem} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.generalItem} activeOpacity={0.7} onPress={() => navigation.navigate('TermsPolicies')}>
             <View style={styles.generalItemLeft}>
               <Ionicons name="document-text-outline" size={22} color={Colors.text} />
               <Text style={styles.generalItemText}>Terms & policies</Text>
