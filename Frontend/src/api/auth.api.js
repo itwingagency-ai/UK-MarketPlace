@@ -15,8 +15,18 @@ export const verifySignup = async (email, otp) => {
   return data;
 };
 
+export const resendSignupOtp = async (email) => {
+  const { data } = await client.post('/auth/resend-signup-otp', { email });
+  return data;
+};
+
 export const forgotPassword = async (email) => {
   const { data } = await client.post('/auth/forgot-password', { email });
+  return data;
+};
+
+export const verifyResetOtp = async (email, otp) => {
+  const { data } = await client.post('/auth/verify-reset-otp', { email, otp });
   return data;
 };
 

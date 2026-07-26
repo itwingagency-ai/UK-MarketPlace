@@ -9,16 +9,21 @@ import {
   ScrollView,
   StatusBar,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { Colors, Spacing, Typography, Radius } from '../theme';
+import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 
 export default function ForgotPasswordScreen({ navigation }) {
   const { forgotPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  
+  const isFormValid = email.trim().length > 0 && /\S+@\S+\.\S+/.test(email);
 
   const handleSendLink = async () => {
     if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
@@ -41,19 +46,27 @@ export default function ForgotPasswordScreen({ navigation }) {
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.canGoBack() ? navigation.goBack() : null}
-        >
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.canGoBack() ? navigation.goBack() : null}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <View style={styles.headerTitles}>
+            <Text style={styles.headerTitle}>Forgot Password?</Text>
+            <Text style={styles.headerSubtitle}>Password Recovery</Text>
+          </View>
+        </View>
       </SafeAreaView>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.content}>
           <View style={styles.headerBlock}>
-            <Text style={styles.welcomeLabel}>Password Recovery</Text>
-            <Text style={styles.title}>Forgot Password?</Text>
             <Text style={styles.tagline}>
               Enter the email address associated with your account and we'll send you a code to reset your password.
             </Text>
@@ -63,27 +76,31 @@ export default function ForgotPasswordScreen({ navigation }) {
             <Text style={styles.label}>Email</Text>
             <View style={[
               styles.inputContainer,
+              isFocused ? styles.inputContainerFocused : null,
               error ? styles.inputContainerError : null,
             ]}>
-              <Text style={styles.inputIcon}>✉️</Text>
+              <Feather name="mail" size={20} color={isFocused ? Colors.primary : Colors.muted} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
                 placeholder="youremail@example.com"
                 placeholderTextColor={Colors.muted}
                 value={email}
                 onChangeText={(t) => { setEmail(t); setError(''); }}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                autoFocus={true}
               />
             </View>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
           </View>
 
           <TouchableOpacity
-            style={[styles.btn, isSubmitting && styles.btnDisabled]}
+            style={[styles.btn, (!isFormValid || isSubmitting) && styles.btnDisabled]}
             onPress={handleSendLink}
-            disabled={isSubmitting}
+            disabled={!isFormValid || isSubmitting}
           >
             {isSubmitting ? (
               <ActivityIndicator color={Colors.white} size="small" />
@@ -93,7 +110,8 @@ export default function ForgotPasswordScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
+  </View>
   );
 }
 
@@ -107,13 +125,30 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
+    ...Shadow.sm,
   },
-  backIcon: { fontSize: 20, color: Colors.text, fontWeight: '600' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+  },
+  headerTitles: {
+    flex: 1,
+    paddingHorizontal: Spacing.md,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
   scrollContent: { flexGrow: 1, paddingBottom: 40 },
   content: {
     flex: 1,
@@ -158,11 +193,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     minHeight: 52,
   },
+  inputContainerFocused: {
+    borderColor: Colors.primary,
+  },
   inputContainerError: {
     borderColor: Colors.error,
   },
   inputIcon: {
-    fontSize: 16,
     marginRight: Spacing.sm,
   },
   textInput: {
@@ -185,7 +222,9 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: Spacing.lg,
   },
-  btnDisabled: { opacity: 0.7 },
+  btnDisabled: { 
+    backgroundColor: Colors.surfaceSecondary || '#E5E7EB',
+  },
   btnText: {
     fontSize: Typography.size.md,
     fontWeight: Typography.weight.bold,

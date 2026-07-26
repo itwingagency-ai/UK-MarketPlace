@@ -1,6 +1,6 @@
 // API base URL — change to your machine's LAN IP when testing on a physical device
 // e.g. 'http://192.168.1.x:5000/api/v1'
-export const API_BASE_URL = 'http://10.23.41.164:5000/api/v1';
+export const API_BASE_URL = 'http://192.168.100.12:5000/api/v1';
 
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'snappy_access_token',

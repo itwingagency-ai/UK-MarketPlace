@@ -5,7 +5,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { Colors, Spacing, Typography, Radius } from '../theme';
 import { getMyOrders } from '../api/orders.api';
 
-export default function OrdersScreen({ navigation }) {
+export default function OrdersScreen({ navigation, route }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,6 +13,14 @@ export default function OrdersScreen({ navigation }) {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  useEffect(() => {
+    if (route.params?.autoOpenOrderId) {
+      const orderId = route.params.autoOpenOrderId;
+      navigation.setParams({ autoOpenOrderId: undefined });
+      navigation.navigate('OrderDetail', { orderId });
+    }
+  }, [route.params?.autoOpenOrderId]);
 
   const fetchOrders = async () => {
     try {

@@ -9,17 +9,50 @@ import {
   ScrollView,
   StatusBar,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { Colors, Spacing, Typography, Radius } from '../theme';
+import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 
 export default function OtpVerificationScreen({ route, navigation }) {
   const { email, mode } = route.params; // mode: 'signup' | 'forgot_password'
-  const { verifySignup, isLoading: authLoading } = useAuth();
+  const { verifySignup, verifyResetOtp, resendSignupOtp, forgotPassword, isLoading: authLoading } = useAuth();
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [isResending, setIsResending] = useState(false);
+
+  React.useEffect(() => {
+    if (timeLeft > 0) {
+      const timerId = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timerId);
+    }
+  }, [timeLeft]);
+
+  const handleResend = async () => {
+    if (timeLeft > 0) return;
+    setIsResending(true);
+    setError('');
+    
+    let result;
+    if (mode === 'signup') {
+      result = await resendSignupOtp(email);
+    } else {
+      result = await forgotPassword(email);
+    }
+    
+    setIsResending(false);
+    if (result.success) {
+      setTimeLeft(60);
+    } else {
+      setError(result.error || 'Failed to resend code');
+    }
+  };
 
   const handleVerify = async () => {
     if (otp.length < 6) {
@@ -36,8 +69,15 @@ export default function OtpVerificationScreen({ route, navigation }) {
         setError(result.error || 'Verification failed');
       }
     } else if (mode === 'forgot_password') {
-      // Proceed to reset password screen with verified email and OTP
-      navigation.navigate('ResetPassword', { email, otp });
+      setIsSubmitting(true);
+      const result = await verifyResetOtp(email, otp);
+      setIsSubmitting(false);
+
+      if (result.success) {
+        navigation.navigate('ResetPassword', { email, otp });
+      } else {
+        setError(result.error || 'Invalid or expired OTP');
+      }
     }
   };
 
@@ -47,19 +87,27 @@ export default function OtpVerificationScreen({ route, navigation }) {
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.canGoBack() ? navigation.goBack() : null}
-        >
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.canGoBack() ? navigation.goBack() : null}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <View style={styles.headerTitles}>
+            <Text style={styles.headerTitle}>Check your email</Text>
+            <Text style={styles.headerSubtitle}>Verification</Text>
+          </View>
+        </View>
       </SafeAreaView>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.content}>
           <View style={styles.headerBlock}>
-            <Text style={styles.welcomeLabel}>Verification</Text>
-            <Text style={styles.title}>Check your email</Text>
             <Text style={styles.tagline}>
               We've sent a 6-digit verification code to {email}.
             </Text>
@@ -68,28 +116,31 @@ export default function OtpVerificationScreen({ route, navigation }) {
           <View style={styles.fieldWrapper}>
             <Text style={styles.label}>Verification Code</Text>
             <View style={[
-              styles.inputContainer,
+              styles.otpInputContainer,
+              isFocused ? styles.inputContainerFocused : null,
               error ? styles.inputContainerError : null,
             ]}>
-              <Text style={styles.inputIcon}>🔢</Text>
               <TextInput
-                style={styles.textInput}
+                style={styles.otpTextInput}
                 placeholder="000000"
-                placeholderTextColor={Colors.muted}
+                placeholderTextColor={Colors.border}
                 value={otp}
                 onChangeText={(t) => { setOtp(t); setError(''); }}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
                 keyboardType="number-pad"
                 maxLength={6}
                 autoCorrect={false}
+                autoFocus={true}
               />
             </View>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
           </View>
 
           <TouchableOpacity
-            style={[styles.btn, isLoading && styles.btnDisabled]}
+            style={[styles.btn, (otp.length < 6 || isLoading) && styles.btnDisabled]}
             onPress={handleVerify}
-            disabled={isLoading}
+            disabled={otp.length < 6 || isLoading}
           >
             {isLoading ? (
               <ActivityIndicator color={Colors.white} size="small" />
@@ -97,9 +148,23 @@ export default function OtpVerificationScreen({ route, navigation }) {
               <Text style={styles.btnText}>Verify Code</Text>
             )}
           </TouchableOpacity>
+
+          <View style={styles.resendContainer}>
+            <Text style={styles.resendText}>Didn't receive a code? </Text>
+            <TouchableOpacity onPress={handleResend} disabled={timeLeft > 0 || isResending}>
+              {isResending ? (
+                 <ActivityIndicator color={Colors.primary} size="small" />
+              ) : (
+                 <Text style={[styles.resendLink, timeLeft > 0 && styles.resendLinkDisabled]}>
+                   {timeLeft > 0 ? `Resend in ${timeLeft}s` : 'Resend'}
+                 </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
+  </View>
   );
 }
 
@@ -113,13 +178,30 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
+    ...Shadow.sm,
   },
-  backIcon: { fontSize: 20, color: Colors.text, fontWeight: '600' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+  },
+  headerTitles: {
+    flex: 1,
+    paddingHorizontal: Spacing.md,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
   scrollContent: { flexGrow: 1, paddingBottom: 40 },
   content: {
     flex: 1,
@@ -154,28 +236,29 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginBottom: Spacing.xs,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  otpInputContainer: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     borderWidth: 1.5,
     borderColor: Colors.border,
     paddingHorizontal: Spacing.md,
-    minHeight: 52,
+    height: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inputContainerFocused: {
+    borderColor: Colors.primary,
   },
   inputContainerError: {
     borderColor: Colors.error,
   },
-  inputIcon: {
-    fontSize: 16,
-    marginRight: Spacing.sm,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: Typography.size.base,
+  otpTextInput: {
+    fontSize: 32,
+    fontWeight: '700',
+    letterSpacing: 8,
     color: Colors.text,
-    paddingVertical: Spacing.sm,
+    textAlign: 'center',
+    width: '100%',
   },
   errorText: {
     color: Colors.error,
@@ -191,10 +274,30 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: Spacing.lg,
   },
-  btnDisabled: { opacity: 0.7 },
+  btnDisabled: { 
+    backgroundColor: Colors.surfaceSecondary || '#E5E7EB',
+  },
   btnText: {
     fontSize: Typography.size.md,
     fontWeight: Typography.weight.bold,
     color: Colors.white,
+  },
+  resendContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: Spacing.xl,
+    alignItems: 'center',
+  },
+  resendText: {
+    color: Colors.textSecondary,
+    fontSize: Typography.size.sm,
+  },
+  resendLink: {
+    color: Colors.primary,
+    fontSize: Typography.size.sm,
+    fontWeight: '700',
+  },
+  resendLinkDisabled: {
+    color: Colors.muted,
   },
 });

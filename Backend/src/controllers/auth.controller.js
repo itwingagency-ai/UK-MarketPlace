@@ -136,6 +136,29 @@ const verifySignup = asyncHandler(async (req, res) => {
   });
 });
 
+const resendSignupOtp = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) throw new ApiError(400, "Email is required");
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user || user.status !== "unverified") {
+    throw new ApiError(400, "User not found or already verified");
+  }
+
+  await Otp.deleteMany({ email: normalizedEmail, purpose: "signup" });
+  const otp = generateOtp();
+  await Otp.create({ email: normalizedEmail, otp, purpose: "signup" });
+
+  await sendEmail({
+    to: normalizedEmail,
+    subject: "Verify your email",
+    body: `Your new verification code is: ${otp}. It will expire in 10 minutes.`,
+  });
+
+  res.status(200).json({ message: "A new OTP has been sent." });
+});
+
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
   if (!email) throw new ApiError(400, "Email is required");
@@ -143,8 +166,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({ email: normalizedEmail });
   if (!user) {
-    // Return 200 anyway for security (prevent email enumeration)
-    return res.status(200).json({ message: "If an account exists, an OTP has been sent." });
+    throw new ApiError(404, "No account found with this email address");
   }
 
   await Otp.deleteMany({ email: normalizedEmail, purpose: "reset_password" });
@@ -158,6 +180,22 @@ const forgotPassword = asyncHandler(async (req, res) => {
   });
 
   res.status(200).json({ message: "If an account exists, an OTP has been sent." });
+});
+
+const verifyResetOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    throw new ApiError(400, "Email and OTP are required");
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const otpRecord = await Otp.findOne({ email: normalizedEmail, otp, purpose: "reset_password" });
+  
+  if (!otpRecord) {
+    throw new ApiError(400, "Invalid or expired OTP");
+  }
+
+  res.status(200).json({ message: "OTP is valid" });
 });
 
 const resetPassword = asyncHandler(async (req, res) => {
@@ -357,7 +395,9 @@ const logout = asyncHandler(async (req, res) => {
 module.exports = {
   register,
   verifySignup,
+  resendSignupOtp,
   forgotPassword,
+  verifyResetOtp,
   resetPassword,
   login,
   googleLogin,

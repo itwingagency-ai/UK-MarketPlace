@@ -35,6 +35,8 @@ import MoreScreen from './src/screens/MoreScreen';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
 import OrderSuccessScreen from './src/screens/OrderSuccessScreen';
+import HelpCenterScreen from './src/screens/HelpCenterScreen';
+import TermsPoliciesScreen from './src/screens/TermsPoliciesScreen';
 import BottomTabBar from './src/components/BottomTabBar';
 
 import { Colors } from './src/theme';
@@ -104,6 +106,8 @@ function AccountStack() {
           <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
         </>
       )}
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+      <Stack.Screen name="TermsPolicies" component={TermsPoliciesScreen} />
     </Stack.Navigator>
   );
 }
@@ -125,6 +129,8 @@ function RootStack() {
       <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
       <Stack.Screen name="Checkout" component={CheckoutScreen} />
       <Stack.Screen name="OrderSuccess" component={OrderSuccessScreen} options={{ gestureEnabled: false }} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+      <Stack.Screen name="TermsPolicies" component={TermsPoliciesScreen} />
     </Stack.Navigator>
   );
 }
