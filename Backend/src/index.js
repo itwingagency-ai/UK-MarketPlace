@@ -2,13 +2,13 @@ const http = require("http");
 const app = require("./app");
 const env = require("./config/env");
 const connectDb = require("./config/db");
-const { initSocketIO } = require("./lib/socketIO");
+// const { initSocketIO } = require("./lib/socketIO");
 
 const bootstrap = async () => {
   await connectDb();
 
   const server = http.createServer(app);
-  initSocketIO(server);
+  // initSocketIO(server);
 
   server.listen(env.port, () => {
     // eslint-disable-next-line no-console

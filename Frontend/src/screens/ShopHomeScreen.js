@@ -105,13 +105,13 @@ function StoreBanner({ store, onPress, isFavorited, onToggleFavorite }) {
           style={bannerStyles.bgImage}
           imageStyle={bannerStyles.imageRounded}
         >
-          {/* Carousel dots (visual only) */}
+          {/* Carousel dots (visual only)
           <View style={bannerStyles.dotsRow}>
             <View style={[bannerStyles.dot, bannerStyles.dotActive]} />
             <View style={bannerStyles.dot} />
             <View style={bannerStyles.dot} />
             <View style={bannerStyles.dot} />
-          </View>
+          </View> */}
 
           {/* Closed Overlay (rendered last to cover dots) */}
           {store.isOpen === false && closedText && (
