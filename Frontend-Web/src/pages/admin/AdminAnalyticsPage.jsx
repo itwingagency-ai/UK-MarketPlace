@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '../../api/adminService';
 import { PageHeader, Skeleton } from '../../components/common';
+import { formatCurrency } from '../../utils/formatters';
 import toast from 'react-hot-toast';
 import {
   AreaChart, Area, BarChart, Bar,
@@ -27,7 +28,7 @@ function ChartTooltip({ active, payload, label }) {
           <span>{p.name}:</span>
           <span style={{ fontWeight: 600 }}>
             {p.name?.toLowerCase().includes('revenue') || p.name?.toLowerCase().includes('value')
-              ? `£${Number(p.value).toFixed(2)}` : p.value}
+              ? formatCurrency(p.value) : p.value}
           </span>
         </div>
       ))}
@@ -143,7 +144,7 @@ export default function AdminAnalyticsPage() {
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
                     axisLine={{ stroke: 'var(--aa-panel-border)' }} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
-                    axisLine={false} tickLine={false} tickFormatter={v => `£${v}`} />
+                    axisLine={false} tickLine={false} tickFormatter={v => `£${Math.round(v / 100)}`} />
                   <Tooltip content={<ChartTooltip />} />
                   <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2.5}
                     fill="url(#revenueGradient)"
@@ -170,7 +171,7 @@ export default function AdminAnalyticsPage() {
                 <BarChart data={topStoresChart} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--aa-panel-border)" horizontal={false} />
                   <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-secondary)' }}
-                    axisLine={false} tickLine={false} tickFormatter={v => `£${v}`} />
+                    axisLine={false} tickLine={false} tickFormatter={v => `£${Math.round(v / 100)}`} />
                   <YAxis type="category" dataKey="name" width={90}
                     tick={{ fontSize: 10, fill: 'var(--text-secondary)' }}
                     axisLine={false} tickLine={false} />

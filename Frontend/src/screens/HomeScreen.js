@@ -24,10 +24,11 @@ import { useLocation } from '../context/LocationContext';
 import { useCart } from '../context/CartContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { Colors, Spacing, Typography, Radius } from '../theme';
+import { Feather, Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
-// ─── Coming Soon Modal ────────────────────────────────────────────────────────
+// ─── Coming Soon Modal (Account Screen Style) ────────────────────────────────────────────────────────
 function ComingSoonModal({ visible, postcode, onClose }) {
   const slideAnim = useRef(new Animated.Value(300)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -55,47 +56,53 @@ function ComingSoonModal({ visible, postcode, onClose }) {
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
       <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
-        <Animated.View
-          style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}
-        >
-          {/* Top accent bar */}
-          <View style={styles.modalAccentBar} />
+        <Animated.View style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}>
+          {/* Top Header */}
+          <View style={styles.modalHeaderRow}>
+            <Text style={styles.modalHeaderTitle}>Store Status</Text>
+            <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
+              <Feather name="x" size={20} color={Colors.text} />
+            </TouchableOpacity>
+          </View>
 
           {/* Icon */}
           <View style={styles.modalIconWrapper}>
-            <Text style={styles.modalIconEmoji}>🏪</Text>
+            <Ionicons name="storefront-outline" size={32} color={Colors.primary} />
           </View>
 
-          {/* Text */}
+          {/* Title & Postcode */}
           <Text style={styles.modalTitle}>No stores in your area yet</Text>
           {postcode ? (
-            <Text style={styles.modalPostcodeLabel}>{postcode}</Text>
+            <View style={styles.modalPostcodeBadge}>
+              <Text style={styles.modalPostcodeLabel}>{postcode}</Text>
+            </View>
           ) : null}
           <Text style={styles.modalBody}>
-            We're working hard to bring Snappy Shopper to your neighbourhood. Be the first to
-            know when we launch near you!
+            We're working hard to bring our marketplace to your neighbourhood. Be the first to know when we launch near you!
           </Text>
 
-          {/* Coming soon badge */}
-          <View style={styles.comingSoonBadge}>
-            <Text style={styles.comingSoonDot}>●</Text>
-            <Text style={styles.comingSoonText}>Coming Soon to This Area</Text>
-          </View>
-
-          {/* Steps */}
-          <View style={styles.stepsContainer}>
-            {[
-              { icon: '📧', label: 'Get notified when we launch' },
-              { icon: '🚀', label: 'New stores added every week' },
-              { icon: '🗺️', label: 'Try a nearby postcode' },
-            ].map((item, i) => (
-              <View key={i} style={styles.stepRow}>
-                <View style={styles.stepIconWrapper}>
-                  <Text style={styles.stepIcon}>{item.icon}</Text>
-                </View>
-                <Text style={styles.stepLabel}>{item.label}</Text>
+          {/* Account-style Action Card Box for steps */}
+          <View style={styles.accountActionCard}>
+            <View style={styles.accountActionRow}>
+              <View style={styles.accountActionLeft}>
+                <Feather name="bell" size={20} color={Colors.text} />
+                <Text style={styles.accountActionText}>Get notified when we launch</Text>
               </View>
-            ))}
+            </View>
+            <View style={styles.accountDivider} />
+            <View style={styles.accountActionRow}>
+              <View style={styles.accountActionLeft}>
+                <Ionicons name="add-circle-outline" size={22} color={Colors.text} />
+                <Text style={styles.accountActionText}>New stores added every week</Text>
+              </View>
+            </View>
+            <View style={styles.accountDivider} />
+            <View style={styles.accountActionRow}>
+              <View style={styles.accountActionLeft}>
+                <Ionicons name="map-outline" size={22} color={Colors.text} />
+                <Text style={styles.accountActionText}>Try a nearby postcode</Text>
+              </View>
+            </View>
           </View>
 
           {/* Actions */}
@@ -547,154 +554,127 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
 
-  // ── Coming Soon Modal ──────────────────────────────────────────────────────
+  // ── Coming Soon Modal (Account Screen Style) ──────────────────────────────────────────────────────
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalCard: {
     backgroundColor: Colors.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: Spacing['2xl'],
-    paddingBottom: Spacing['5xl'],
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xl * 2,
     paddingTop: 0,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 20,
   },
-  modalAccentBar: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.border,
-    marginTop: 12,
+  modalHeaderRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
     marginBottom: Spacing.lg,
+  },
+  modalHeaderTitle: {
+    fontSize: Typography.size.lg,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  modalCloseBtn: {
+    padding: 4,
   },
   modalIconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#FFF5F5',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#EEF2FF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.lg,
-    borderWidth: 2,
-    borderColor: '#FECACA',
-  },
-  modalIconEmoji: {
-    fontSize: 36,
+    marginBottom: Spacing.md,
   },
   modalTitle: {
-    fontSize: Typography.size.xl,
-    fontWeight: Typography.weight.extrabold,
+    fontSize: Typography.size.lg,
+    fontWeight: '800',
     color: Colors.text,
     textAlign: 'center',
-    letterSpacing: -0.4,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
-  modalPostcodeLabel: {
-    fontSize: Typography.size.lg,
-    fontWeight: Typography.weight.bold,
-    color: Colors.primary,
-    letterSpacing: 1.5,
-    marginBottom: Spacing.md,
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 16,
+  modalPostcodeBadge: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: Radius.full,
+    marginBottom: Spacing.md,
+  },
+  modalPostcodeLabel: {
+    fontSize: Typography.size.sm,
+    fontWeight: '700',
+    color: Colors.primary,
   },
   modalBody: {
     fontSize: Typography.size.sm,
-    color: Colors.textSecondary,
+    color: '#4B5563',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: Spacing.lg,
     maxWidth: 300,
   },
-  comingSoonBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF7ED',
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#FED7AA',
-    marginBottom: Spacing['2xl'],
-    gap: 6,
-  },
-  comingSoonDot: {
-    fontSize: 8,
-    color: '#F59E0B',
-  },
-  comingSoonText: {
-    fontSize: Typography.size.xs,
-    fontWeight: Typography.weight.bold,
-    color: '#92400E',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  stepsContainer: {
+  accountActionCard: {
     width: '100%',
-    gap: Spacing.md,
-    marginBottom: Spacing['2xl'],
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.xl,
   },
-  stepRow: {
+  accountActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-    paddingHorizontal: Spacing.md,
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.md,
   },
-  stepIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.surface,
+  accountActionLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
-  stepIcon: {
-    fontSize: 18,
-  },
-  stepLabel: {
+  accountActionText: {
+    marginLeft: Spacing.md,
     fontSize: Typography.size.sm,
-    fontWeight: Typography.weight.medium,
-    color: Colors.textSecondary,
-    flex: 1,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  accountDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginLeft: 36,
   },
   modalPrimaryBtn: {
     width: '100%',
     backgroundColor: Colors.primary,
-    borderRadius: Radius.full,
-    paddingVertical: 16,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   modalPrimaryBtnText: {
-    fontSize: Typography.size.base,
-    fontWeight: Typography.weight.bold,
+    fontSize: Typography.size.md,
+    fontWeight: '700',
     color: Colors.white,
-    letterSpacing: 0.3,
   },
   modalSecondaryBtn: {
     paddingVertical: Spacing.sm,
   },
   modalSecondaryBtnText: {
     fontSize: Typography.size.sm,
-    fontWeight: Typography.weight.semibold,
-    color: Colors.muted,
+    fontWeight: '600',
+    color: '#6B7280',
   },
 });

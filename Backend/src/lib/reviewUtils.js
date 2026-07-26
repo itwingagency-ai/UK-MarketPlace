@@ -73,7 +73,8 @@ const findEligibleDeliveredOrder = async (userId, productId) => {
   if (!userId || !productId) return null;
   return Order.findOne({
     customer: userId,
-    orderStatus: "delivered",
+    orderStatus: { $in: ["delivered", "completed"] },
+    paymentStatus: "paid",
     "items.product": productId,
   })
     .sort({ "tracking.deliveredAt": -1, createdAt: -1 })

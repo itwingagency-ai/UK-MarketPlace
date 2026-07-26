@@ -45,6 +45,9 @@ const resolveCustomerCoords = async (body, userId) => {
     if (user) {
       const addr = user.addresses.id(body.addressId);
       if (addr) {
+        if (isValidLatLng(addr.lat, addr.lng)) {
+          return { lat: Number(addr.lat), lng: Number(addr.lng) };
+        }
         const parts = [addr.line1, addr.city, addr.postalCode, addr.country]
           .filter(Boolean)
           .join(", ");
@@ -59,6 +62,9 @@ const resolveCustomerCoords = async (body, userId) => {
   // Inline shipping address
   if (body.shippingAddress && typeof body.shippingAddress === "object") {
     const a = body.shippingAddress;
+    if (isValidLatLng(a.lat, a.lng)) {
+      return { lat: Number(a.lat), lng: Number(a.lng) };
+    }
     const parts = [a.line1, a.city, a.postalCode, a.country]
       .filter(Boolean)
       .join(", ");

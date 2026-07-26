@@ -54,6 +54,9 @@ export const Typography = {
   },
 };
 
+// Compatibility alias
+Typography.fontSize = Typography.size;
+
 export const Spacing = {
   xs: 4,
   sm: 8,
@@ -61,6 +64,7 @@ export const Spacing = {
   base: 16,
   lg: 20,
   xl: 24,
+  xxl: 32,
   '2xl': 32,
   '3xl': 40,
   '4xl': 48,
@@ -74,6 +78,7 @@ export const Radius = {
   xl: 20,
   '2xl': 28,
   full: 9999,
+  round: 9999,
 };
 
 export const Shadow = {

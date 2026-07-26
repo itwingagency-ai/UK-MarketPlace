@@ -111,7 +111,7 @@ function CartItem({ item, onUpdate, onRemove, navigation }) {
 }
 
 export default function BasketScreen({ navigation }) {
-  const { items, total, subtotal, shippingFee, itemCount, storeId, defaultShippingMethod, updateItem, removeItem, isLoading } = useCart();
+  const { items, byStore, total, subtotal, shippingFee, itemCount, storeId, defaultShippingMethod, updateItem, removeItem, isLoading } = useCart();
   const { showAlert } = useCustomAlert();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
@@ -128,8 +128,10 @@ export default function BasketScreen({ navigation }) {
     }
   }
 
-  // Dummy store name, ideally fetched from cart context
-  const storeName = items[0]?.product?.store?.name || 'Snappy Store';
+  // Store name or summary of multiple stores
+  const storeName = byStore && byStore.length > 1 
+    ? `${byStore.length} Stores (${itemCount} items)` 
+    : (byStore?.[0]?.storeName || items[0]?.product?.store?.name || 'Snappy Store');
 
   const totalInPounds = (total / 100).toFixed(2);
   const subtotalInPounds = (subtotal / 100).toFixed(2);
@@ -145,21 +147,25 @@ export default function BasketScreen({ navigation }) {
   const originalTotal = hasDiscount ? ((originalSubtotal + shippingFee) / 100).toFixed(2) : null;
 
   const handleCheckout = async () => {
-    if (!storeId) return;
+    if (itemCount === 0) return;
     setIsCheckingOut(true);
     try {
-      const res = await getStoreStatus(storeId);
-      const statusData = res?.data ?? res;
-      if (statusData && statusData.isOpen === false) {
-        showAlert({
-          title: 'Store Closed',
-          message: `Sorry, this store is currently closed. ${statusData.statusLabel || ''}`,
-          icon: 'clock',
-          showCancel: false,
-          confirmText: 'Okay',
-        });
-        setIsCheckingOut(false);
-        return;
+      const storesToCheck = byStore && byStore.length > 0 ? byStore : (storeId ? [{ storeId, storeName }] : []);
+      for (const st of storesToCheck) {
+        if (!st.storeId) continue;
+        const res = await getStoreStatus(st.storeId);
+        const statusData = res?.data ?? res;
+        if (statusData && statusData.isOpen === false) {
+          showAlert({
+            title: 'Store Closed',
+            message: `Sorry, ${st.storeName || 'one of the stores in your cart'} is currently closed. ${statusData.statusLabel || ''}`,
+            icon: 'clock',
+            showCancel: false,
+            confirmText: 'Okay',
+          });
+          setIsCheckingOut(false);
+          return;
+        }
       }
 
       // Proceed with checkout logic
@@ -235,17 +241,60 @@ export default function BasketScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* Cart Items */}
+        {/* Cart Items Grouped By Store Order */}
         <View style={styles.itemsSection}>
-          {items.map(item => (
-            <CartItem
-              key={item._id}
-              item={item}
-              onUpdate={updateItem}
-              onRemove={removeItem}
-              navigation={navigation}
-            />
-          ))}
+          {byStore && byStore.length > 0 ? (
+            byStore.map((storeCart, index) => (
+              <View key={storeCart.storeId || index} style={styles.storeCartCard}>
+                <View style={styles.storeCartHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <Ionicons name="storefront-outline" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
+                    <Text style={styles.storeCartTitle}>{storeCart.storeName || `Store #${index + 1}`}</Text>
+                  </View>
+                  <View style={styles.storeCartBadge}>
+                    <Text style={styles.storeCartBadgeText}>Order #{index + 1}</Text>
+                  </View>
+                </View>
+
+                {storeCart.items?.map(item => (
+                  <CartItem
+                    key={item._id}
+                    item={item}
+                    onUpdate={updateItem}
+                    onRemove={removeItem}
+                    navigation={navigation}
+                  />
+                ))}
+
+                {byStore.length > 1 && (
+                  <View style={styles.storeCartFooter}>
+                    <View style={styles.storeSummaryRow}>
+                      <Text style={styles.storeSummaryLabel}>Subtotal ({storeCart.itemCount} items):</Text>
+                      <Text style={styles.storeSummaryVal}>£{(storeCart.subtotal / 100).toFixed(2)}</Text>
+                    </View>
+                    <View style={styles.storeSummaryRow}>
+                      <Text style={styles.storeSummaryLabel}>Delivery Fee:</Text>
+                      <Text style={styles.storeSummaryVal}>£{(storeCart.shippingFee / 100).toFixed(2)}</Text>
+                    </View>
+                    <View style={[styles.storeSummaryRow, { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#F3F4F6' }]}>
+                      <Text style={[styles.storeSummaryLabel, { fontWeight: '700', color: Colors.text }]}>Store Order Total:</Text>
+                      <Text style={[styles.storeSummaryVal, { fontWeight: '800', color: Colors.primary }]}>£{(storeCart.total / 100).toFixed(2)}</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            ))
+          ) : (
+            items.map(item => (
+              <CartItem
+                key={item._id}
+                item={item}
+                onUpdate={updateItem}
+                onRemove={removeItem}
+                navigation={navigation}
+              />
+            ))
+          )}
 
           <TouchableOpacity style={styles.addMoreRow} onPress={() => navigation.goBack()}>
             <Feather name="plus" size={20} color={Colors.text} />
@@ -605,5 +654,67 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: Typography.size.sm, color: Colors.muted, textAlign: 'center', lineHeight: 20,
+  },
+  storeCartCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xs,
+    marginBottom: Spacing.lg,
+  },
+  storeCartHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    marginBottom: Spacing.sm,
+  },
+  storeCartTitle: {
+    fontSize: Typography.size.base,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  storeCartBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+  },
+  storeCartBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  storeCartFooter: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    backgroundColor: '#F9FAFB',
+    marginHorizontal: -Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderBottomLeftRadius: Radius.lg,
+    borderBottomRightRadius: Radius.lg,
+  },
+  storeSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  storeSummaryLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  storeSummaryVal: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
   },
 });

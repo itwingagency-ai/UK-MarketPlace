@@ -191,7 +191,7 @@ const buildPreviewResponse = async (evaluatedItems, selections = null) => {
     (k) => new mongoose.Types.ObjectId(k)
   );
   const stores = storeIds.length
-    ? await Store.find({ _id: { $in: storeIds } }).select("name slug")
+    ? await Store.find({ _id: { $in: storeIds } }).select("name slug location locationSet deliveryRadiusKm")
     : [];
   const storesById = new Map(stores.map((s) => [String(s._id), s]));
 
@@ -204,6 +204,9 @@ const buildPreviewResponse = async (evaluatedItems, selections = null) => {
       storeId: group.storeId,
       storeName: store?.name || "",
       storeSlug: store?.slug || "",
+      location: store?.location || null,
+      locationSet: store?.locationSet || false,
+      deliveryRadiusKm: store?.deliveryRadiusKm || 5,
       itemCount: group.items.reduce((acc, x) => acc + x.item.quantity, 0),
       subtotal: group.subtotal,
       shippingFee: group.shippingFee,

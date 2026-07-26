@@ -5,6 +5,7 @@ import * as CartAPI from '../api/cart.api';
 // ─── State & Reducer ──────────────────────────────────────────────────────
 const initialState = {
   items: [],
+  byStore: [],
   total: 0,
   itemCount: 0,
   storeId: null,
@@ -31,6 +32,7 @@ function cartReducer(state, action) {
       return {
         ...state,
         items: flattenedItems,
+        byStore: cart.byStore || [],
         total,
         subtotal,
         shippingFee,
@@ -124,6 +126,7 @@ export const CartProvider = ({ children }) => {
     <CartContext.Provider
       value={{
         items: state.items,
+        byStore: state.byStore || [],
         total: state.total,
         subtotal: state.subtotal,
         shippingFee: state.shippingFee,

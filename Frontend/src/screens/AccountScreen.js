@@ -55,7 +55,7 @@ export default function AccountScreen({ navigation }) {
             <Feather name="heart" size={28} color={Colors.text} />
             <Text style={styles.actionCardText}>Favourites</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionCard} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.actionCard} activeOpacity={0.7} onPress={() => navigation.navigate('Addresses')}>
             <Ionicons name="location-outline" size={28} color={Colors.text} />
             <Text style={styles.actionCardText}>Addresses</Text>
           </TouchableOpacity>

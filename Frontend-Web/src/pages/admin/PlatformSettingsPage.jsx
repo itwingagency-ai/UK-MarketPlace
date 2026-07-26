@@ -11,6 +11,7 @@ export default function PlatformSettingsPage() {
     defaultCommissionRate: 10,
     platformFee: 0,
     supportEmail: '',
+    supportPhone: '',
     autoApproveVendors: false,
   });
 
@@ -24,6 +25,7 @@ export default function PlatformSettingsPage() {
             defaultCommissionRate: Number(((res.data.commission?.defaultRate || 0) * 100).toFixed(2)),
             platformFee: res.data.commission?.defaultFixed || 0,
             supportEmail: res.data.supportEmail || '',
+            supportPhone: res.data.supportPhone || '',
             autoApproveVendors: res.data.features?.vendorSelfRegistration || false,
           });
         }
@@ -50,6 +52,7 @@ export default function PlatformSettingsPage() {
       setSaving(true);
       await adminService.updateSettings({
         supportEmail: settings.supportEmail,
+        supportPhone: settings.supportPhone,
         commission: {
           type: 'percentage',
           defaultRate: Number(settings.defaultCommissionRate) / 100,
@@ -144,7 +147,22 @@ export default function PlatformSettingsPage() {
               />
             </div>
 
-            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+            <div className="form-group">
+              <label className="form-label">Support Phone</label>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+                The contact phone number vendors and customers can use for support.
+              </p>
+              <input
+                type="tel"
+                className="form-input"
+                name="supportPhone"
+                value={settings.supportPhone}
+                onChange={handleChange}
+                placeholder="+44 20 7946 0921"
+              />
+            </div>
+
+            {/* <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
               <input
                 type="checkbox"
                 id="autoApproveVendors"
@@ -159,7 +177,7 @@ export default function PlatformSettingsPage() {
             </div>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginLeft: 30 }}>
               If enabled, new vendor applications will be automatically approved without manual review.
-            </p>
+            </p> */}
 
             <div style={{ marginTop: 'var(--space-4)', display: 'flex', justifyContent: 'flex-end' }}>
               <button type="submit" className="btn btn-primary" disabled={saving}>
