@@ -49,6 +49,16 @@ app.get("/health", (req, res) => {
   res.status(200).json({ message: "Server is healthy" });
 });
 
+app.get(["/api/v1/platform/settings", "/api/v1/settings"], async (req, res) => {
+  try {
+    const PlatformSettings = require("./models/PlatformSettings");
+    const settings = await PlatformSettings.getOrInit();
+    res.status(200).json({ data: settings });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching platform settings" });
+  }
+});
+
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/protected", protectedRoutes);
 app.use("/api/v1/track", orderTrackingRoutes);

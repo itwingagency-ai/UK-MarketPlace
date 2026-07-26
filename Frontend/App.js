@@ -31,6 +31,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import FavouritesScreen from './src/screens/FavouritesScreen';
 import OrdersScreen from './src/screens/OrdersScreen';
 import OrderDetailScreen from './src/screens/OrderDetailScreen';
+import AddressesScreen from './src/screens/AddressesScreen';
 import MoreScreen from './src/screens/MoreScreen';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
@@ -61,7 +62,7 @@ function MainTabs() {
       <Tab.Screen name="ShopHomeTab" component={ShopHomeStack} />
       <Tab.Screen name="BasketTab" component={BasketScreen} />
       <Tab.Screen name="AccountTab" component={AccountStack} />
-      <Tab.Screen name="MoreTab" component={MoreScreen} />
+      {/* <Tab.Screen name="MoreTab" component={MoreScreen} /> */}
     </Tab.Navigator>
   );
 }
@@ -104,6 +105,7 @@ function AccountStack() {
           <Stack.Screen name="Favourites" component={FavouritesScreen} />
           <Stack.Screen name="Orders" component={OrdersScreen} />
           <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
+          <Stack.Screen name="Addresses" component={AddressesScreen} />
         </>
       )}
       <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />

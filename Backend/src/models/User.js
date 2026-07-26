@@ -16,6 +16,8 @@ const addressSchema = new mongoose.Schema(
     state: { type: String, default: "", trim: true, maxlength: 80 },
     postalCode: { type: String, default: "", trim: true, maxlength: 20 },
     country: { type: String, default: "", trim: true, maxlength: 80 },
+    lat: { type: Number, default: null },
+    lng: { type: Number, default: null },
     isDefault: { type: Boolean, default: false },
   },
   { timestamps: true }

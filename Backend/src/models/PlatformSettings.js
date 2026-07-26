@@ -73,11 +73,28 @@ const platformSettingsSchema = new mongoose.Schema(
 );
 
 platformSettingsSchema.statics.getOrInit = async function getOrInit() {
-  return this.findOneAndUpdate(
+  let doc = await this.findOneAndUpdate(
     { key: "platform" },
     { $setOnInsert: { key: "platform" } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
+  if (!doc.supportEmail || !doc.supportPhone) {
+    const User = mongoose.model("User");
+    const admin = await User.findOne({ role: "admin" }).sort({ createdAt: 1 });
+    let changed = false;
+    if (!doc.supportEmail) {
+      doc.supportEmail = admin?.email || "superadmin@marketplace.co.uk";
+      changed = true;
+    }
+    if (!doc.supportPhone) {
+      doc.supportPhone = admin?.phone || "+44 20 7946 0921";
+      changed = true;
+    }
+    if (changed) {
+      await doc.save();
+    }
+  }
+  return doc;
 };
 
 module.exports = mongoose.model("PlatformSettings", platformSettingsSchema);

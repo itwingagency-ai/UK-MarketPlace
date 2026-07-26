@@ -1,6 +1,7 @@
 const ApiError = require("./ApiError");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
+const Store = require("../models/Store");
 const StoreSettings = require("../models/StoreSettings");
 const {
   buildMethodSnapshot,
@@ -186,14 +187,20 @@ const buildCartSummary = async (cart) => {
   }
 
   const storeIds = Array.from(byStoreMap.keys());
-  const [settingsList, methodsByStore] = await Promise.all([
+  const [settingsList, methodsByStore, storesList] = await Promise.all([
     storeIds.length
       ? StoreSettings.find({ store: { $in: storeIds } })
       : Promise.resolve([]),
     findActiveShippingMethodsByStores(storeIds),
+    storeIds.length
+      ? Store.find({ _id: { $in: storeIds } }).select("name slug location locationSet deliveryRadiusKm")
+      : Promise.resolve([]),
   ]);
   const settingsByStore = new Map(
     settingsList.map((s) => [String(s.store), s])
+  );
+  const storesById = new Map(
+    storesList.map((s) => [String(s._id), s])
   );
 
   let grandSubtotal = 0;
@@ -205,6 +212,13 @@ const buildCartSummary = async (cart) => {
     const settings = settingsByStore.get(storeKey);
     const methods = methodsByStore.get(storeKey) || [];
     const defaultMethod = methods[0] || null;
+    const storeObj = storesById.get(storeKey);
+
+    group.storeName = storeObj?.name || "";
+    group.storeSlug = storeObj?.slug || "";
+    group.location = storeObj?.location || null;
+    group.locationSet = storeObj?.locationSet || false;
+    group.deliveryRadiusKm = storeObj?.deliveryRadiusKm || 5;
 
     group.shippingFee = computeShippingFeeForStore({
       method: defaultMethod,

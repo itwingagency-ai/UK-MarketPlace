@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { vendorService } from '../../api/vendorService';
 import { PageHeader, StatCard, Skeleton } from '../../components/common';
+import { formatCurrency } from '../../utils/formatters';
 import toast from 'react-hot-toast';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie,
@@ -40,7 +41,7 @@ function ChartTooltip({ active, payload, label }) {
           <span>{p.name}:</span>
           <span style={{ fontWeight: 600 }}>
             {p.name?.toLowerCase().includes('revenue') || p.name?.toLowerCase().includes('value')
-              ? `£${Number(p.value).toFixed(2)}` : p.value}
+              ? formatCurrency(p.value) : p.value}
           </span>
         </div>
       ))}
@@ -189,7 +190,7 @@ export default function VendorAnalyticsPage() {
       <div className="kpi-grid">
         <StatCard
           label="Revenue"
-          value={`£${Number(current.revenue || 0).toFixed(2)}`}
+          value={formatCurrency(current.revenue || 0)}
           trend={delta.revenue}
           trendLabel="vs prev period"
           icon={<DollarSign size={18} />}
@@ -197,7 +198,7 @@ export default function VendorAnalyticsPage() {
         />
         <StatCard
           label="Net Payout"
-          value={`£${Number(current.netPayout || 0).toFixed(2)}`}
+          value={formatCurrency(current.netPayout || 0)}
           trend={delta.netPayout}
           trendLabel="vs prev period"
           icon={<TrendingUp size={18} />}
@@ -213,7 +214,7 @@ export default function VendorAnalyticsPage() {
         />
         <StatCard
           label="Avg Order Value"
-          value={`£${Number(current.averageOrderValue || 0).toFixed(2)}`}
+          value={formatCurrency(current.averageOrderValue || 0)}
           trend={delta.averageOrderValue}
           trendLabel="vs prev period"
           icon={<BarChart3 size={18} />}
@@ -262,7 +263,7 @@ export default function VendorAnalyticsPage() {
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
                     axisLine={{ stroke: 'var(--aa-panel-border)' }} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
-                    axisLine={false} tickLine={false} tickFormatter={v => `£${v}`} />
+                    axisLine={false} tickLine={false} tickFormatter={v => `£${Math.round(v / 100)}`} />
                   <Tooltip content={<ChartTooltip />} />
                   <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2.5}
                     fill="url(#revenueGradient)"
@@ -321,7 +322,7 @@ export default function VendorAnalyticsPage() {
                   <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text-secondary)' }}
                     axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: 'var(--text-secondary)' }}
-                    axisLine={false} tickLine={false} tickFormatter={v => `£${v}`} />
+                    axisLine={false} tickLine={false} tickFormatter={v => `£${Math.round(v / 100)}`} />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="revenue" radius={[4, 4, 0, 0]} barSize={28}>
                     {categoryBreakdown.slice(0, 8).map((_, i) => (
@@ -349,7 +350,7 @@ export default function VendorAnalyticsPage() {
                 <BarChart data={topProductsChart} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--aa-panel-border)" horizontal={false} />
                   <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--text-secondary)' }}
-                    axisLine={false} tickLine={false} tickFormatter={v => `£${v}`} />
+                    axisLine={false} tickLine={false} tickFormatter={v => `£${Math.round(v / 100)}`} />
                   <YAxis type="category" dataKey="name" width={90}
                     tick={{ fontSize: 10, fill: 'var(--text-secondary)' }}
                     axisLine={false} tickLine={false} />

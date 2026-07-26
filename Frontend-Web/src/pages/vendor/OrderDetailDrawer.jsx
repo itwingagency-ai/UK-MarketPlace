@@ -308,7 +308,7 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
                   </div>
                   <div className="status-action-panel">
                     {/* Show shipping fields when "shipped" is an option */}
-                    {nextStatuses.includes('shipped') && (
+                    {/* {nextStatuses.includes('shipped') && (
                       <div style={{ marginBottom: 'var(--space-4)' }}>
                         <h4 style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-600)', marginBottom: 'var(--space-2)' }}>
                           Shipping Details (optional)
@@ -323,21 +323,21 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
                           onChange={e => setTrackingUrl(e.target.value)}
                           style={{ fontSize: 'var(--text-sm)', height: 32, marginTop: 'var(--space-2)' }} />
                       </div>
-                    )}
+                    )} */}
 
                     {/* Cancellation reason */}
-                    {nextStatuses.includes('cancelled') && (
+                    {/* {nextStatuses.includes('cancelled') && (
                       <div style={{ marginBottom: 'var(--space-3)' }}>
                         <textarea className="form-input" placeholder="Cancellation reason (optional)"
                           value={cancellationReason} onChange={e => setCancellationReason(e.target.value)}
                           rows={2} style={{ fontSize: 'var(--text-sm)' }} />
                       </div>
-                    )}
+                    )} */}
 
                     {/* Note */}
-                    <textarea className="form-input" placeholder="Note (optional)" value={note}
+                    {/* <textarea className="form-input" placeholder="Note (optional)" value={note}
                       onChange={e => setNote(e.target.value)} rows={2}
-                      style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }} />
+                      style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }} /> */}
 
                     {/* Action buttons */}
                     <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>

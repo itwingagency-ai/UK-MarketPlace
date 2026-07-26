@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import client from '../api/client';
 import { Colors, Spacing, Typography, Radius } from '../theme';
 
 const FAQ_ITEMS = [
@@ -33,6 +35,40 @@ const FAQ_ITEMS = [
 
 export default function HelpCenterScreen({ navigation }) {
   const [expandedId, setExpandedId] = useState(null);
+  const [supportEmail, setSupportEmail] = useState('superadmin@marketplace.co.uk');
+  const [supportPhone, setSupportPhone] = useState('+44 20 7946 0921');
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSupportContact = async () => {
+      try {
+        const cachedEmail = await AsyncStorage.getItem('@platform_support_email');
+        const cachedPhone = await AsyncStorage.getItem('@platform_support_phone');
+        if (isMounted && cachedEmail) setSupportEmail(cachedEmail);
+        if (isMounted && cachedPhone) setSupportPhone(cachedPhone);
+
+        const res = await client.get('/platform/settings');
+        const data = res.data?.data || res.data;
+        if (data && isMounted) {
+          const newEmail = data.supportEmail || cachedEmail || 'superadmin@marketplace.co.uk';
+          const newPhone = data.supportPhone || cachedPhone || '+44 20 7946 0921';
+
+          if (newEmail !== cachedEmail) {
+            setSupportEmail(newEmail);
+            await AsyncStorage.setItem('@platform_support_email', newEmail);
+          }
+          if (newPhone !== cachedPhone) {
+            setSupportPhone(newPhone);
+            await AsyncStorage.setItem('@platform_support_phone', newPhone);
+          }
+        }
+      } catch (err) {
+        console.log('Error loading support contact:', err);
+      }
+    };
+    fetchSupportContact();
+    return () => { isMounted = false; };
+  }, []);
 
   const toggleExpand = (id) => {
     setExpandedId(expandedId === id ? null : id);
@@ -40,9 +76,9 @@ export default function HelpCenterScreen({ navigation }) {
 
   const handleContactAction = (type) => {
     if (type === 'email') {
-      Linking.openURL('mailto:support@uk-marketplace.co.uk?subject=Support%20Request');
+      Linking.openURL(`mailto:${supportEmail}?subject=Support%20Request`);
     } else if (type === 'call') {
-      Linking.openURL('tel:08001234567');
+      Linking.openURL(`tel:${supportPhone}`);
     }
   };
 
@@ -85,10 +121,12 @@ export default function HelpCenterScreen({ navigation }) {
           <TouchableOpacity style={styles.actionCard} activeOpacity={0.7} onPress={() => handleContactAction('email')}>
             <Feather name="mail" size={28} color={Colors.text} />
             <Text style={styles.actionCardText}>Email Us</Text>
+            <Text style={styles.actionCardSubtext} numberOfLines={1}>{supportEmail}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionCard} activeOpacity={0.7} onPress={() => handleContactAction('call')}>
             <Ionicons name="call-outline" size={28} color={Colors.text} />
             <Text style={styles.actionCardText}>Call Support</Text>
+            <Text style={styles.actionCardSubtext} numberOfLines={1}>{supportPhone}</Text>
           </TouchableOpacity>
         </View>
 
@@ -137,7 +175,7 @@ export default function HelpCenterScreen({ navigation }) {
         </View>
 
         {/* Support Hours Footer */}
-        <Text style={styles.footerText}>Support Hours: Monday — Sunday (24 Hours){"\n"}UK Toll-Free: 0800 123 4567</Text>
+        <Text style={styles.footerText}>Support Hours: Monday — Sunday (24 Hours){"\n"}Support Line: {supportPhone}</Text>
       </ScrollView>
     </View>
   );
@@ -244,6 +282,13 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     fontWeight: '500',
     color: Colors.textSecondary,
+  },
+  actionCardSubtext: {
+    marginTop: 4,
+    fontSize: Typography.size.xs,
+    color: Colors.muted,
+    paddingHorizontal: Spacing.xs,
+    textAlign: 'center',
   },
 
   /* Section Titles */

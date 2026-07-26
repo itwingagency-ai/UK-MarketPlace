@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { vendorService } from '../../api/vendorService';
 import { PageHeader, StatusBadge, Skeleton } from '../../components/common';
+import { formatCurrency } from '../../utils/formatters';
 import toast from 'react-hot-toast';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -42,7 +43,7 @@ function ChartTooltip({ active, payload, label }) {
       fontSize: 'var(--text-sm)',
     }}>
       <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{label}</div>
-      <div style={{ color: 'var(--primary)' }}>£{Number(payload[0].value).toFixed(2)}</div>
+      <div style={{ color: 'var(--primary)' }}>{formatCurrency(payload[0].value)}</div>
     </div>
   );
 }
@@ -145,7 +146,7 @@ export default function VendorDashboard() {
           const value = s.decimals
             ? Number(raw).toFixed(s.decimals)
             : s.prefix
-            ? Number(raw).toFixed(2)
+            ? (Number(raw) / 100).toFixed(2)
             : raw;
           const trend = safeData.trends?.[s.key] ?? null;
 
@@ -201,7 +202,7 @@ export default function VendorDashboard() {
                   tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(v) => `£${v}`}
+                  tickFormatter={(v) => `£${Math.round(v / 100)}`}
                 />
                 <Tooltip content={<ChartTooltip />} />
                 <Area
@@ -262,7 +263,7 @@ export default function VendorDashboard() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                       <div style={{ fontWeight: 600, fontSize: 'var(--text-md)' }}>
-                        £{Number(order.totalAmount || order.total || 0).toFixed(2)}
+                        {formatCurrency(order.totalAmount || order.total || 0)}
                       </div>
                       <StatusBadge status={order.status || order.orderStatus} size="sm" />
                     </div>

@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   retryBtn: { padding: Spacing.sm, backgroundColor: Colors.primary, borderRadius: Radius.sm },
   retryBtnText: { color: Colors.white, fontWeight: '600' },
   emptyText: { marginTop: Spacing.lg, fontSize: Typography.size.base, color: Colors.textSecondary },
-  listContent: { padding: Spacing.lg },
+  listContent: { padding: Spacing.lg, paddingBottom: 100 },
   card: {
     backgroundColor: Colors.white,
     padding: Spacing.lg,

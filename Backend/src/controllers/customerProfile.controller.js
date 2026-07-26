@@ -99,6 +99,8 @@ const addAddress = asyncHandler(async (req, res) => {
     state: (req.body.state || "").trim(),
     postalCode: (req.body.postalCode || "").trim(),
     country: (req.body.country || "").trim(),
+    lat: req.body.lat != null ? Number(req.body.lat) : null,
+    lng: req.body.lng != null ? Number(req.body.lng) : null,
     isDefault: wantsDefault,
   });
 
@@ -141,6 +143,12 @@ const updateAddress = asyncHandler(async (req, res) => {
     if (req.body[field] !== undefined) {
       address[field] = (req.body[field] || "").trim();
     }
+  }
+  if (req.body.lat !== undefined) {
+    address.lat = req.body.lat != null ? Number(req.body.lat) : null;
+  }
+  if (req.body.lng !== undefined) {
+    address.lng = req.body.lng != null ? Number(req.body.lng) : null;
   }
 
   if (req.body.isDefault === true) {
