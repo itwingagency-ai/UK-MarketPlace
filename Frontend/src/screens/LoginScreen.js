@@ -18,13 +18,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Colors, Spacing, Typography, Radius } from '../theme';
-// IMPORT COMMENTED OUT FOR EXPO GO COMPATIBILITY
-// import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
-// GoogleSignin.configure({
-//   webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-//   offlineAccess: true,
-// });
+try {
+  GoogleSignin.configure({
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+    offlineAccess: true,
+  });
+} catch (e) {
+  console.log('GoogleSignin configuration error:', e.message);
+}
 
 const { width, height } = Dimensions.get('window');
 const HERO_HEIGHT = height * 0.42;
@@ -86,27 +89,38 @@ export default function LoginScreen({ navigation }) {
 
   const handleSocialPress = async (provider) => {
     if (provider === 'Google') {
-      Alert.alert(
-        'Google Sign-In',
-        'Google Sign-In requires a custom development build. It will not work inside the standard Expo Go app. Please test Email/Password and OTP flows here instead!'
-      );
-      /* 
       try {
-        await GoogleSignin.hasPlayServices();
-        const userInfo = await GoogleSignin.signIn();
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        // Sign out any cached session so the account picker always appears
+        await GoogleSignin.signOut();
+        const response = await GoogleSignin.signIn();
+        
+        if (response?.type === 'cancelled') {
+          return;
+        }
+
+        const idToken = response?.data?.idToken || response?.idToken;
+        if (!idToken) {
+          Alert.alert('Google Sign-In Error', 'Could not retrieve ID token from Google.');
+          return;
+        }
+
         setIsSubmitting(true);
-        const result = await googleLogin(userInfo.idToken);
+        const result = await googleLogin(idToken);
         setIsSubmitting(false);
         if (!result.success) {
-          Alert.alert('Login Failed', result.error);
+          Alert.alert('Login Failed', result.error || 'Google Login failed.');
         }
       } catch (error) {
-        if (error.code !== 'SIGN_IN_CANCELLED') {
-          Alert.alert('Google Sign-In Error', error.message || 'An error occurred');
-        }
         setIsSubmitting(false);
+        if (
+          error.code !== 'SIGN_IN_CANCELLED' &&
+          !String(error.message).includes('cancelled') &&
+          !String(error).includes('SIGN_IN_CANCELLED')
+        ) {
+          Alert.alert('Google Sign-In Error', error.message || 'An error occurred during Google Sign-In');
+        }
       }
-      */
     } else {
       Alert.alert(`${provider} Sign-in`, `${provider} sign-in coming soon!`);
     }
