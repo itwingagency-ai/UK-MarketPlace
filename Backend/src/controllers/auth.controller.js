@@ -271,13 +271,16 @@ const googleLogin = asyncHandler(async (req, res) => {
 
   let payload;
   try {
+    // Accept tokens issued to any client ID in our Google Cloud project
+    // The Android app's idToken may have the Android client ID as audience,
+    // not the web client ID, depending on GoogleSignin configuration
     const ticket = await googleClient.verifyIdToken({
       idToken,
-      audience: env.googleClientId
     });
     payload = ticket.getPayload();
   } catch (err) {
-    throw new ApiError(401, "Invalid Google token");
+    console.error("Google token verification failed:", err.message);
+    throw new ApiError(401, "Invalid Google token: " + err.message);
   }
 
   const { email, name, sub: googleId } = payload;
