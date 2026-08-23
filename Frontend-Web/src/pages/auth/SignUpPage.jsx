@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
+import { AlertCircle, CheckCircle, ArrowRight, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import authService from '../../api/authService';
 import client from '../../api/client';
 
@@ -22,7 +22,9 @@ export default function SignUpPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Step 2 – Store / Vendor Application
   const [storeName, setStoreName] = useState('');
@@ -297,28 +299,76 @@ export default function SignUpPage() {
                   <label className="form-label" htmlFor="signup-password">
                     Password*
                   </label>
-                  <input
-                    id="signup-password"
-                    className="form-input"
-                    type="password"
-                    placeholder="Min 8 chars, upper + lower + number"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
+                  <div style={{ position: 'relative', flex: 1, display: 'flex' }}>
+                    <input
+                      id="signup-password"
+                      className="form-input"
+                      style={{ width: '100%', paddingRight: '40px' }}
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Min 8 chars, upper + lower + number"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--gray-500)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0
+                      }}
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="auth-form-row">
                   <label className="form-label" htmlFor="signup-confirm">
                     Confirm Password*
                   </label>
-                  <input
-                    id="signup-confirm"
-                    className="form-input"
-                    type="password"
-                    placeholder="Re-enter password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
+                  <div style={{ position: 'relative', flex: 1, display: 'flex' }}>
+                    <input
+                      id="signup-confirm"
+                      className="form-input"
+                      style={{ width: '100%', paddingRight: '40px' }}
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="Re-enter password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--gray-500)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0
+                      }}
+                      title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="auth-form-actions">
@@ -393,7 +443,7 @@ export default function SignUpPage() {
 
                 <div className="auth-form-row">
                   <label className="form-label" htmlFor="signup-city">
-                    City
+                    City*
                   </label>
                   <input
                     id="signup-city"
@@ -421,7 +471,7 @@ export default function SignUpPage() {
 
                 <div className="auth-form-row">
                   <label className="form-label" htmlFor="signup-country">
-                    Country
+                    Country*
                   </label>
                   <input
                     id="signup-country"

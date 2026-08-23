@@ -2,10 +2,12 @@ const http = require("http");
 const app = require("./app");
 const env = require("./config/env");
 const connectDb = require("./config/db");
+const seedSuperAdmin = require("./utils/seedSuperAdmin");
 // const { initSocketIO } = require("./lib/socketIO");
 
 const bootstrap = async () => {
   await connectDb();
+  await seedSuperAdmin();
 
   const server = http.createServer(app);
   // initSocketIO(server);

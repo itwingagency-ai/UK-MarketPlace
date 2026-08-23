@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+
 import { Clock, CheckCircle, XCircle } from 'lucide-react';
 
 /**
@@ -70,18 +70,19 @@ export default function ApplicationPendingPage({ status = 'pending', storeName =
             </>
           )}
 
-          <Link
-            to="/login"
+          <button
+            type="button"
             className="btn btn-ghost"
             style={{ marginTop: 'var(--space-6)' }}
             onClick={() => {
               localStorage.removeItem('accessToken');
               localStorage.removeItem('refreshToken');
               localStorage.removeItem('user');
+              window.location.href = '/login';
             }}
           >
             Back to Login
-          </Link>
+          </button>
         </div>
       </div>
     </div>
