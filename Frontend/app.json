@@ -30,12 +30,20 @@
           "merchantIdentifier": "merchant.com.ukmarketplace",
           "enableGooglePay": false
         }
-      ]
+      ],
+      "expo-font",
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {
         "projectId": "91d2d940-c963-4b29-8158-2e9ccc95d479"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/91d2d940-c963-4b29-8158-2e9ccc95d479"
     }
   }
 }
