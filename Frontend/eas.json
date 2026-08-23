@@ -18,6 +18,10 @@
       "extends": "production",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "1027118920712-neal2qkc242ekpc0eve5skdn2r847hqv.apps.googleusercontent.com",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51Po3VTD7uwi7FuaacJ1pc7ziSIgUQMKizFC8qYK0UFuP91UNxNWCJwebw6cSe1jU81l0ZQ43DsWZO751hteCLlTV00FQANxQIC"
       }
     }
   },
