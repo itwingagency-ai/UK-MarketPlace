@@ -298,7 +298,7 @@ export default function HomeScreen({ navigation }) {
 
       {/* Full-bleed background image (blue blob + all food items) */}
       <Image
-        source={require('../../assets/home_hero_bg.png')}
+        source={require('../../assets/home_hero_bg.jpg')}
         style={styles.bgImage}
         resizeMode="cover"
       />

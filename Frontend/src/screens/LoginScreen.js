@@ -144,7 +144,7 @@ export default function LoginScreen({ navigation }) {
       >
         {/* Hero image scrolls naturally with the page */}
         <Image
-          source={require('../../assets/login_hero.png')}
+          source={require('../../assets/login_hero.jpg')}
           style={styles.heroImage}
           resizeMode="cover"
         />
