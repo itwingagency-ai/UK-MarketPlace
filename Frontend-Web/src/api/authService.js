@@ -7,8 +7,8 @@ const authService = {
 
   refresh: (refreshToken) => client.post('/auth/refresh', { refreshToken }),
 
-  register: (name, email, password) =>
-    client.post('/auth/register', { name, email, password }),
+  register: (name, email, password, isVendor = false) =>
+    client.post('/auth/register', { name, email, password, isVendor }),
 };
 
 export default authService;

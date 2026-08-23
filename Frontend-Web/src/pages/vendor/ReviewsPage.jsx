@@ -238,6 +238,7 @@ export default function ReviewsPage() {
         </div>
       ),
     },
+    /*
     {
       key: 'vendorResponse',
       label: 'Response',
@@ -252,6 +253,7 @@ export default function ReviewsPage() {
         </span>
       ),
     },
+    */
     {
       key: 'status',
       label: 'Status',
@@ -354,10 +356,10 @@ export default function ReviewsPage() {
           emptyText="No reviews match the selected filters."
           actions={(row) => (
             <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost btn-sm" title="Respond"
+              {/* <button className="btn btn-ghost btn-sm" title="Respond"
                 onClick={() => openResponseModal(row)}>
                 <MessageSquare size={14} />
-              </button>
+              </button> */}
               <button className={`btn ${row.status === 'hidden' ? 'btn-success' : 'btn-ghost'} btn-sm`}
                 title={row.status === 'hidden' ? 'Unhide' : 'Hide'}
                 onClick={() => handleToggleVisibility(row)}>
@@ -369,6 +371,7 @@ export default function ReviewsPage() {
       </div>
 
       {/* ── Response Modal ── */}
+      {false && (
       <Modal
         open={!!responseModal}
         onClose={() => !submitting && setResponseModal(null)}
@@ -430,6 +433,7 @@ export default function ReviewsPage() {
           </div>
         )}
       </Modal>
+      )}
     </div>
   );
 }
