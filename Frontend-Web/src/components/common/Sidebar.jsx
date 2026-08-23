@@ -90,7 +90,7 @@ const vendorNav = [
   },
 ];
 
-export default function Sidebar({ role }) {
+export default function Sidebar({ role, isOpen, onClose }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const isAdminRole = ['admin', 'superadmin', 'super_admin', 'super-admin', 'super admin'].includes(role?.toLowerCase());
@@ -111,8 +111,9 @@ export default function Sidebar({ role }) {
     : '??';
 
   return (
-    <aside className="sidebar" id="main-sidebar">
-      {/* ── Brand ── */}
+    <>
+      <aside className={`sidebar ${isOpen ? 'open' : ''}`} id="main-sidebar">
+        {/* ── Brand ── */}
       <div className="sidebar-brand">
         <div className="sidebar-brand-icon">
           <Shield size={18} />
@@ -134,6 +135,7 @@ export default function Sidebar({ role }) {
               <NavLink
                 key={item.to}
                 to={item.to}
+                onClick={onClose}
                 className={({ isActive }) =>
                   `sidebar-link${isActive ? ' active' : ''}`
                 }
@@ -167,5 +169,6 @@ export default function Sidebar({ role }) {
         </button>
       </div>
     </aside>
+    </>
   );
 }

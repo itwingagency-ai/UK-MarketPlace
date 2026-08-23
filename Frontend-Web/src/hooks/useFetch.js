@@ -33,15 +33,19 @@ export default function useFetch(url, options = {}) {
           params: overrideParams || JSON.parse(paramsString),
           signal: controller.signal,
         });
-        setData(res.data);
+        if (controllerRef.current === controller) {
+          setData(res.data);
+          setLoading(false);
+        }
         return res.data;
       } catch (err) {
-        if (err.name !== 'CanceledError') {
-          setError(err.response?.data?.message || err.message || 'Request failed');
+        if (controllerRef.current === controller) {
+          if (err.name !== 'CanceledError') {
+            setError(err.response?.data?.message || err.message || 'Request failed');
+          }
+          setLoading(false);
         }
         return null;
-      } finally {
-        setLoading(false);
       }
     },
     [url, paramsString]

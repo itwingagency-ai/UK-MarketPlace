@@ -30,7 +30,6 @@ export default function SignUpPage() {
   const [slugStatus, setSlugStatus] = useState(''); // 'checking', 'available', 'taken', ''
   const [description, setDescription] = useState('');
   const [contactPhone, setContactPhone] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
   const [addressCity, setAddressCity] = useState('');
   const [addressPostalCode, setAddressPostalCode] = useState('');
@@ -128,8 +127,8 @@ export default function SignUpPage() {
       return;
     }
     try {
-      // 1. Register as a customer
-      const registerRes = await authService.register(name.trim(), email.trim(), password);
+      // 1. Register as a customer (bypass OTP for vendors)
+      const registerRes = await authService.register(name.trim(), email.trim(), password, true);
       const { accessToken, refreshToken } = registerRes.data;
 
       // Store tokens temporarily so we can make the vendor application call
@@ -143,7 +142,7 @@ export default function SignUpPage() {
         description: description.trim(),
         contact: {
           phone: contactPhone.trim(),
-          email: contactEmail.trim() || email.trim(),
+          email: email.trim(),
         },
         address: {
           line1: addressLine1.trim(),
@@ -377,19 +376,6 @@ export default function SignUpPage() {
                   />
                 </div>
 
-                <div className="auth-form-row">
-                  <label className="form-label" htmlFor="signup-contact-email">
-                    Store Contact Email
-                  </label>
-                  <input
-                    id="signup-contact-email"
-                    className="form-input"
-                    type="email"
-                    placeholder="Defaults to your account email"
-                    value={contactEmail}
-                    onChange={(e) => setContactEmail(e.target.value)}
-                  />
-                </div>
 
                 <div className="auth-form-row">
                   <label className="form-label" htmlFor="signup-address">

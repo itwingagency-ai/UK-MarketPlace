@@ -6,7 +6,7 @@ const NOTIFICATION_EVENTS = {
   "account.welcome": {
     description: "Sent when a user registers",
     audience: "user",
-    placeholders: ["appName", "name", "email", "loginUrl"],
+    placeholders: ["appName", "name", "email"],
   },
   "account.password_changed": {
     description: "Sent when a user changes their password",
@@ -24,7 +24,6 @@ const NOTIFICATION_EVENTS = {
       "total",
       "currency",
       "paymentMethod",
-      "trackUrl",
     ],
   },
   "order.placed.vendor": {
@@ -38,7 +37,6 @@ const NOTIFICATION_EVENTS = {
       "customerName",
       "total",
       "currency",
-      "dashboardUrl",
     ],
   },
   "order.payment_succeeded": {
@@ -50,13 +48,12 @@ const NOTIFICATION_EVENTS = {
       "orderNumber",
       "total",
       "currency",
-      "trackUrl",
     ],
   },
   "order.payment_failed": {
     description: "Sent to the customer when payment fails or expires",
     audience: "customer",
-    placeholders: ["appName", "name", "orderNumber", "reason", "retryUrl"],
+    placeholders: ["appName", "name", "orderNumber", "reason"],
   },
   "order.shipped": {
     description: "Sent when a vendor ships an order",
@@ -67,10 +64,8 @@ const NOTIFICATION_EVENTS = {
       "orderNumber",
       "carrier",
       "trackingNumber",
-      "trackingUrl",
       "etaMin",
       "etaMax",
-      "trackUrl",
     ],
   },
   "order.delivered": {
@@ -93,18 +88,27 @@ const NOTIFICATION_EVENTS = {
       "eventStatus",
       "location",
       "note",
-      "trackUrl",
     ],
   },
   "vendor.application_approved": {
     description: "Sent when an admin approves a vendor application",
     audience: "vendor",
-    placeholders: ["appName", "name", "storeName", "dashboardUrl"],
+    placeholders: ["appName", "name", "storeName"],
   },
   "vendor.application_rejected": {
     description: "Sent when an admin rejects a vendor application",
     audience: "user",
     placeholders: ["appName", "name", "reason"],
+  },
+  "vendor.application_submitted": {
+    description: "Sent to a user when they successfully submit a vendor application",
+    audience: "user",
+    placeholders: ["appName", "name", "storeName"],
+  },
+  "admin.vendor_application_submitted": {
+    description: "Sent to admins when a new vendor application is submitted",
+    audience: "admin",
+    placeholders: ["appName", "applicantName", "storeName"],
   },
   "review.submitted.vendor": {
     description: "Notifies the vendor when a new review is submitted on their product",
@@ -116,7 +120,6 @@ const NOTIFICATION_EVENTS = {
       "productTitle",
       "rating",
       "customerName",
-      "dashboardUrl",
     ],
   },
   "review.responded.customer": {
@@ -128,7 +131,6 @@ const NOTIFICATION_EVENTS = {
       "storeName",
       "productTitle",
       "responseSnippet",
-      "reviewUrl",
     ],
   },
 };
@@ -140,7 +142,6 @@ const DEFAULT_TEMPLATES = {
       body:
         "Hi {{name}},\n\n" +
         "Welcome to {{appName}}! Your account ({{email}}) is ready to use.\n\n" +
-        // "You can sign in any time at {{loginUrl}}.\n\n" +
         "— The {{appName}} team",
     },
     // sms: { body: "Welcome to {{appName}}, {{name}}! Your account is ready." },
@@ -177,7 +178,6 @@ const DEFAULT_TEMPLATES = {
         "Order number: {{orderNumber}}\n" +
         "Total: {{total}} {{currency}}\n" +
         "Payment: {{paymentMethod}}\n\n" +
-        // "Track your order: {{trackUrl}}\n\n" +
         "— The {{appName}} team",
     },
     // sms: {
@@ -200,7 +200,6 @@ const DEFAULT_TEMPLATES = {
         "Order: {{orderNumber}}\n" +
         "Customer: {{customerName}}\n" +
         "Total: {{total}} {{currency}}\n\n" +
-        "Manage it here: {{dashboardUrl}}\n\n" +
         "— The {{appName}} team",
     },
     // sms: {
@@ -221,7 +220,6 @@ const DEFAULT_TEMPLATES = {
         "Hi {{name}},\n\n" +
         "We've received your payment of {{total}} {{currency}} " +
         "for order {{orderNumber}}.\n\n" +
-        // "Track your order: {{trackUrl}}\n\n" +
         "— The {{appName}} team",
     },
     // sms: {
@@ -242,7 +240,6 @@ const DEFAULT_TEMPLATES = {
         "Hi {{name}},\n\n" +
         "We couldn't complete payment for order {{orderNumber}}.\n" +
         "Reason: {{reason}}\n\n" +
-        // "You can retry payment here: {{retryUrl}}\n\n" +
         "— The {{appName}} team",
     },
     // sms: {
@@ -262,10 +259,7 @@ const DEFAULT_TEMPLATES = {
       body:
         "Hi {{name}},\n\n" +
         "Your order {{orderNumber}} is on its way!\n\n" +
-        "Carrier: {{carrier}}\n" +
-        // "Carrier link: {{trackingUrl}}\n" +
-        // "Estimated delivery: {{etaMin}} - {{etaMax}}\n\n" +
-        // "Track here: {{trackUrl}}\n\n" +
+        "Carrier: {{carrier}}\n\n" +
         "— The {{appName}} team",
     },
     // sms: {
@@ -321,7 +315,6 @@ const DEFAULT_TEMPLATES = {
         "Status: {{eventStatus}}\n" +
         "Location: {{location}}\n" +
         "Note: {{note}}\n\n" +
-        // "Track here: {{trackUrl}}\n\n" +
         "— The {{appName}} team",
     },
     // sms: {
@@ -342,7 +335,6 @@ const DEFAULT_TEMPLATES = {
         "Hi {{name}},\n\n" +
         "Great news — your application to open {{storeName}} on {{appName}} " +
         "was approved.\n\n" +
-        "Open your vendor dashboard: {{dashboardUrl}}\n\n" +
         "— The {{appName}} team",
     },
     // sms: {
@@ -374,6 +366,26 @@ const DEFAULT_TEMPLATES = {
     //   body: "{{appName}}: your store application was not approved. {{reason}}",
     // },
   },
+  "vendor.application_submitted": {
+    email: {
+      subject: "Vendor application received",
+      body:
+        "Hi {{name}},\n\n" +
+        "We have received your application to open a store named \"{{storeName}}\" on {{appName}}.\n\n" +
+        "Our team will review your application and get back to you shortly.\n\n" +
+        "— The {{appName}} team",
+    },
+  },
+  "admin.vendor_application_submitted": {
+    email: {
+      subject: "New vendor application: {{storeName}}",
+      body:
+        "Hello Admin,\n\n" +
+        "{{applicantName}} has submitted a new vendor application for the store \"{{storeName}}\".\n\n" +
+        "Please review it in the admin dashboard.\n\n" +
+        "— The {{appName}} team",
+    },
+  },
   "review.submitted.vendor": {
     email: {
       subject: "New review for {{productTitle}}",
@@ -381,7 +393,6 @@ const DEFAULT_TEMPLATES = {
         "Hi {{vendorName}},\n\n" +
         "{{customerName}} just left a {{rating}}-star review on " +
         "\"{{productTitle}}\" at {{storeName}}.\n\n" +
-        "Manage and respond from your dashboard: {{dashboardUrl}}\n\n" +
         "— The {{appName}} team",
     },
     // sms: {
@@ -402,7 +413,6 @@ const DEFAULT_TEMPLATES = {
         "Hi {{name}},\n\n" +
         "{{storeName}} replied to your review of \"{{productTitle}}\":\n\n" +
         "\"{{responseSnippet}}\"\n\n" +
-        // "See the full response: {{reviewUrl}}\n\n" +
         "— The {{appName}} team",
     },
     // sms: {

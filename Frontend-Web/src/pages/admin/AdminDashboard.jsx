@@ -18,7 +18,7 @@ const getRelativeTime = (dateString) => {
   const now = new Date();
   const date = new Date(dateString);
   const diffInSeconds = Math.floor((now - date) / 1000);
-  
+
   if (diffInSeconds < 60) return 'Just now';
   if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
@@ -67,7 +67,7 @@ export default function AdminDashboard() {
             users: d.users?.total || 0
           });
         }
-        
+
         if (activityRes.status === 'fulfilled' && activityRes.value.data) {
           const actData = activityRes.value.data;
           const normalizedActivity = [];
@@ -137,7 +137,7 @@ export default function AdminDashboard() {
         <div className="h-8 bg-slate-200 rounded w-1/4 mb-4"></div>
         <div className="h-4 bg-slate-200 rounded w-1/3 mb-8"></div>
         <div className="grid grid-cols-4 gap-6 mb-8">
-          {[1,2,3,4].map(i => <div key={i} className="h-24 bg-slate-200 rounded"></div>)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-24 bg-slate-200 rounded"></div>)}
         </div>
       </div>
     );
@@ -200,8 +200,8 @@ export default function AdminDashboard() {
                   const Icon = config.icon;
                   return (
                     <li key={idx} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                      <div style={{ 
-                        width: 36, height: 36, borderRadius: 'var(--radius-full)', 
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 'var(--radius-full)',
                         backgroundColor: config.bg, color: config.color,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         flexShrink: 0

@@ -247,6 +247,20 @@ const onShipmentEvent = async (order, event) => {
 const onVendorApplicationSubmitted = async (applicant, application) => {
   if (!applicant?._id) return;
   try {
+    // Notify the applicant
+    notifyAsync({
+      user: applicant,
+      eventType: "vendor.application_submitted",
+      context: {
+        name: applicant.name || "",
+        storeName: application.storeName || "",
+      },
+      related: {
+        vendorApplication: application?._id || null,
+      },
+    });
+
+    // Notify all admins
     const admins = await User.find({ role: "admin" });
     for (const admin of admins) {
       notifyAsync({
@@ -255,7 +269,6 @@ const onVendorApplicationSubmitted = async (applicant, application) => {
         context: {
           applicantName: applicant.name || "",
           storeName: application.storeName || "",
-          dashboardUrl: `${env.appUrl.replace(/\/+$/, "")}/admin/vendor-applications`,
         },
         related: {
           vendorApplication: application?._id || null,
@@ -275,7 +288,6 @@ const onVendorApplicationApproved = async (applicant, store, application) => {
     context: {
       name: applicant.name || "",
       storeName: store?.name || "",
-      dashboardUrl: dashboardUrl(),
     },
     related: {
       store: store?._id || null,

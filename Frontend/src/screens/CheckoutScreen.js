@@ -569,6 +569,7 @@ export default function CheckoutScreen({ navigation }) {
               <TextInput
                 style={styles.input}
                 placeholder="Full Name"
+                placeholderTextColor={Colors.muted}
                 value={address.fullName}
                 onChangeText={(text) => {
                   setAddress({ ...address, fullName: text });
@@ -578,6 +579,7 @@ export default function CheckoutScreen({ navigation }) {
               <TextInput
                 style={styles.input}
                 placeholder="Phone Number *"
+                placeholderTextColor={Colors.muted}
                 keyboardType="phone-pad"
                 value={address.phone}
                 onChangeText={(text) => {
@@ -590,6 +592,7 @@ export default function CheckoutScreen({ navigation }) {
                 <TextInput
                   style={[styles.input, { marginBottom: 0, paddingRight: 40 }]}
                   placeholder="Street Address (Start typing for UK suggestions...)"
+                  placeholderTextColor={Colors.muted}
                   value={address.line1}
                   onChangeText={handleLine1Change}
                 />
@@ -649,6 +652,7 @@ export default function CheckoutScreen({ navigation }) {
               <TextInput
                 style={[styles.input, { marginTop: Spacing.sm }]}
                 placeholder="Apartment, suite, etc. (Optional)"
+                placeholderTextColor={Colors.muted}
                 value={address.line2}
                 onChangeText={(text) => {
                   setAddress({ ...address, line2: text });
@@ -660,12 +664,14 @@ export default function CheckoutScreen({ navigation }) {
                 <TextInput
                   style={[styles.input, styles.halfInput]}
                   placeholder="City / Town"
+                  placeholderTextColor={Colors.muted}
                   value={address.city}
                   onChangeText={(text) => setAddress({ ...address, city: text })}
                 />
                 <TextInput
                   style={[styles.input, styles.halfInput]}
                   placeholder="Postcode (e.g. SW1)"
+                  placeholderTextColor={Colors.muted}
                   autoCapitalize="characters"
                   value={address.postalCode}
                   onChangeText={(text) => setAddress({ ...address, postalCode: text })}
@@ -882,9 +888,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: Radius.sm,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    height: 50,
+    justifyContent: 'center',
     marginBottom: Spacing.sm,
-    ...Typography.body1,
+    fontSize: Typography.size.base,
+    color: Colors.text,
   },
   paymentOption: {
     flexDirection: 'row',

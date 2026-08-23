@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Bell, Search } from 'lucide-react';
+import { Menu } from 'lucide-react';
 
 /* ── Breadcrumb builder from pathname ────────────────────────────────── */
 function buildBreadcrumbs(pathname) {
@@ -12,7 +12,7 @@ function buildBreadcrumbs(pathname) {
   );
 }
 
-export default function TopHeader() {
+export default function TopHeader({ onMenuClick }) {
   const { user } = useAuth();
   const location = useLocation();
   const crumbs = buildBreadcrumbs(location.pathname);
@@ -20,6 +20,9 @@ export default function TopHeader() {
   return (
     <header className="top-header" id="top-header">
       <div className="top-header-left">
+        <button className="btn btn-icon btn-ghost mobile-menu-btn" onClick={onMenuClick}>
+          <Menu size={18} />
+        </button>
         <div className="top-header-breadcrumb">
           {crumbs.map((crumb, i) => (
             <span key={i}>
@@ -33,29 +36,6 @@ export default function TopHeader() {
       </div>
 
       <div className="top-header-right">
-        <button className="btn btn-icon btn-ghost" data-tooltip="Search" id="header-search-btn">
-          <Search size={18} />
-        </button>
-        <button className="btn btn-icon btn-ghost" data-tooltip="Notifications" id="header-notifications-btn">
-          <Bell size={18} />
-        </button>
-        <div
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: 'var(--radius-full)',
-            background: 'linear-gradient(135deg, var(--primary-400), var(--primary-600))',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            fontSize: 'var(--text-xs)',
-            fontWeight: 600,
-          }}
-          data-tooltip={user?.name || 'User'}
-        >
-          {user?.name?.[0]?.toUpperCase() || '?'}
-        </div>
       </div>
     </header>
   );

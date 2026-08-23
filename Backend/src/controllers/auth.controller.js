@@ -55,7 +55,7 @@ const generateOtp = () => {
 const register = asyncHandler(async (req, res) => {
   validateRegisterInput(req.body);
 
-  const { name, email, password } = req.body;
+  const { name, email, password, isVendor } = req.body;
   const normalizedEmail = email.trim().toLowerCase();
 
   const existingUser = await User.findOne({ email: normalizedEmail });
@@ -77,7 +77,21 @@ const register = asyncHandler(async (req, res) => {
       email: normalizedEmail,
       password,
       role: "customer",
-      status: "unverified",
+      status: isVendor ? "active" : "unverified",
+    });
+  }
+
+  // If isVendor is true, bypass OTP verification for now
+  if (isVendor) {
+    // If the user already existed and was unverified, activate them
+    if (user.status === "unverified") {
+      user.status = "active";
+      await user.save();
+    }
+    const tokens = await issueAuthTokens(user);
+    return res.status(201).json({
+      message: "Registration successful",
+      ...tokens,
     });
   }
 
