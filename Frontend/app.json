@@ -30,7 +30,9 @@
           "merchantIdentifier": "merchant.com.ukmarketplace",
           "enableGooglePay": false
         }
-      ]
+      ],
+      "expo-font",
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {
