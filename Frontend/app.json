@@ -8,7 +8,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ukmarketplace.app"
+      "bundleIdentifier": "com.ukmarketplace.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.ukmarketplace.app",
@@ -23,7 +26,12 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "@react-native-google-signin/google-signin",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.1027118920712-1esuctaq7j2uudiqjf4q7es9sv4pv8lq"
+        }
+      ],
       [
         "@stripe/stripe-react-native",
         {
