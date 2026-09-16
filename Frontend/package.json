@@ -12,6 +12,7 @@
     "@stripe/stripe-react-native": "0.64.0",
     "axios": "^1.18.0",
     "expo": "~57.0.23",
+    "expo-build-properties": "~57.0.19",
     "expo-cloudflared": "^4.2.1",
     "expo-dev-client": "~57.0.19",
     "expo-font": "~57.0.1",
