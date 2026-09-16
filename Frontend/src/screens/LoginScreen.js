@@ -23,6 +23,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 try {
   GoogleSignin.configure({
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+    iosClientId: process.env.EXPO_PUBLIC_IOS_CLIENT_ID,
     offlineAccess: true,
   });
 } catch (e) {
@@ -94,7 +95,7 @@ export default function LoginScreen({ navigation }) {
         // Sign out any cached session so the account picker always appears
         await GoogleSignin.signOut();
         const response = await GoogleSignin.signIn();
-        
+
         if (response?.type === 'cancelled') {
           return;
         }
