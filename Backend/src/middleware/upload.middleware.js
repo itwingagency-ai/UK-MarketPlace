@@ -10,15 +10,15 @@ const ApiError = require("../lib/ApiError");
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
-// Without AWS credentials (local development) uploads are written to disk and
-// served from /uploads, so image flows can still be exercised. Production
-// always uses S3.
+// Without AWS credentials uploads are written to disk and served from
+// /uploads — locally, and on the VPS (a Docker volume) until S3 keys are
+// added. Once AWS_* is set, everything new goes to S3.
 const S3_CONFIGURED = Boolean(
   process.env.AWS_BUCKET_NAME &&
     process.env.AWS_ACCESS_KEY_ID &&
     process.env.AWS_SECRET_ACCESS_KEY
 );
-const USE_LOCAL_UPLOADS = !S3_CONFIGURED && process.env.NODE_ENV !== "production";
+const USE_LOCAL_UPLOADS = !S3_CONFIGURED;
 const LOCAL_UPLOAD_DIR = path.join(__dirname, "../../uploads");
 
 const fileKey = (file) => {
