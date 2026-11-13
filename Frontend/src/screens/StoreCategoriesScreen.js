@@ -257,7 +257,8 @@ export default function StoreCategoriesScreen({ route, navigation }) {
           ) : (
             <View style={styles.grid}>
               {categories.map((category, index) => {
-                const asset = assetForCategory(category.name);
+                // Mapped marketplace category's icon first; name guess for unmapped ones
+                const asset = category.globalCategory?.iconKey || assetForCategory(category.name);
                 return (
                   <CategoryTile
                     key={category.id}

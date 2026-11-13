@@ -20,6 +20,7 @@ import {
   DollarSign,
   MapPin,
   Clock,
+  FolderTree,
 } from 'lucide-react';
 
 /* ── Navigation configs per role ────────────────────────────────────── */
@@ -43,6 +44,7 @@ const adminNav = [
   {
     label: 'Content',
     items: [
+      { to: '/admin/categories', icon: FolderTree, text: 'Category Studio' },
       { to: '/admin/reviews', icon: Star, text: 'Reviews' },
       { to: '/admin/notifications', icon: Bell, text: 'Notifications' },
     ],

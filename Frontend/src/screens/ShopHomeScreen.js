@@ -26,7 +26,7 @@ import Animated, {
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from '../context/LocationContext';
 import { useCustomAlert } from '../context/AlertContext';
-import { getNearbyStores } from '../api/stores.api';
+import { getNearbyStores, getMarketplaceCategories } from '../api/stores.api';
 import { useFavorites } from '../context/FavoritesContext';
 import Asset3D from '../components/Asset3D';
 import Button from '../components/Button';
@@ -43,17 +43,6 @@ const TILE_IN = Array.from({ length: 12 }, (_, i) =>
   FadeInRight.delay(80 + i * Motion.stagger.list).springify().damping(Motion.springs.gentle.damping)
 );
 const FADE_IN = FadeIn.duration(300);
-
-const CATEGORIES = [
-  ['cat-fruit-veg', 'Fruit & Veg'],
-  ['cat-bakery', 'Bakery'],
-  ['cat-dairy-eggs', 'Dairy & Eggs'],
-  ['cat-drinks', 'Drinks'],
-  ['cat-snacks-sweets', 'Snacks'],
-  ['cat-household', 'Household'],
-  ['cat-frozen', 'Frozen'],
-  ['cat-pharmacy', 'Pharmacy'],
-];
 
 const FILTERS = [
   ['open', 'Open now', 'clock'],
@@ -236,12 +225,26 @@ export default function ShopHomeScreen({ route, navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState([]);
 
+  // Featured marketplace categories (admin's Category Studio). Picking one
+  // narrows the list to nearby stores that actually sell it.
+  const [categories, setCategories] = useState([]);
+  const [activeCategory, setActiveCategory] = useState(null);
+  const [categoryStores, setCategoryStores] = useState(null);
+  const [categoryLoading, setCategoryLoading] = useState(false);
+
+  useEffect(() => {
+    getMarketplaceCategories({ featured: true })
+      .then((res) => setCategories(res?.data ?? []))
+      .catch(() => setCategories([]));
+  }, []);
+
   const displayLocation = locationLabel || postcode;
 
   const visibleStores = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const base = activeCategory && categoryStores ? categoryStores : stores;
     // Open stores first, then nearest
-    const ordered = [...stores].sort(
+    const ordered = [...base].sort(
       (a, b) => Number(Boolean(b.isOpen)) - Number(Boolean(a.isOpen)) || (a.distanceKm ?? 0) - (b.distanceKm ?? 0)
     );
     return ordered.filter((s) => {
@@ -253,7 +256,7 @@ export default function ShopHomeScreen({ route, navigation }) {
       if (activeFilters.includes('rated') && !(Number(s.averageRating) >= 4.5)) return false;
       return true;
     });
-  }, [stores, searchQuery, activeFilters]);
+  }, [stores, categoryStores, activeCategory, searchQuery, activeFilters]);
 
   // Prefer coordinates: the server-side postcode geocoder needs a Google key.
   const fetchStores = useCallback(async (isRefresh = false) => {
@@ -282,9 +285,28 @@ export default function ShopHomeScreen({ route, navigation }) {
 
   const openStore = (store) => navigation.navigate('StoreCategories', { store });
 
-  const openCategory = () => {
-    const target = visibleStores.find((s) => s.isOpen) || visibleStores[0];
-    if (target) openStore(target);
+  const toggleCategory = async (category) => {
+    if (activeCategory?.slug === category.slug) {
+      setActiveCategory(null);
+      setCategoryStores(null);
+      return;
+    }
+    const query = location?.lat != null && location?.lng != null
+      ? { lat: location.lat, lng: location.lng }
+      : postcode ? { postcode } : null;
+    if (!query) return;
+    setActiveCategory(category);
+    setCategoryStores(null);
+    setCategoryLoading(true);
+    try {
+      const data = await getNearbyStores({ ...query, category: category.slug });
+      setCategoryStores(data?.data?.stores ?? []);
+    } catch {
+      setActiveCategory(null);
+      showAlert({ title: "Couldn't filter stores", message: 'Please try again.', icon: 'alert-circle', showCancel: false, confirmText: 'OK' });
+    } finally {
+      setCategoryLoading(false);
+    }
   };
 
   const toggleFilter = (key) =>
@@ -310,23 +332,36 @@ export default function ShopHomeScreen({ route, navigation }) {
   const header = (
     <View>
       {/* Category tiles */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Shop by category</Text>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tilesRow}
-      >
-        {CATEGORIES.map(([asset, label], i) => (
-          <Animated.View key={asset} entering={TILE_IN[i]}>
-            <Pressable onPress={openCategory} style={styles.tile} accessibilityRole="button" accessibilityLabel={label}>
-              <Asset3D name={asset} size={58} />
-              <Text style={styles.tileLabel} numberOfLines={1}>{label}</Text>
-            </Pressable>
-          </Animated.View>
-        ))}
-      </ScrollView>
+      {categories.length > 0 && (
+        <>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Shop by category</Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tilesRow}
+          >
+            {categories.map((category, i) => {
+              const selected = activeCategory?.slug === category.slug;
+              return (
+                <Animated.View key={category.slug} entering={TILE_IN[Math.min(i, TILE_IN.length - 1)]}>
+                  <Pressable
+                    onPress={() => toggleCategory(category)}
+                    style={[styles.tile, selected && styles.tileActive]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={category.name}
+                  >
+                    <Asset3D name={category.icon3d?.assetKey} size={58} />
+                    <Text style={[styles.tileLabel, selected && styles.tileLabelActive]} numberOfLines={1}>{category.name}</Text>
+                  </Pressable>
+                </Animated.View>
+              );
+            })}
+          </ScrollView>
+        </>
+      )}
 
       {/* Brand banner */}
       <View style={styles.banner}>
@@ -358,8 +393,13 @@ export default function ShopHomeScreen({ route, navigation }) {
       </ScrollView>
 
       <Text style={styles.resultsTitle}>
-        {visibleStores.length} {visibleStores.length === 1 ? 'store' : 'stores'} near{' '}
-        <Text style={styles.resultsAccent}>{postcode || 'you'}</Text>
+        {categoryLoading ? 'Finding stores…' : (
+          <>
+            {visibleStores.length} {visibleStores.length === 1 ? 'store' : 'stores'} near{' '}
+            <Text style={styles.resultsAccent}>{postcode || 'you'}</Text>
+            {activeCategory ? <> selling <Text style={styles.resultsAccent}>{activeCategory.name}</Text></> : null}
+          </>
+        )}
       </Text>
     </View>
   );
@@ -440,11 +480,21 @@ export default function ShopHomeScreen({ route, navigation }) {
           )}
           ListHeaderComponent={header}
           ListEmptyComponent={
-            <StateMessage
-              asset="illo-search-empty"
-              title="No matching stores"
-              body="Try a different search or clear your filters."
-            />
+            categoryLoading ? null : activeCategory ? (
+              <StateMessage
+                asset={activeCategory.icon3d?.assetKey || 'illo-search-empty'}
+                title={`No ${activeCategory.name} nearby yet`}
+                body="None of the stores that deliver to you sell this right now."
+                actionLabel="Show all stores"
+                onAction={() => toggleCategory(activeCategory)}
+              />
+            ) : (
+              <StateMessage
+                asset="illo-search-empty"
+                title="No matching stores"
+                body="Try a different search or clear your filters."
+              />
+            )
           }
           contentContainerStyle={styles.listPad}
           ItemSeparatorComponent={() => <View style={{ height: Spacing.base }} />}
@@ -560,6 +610,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.text,
     marginTop: Spacing.xs,
+  },
+  tileActive: {
+    borderColor: Colors.primary,
+    borderWidth: 2,
+    backgroundColor: Colors.primaryLight,
+  },
+  tileLabelActive: {
+    color: Colors.primary,
   },
   banner: {
     flexDirection: 'row',

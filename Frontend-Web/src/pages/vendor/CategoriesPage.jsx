@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { vendorService } from '../../api/vendorService';
+import client from '../../api/client';
 import {
   PageHeader,
   DataTable,
@@ -9,12 +10,13 @@ import {
   Modal
 } from '../../components/common';
 import { flattenCategoryTree, descendantIds } from '../../utils/categoryTree';
-import { Tag, Plus, Edit2, Trash2, Eye, EyeOff, CornerDownRight, FolderPlus } from 'lucide-react';
+import { Tag, Plus, Edit2, Trash2, Eye, EyeOff, CornerDownRight, FolderPlus, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const EMPTY_CATEGORY = {
   name: '',
   parent: '',
+  globalCategory: '',
   slug: '',
   description: '',
   sortOrder: 0,
@@ -23,6 +25,8 @@ const EMPTY_CATEGORY = {
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState([]);
+  // Marketplace categories from Category Studio; every aisle maps to one
+  const [globalCategories, setGlobalCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -50,7 +54,16 @@ export default function CategoriesPage() {
 
   useEffect(() => {
     fetchCategories();
+    client.get('/categories')
+      .then((res) => setGlobalCategories(res.data?.data || []))
+      .catch(() => toast.error('Could not load marketplace categories'));
   }, [fetchCategories]);
+
+  const globalOptions = useMemo(
+    () => globalCategories.map((g) => ({ value: g.id, label: g.parent ? `— ${g.name}` : g.name })),
+    [globalCategories]
+  );
+  const unmapped = useMemo(() => categories.filter((c) => !c.globalCategory), [categories]);
 
   const tree = useMemo(() => flattenCategoryTree(categories), [categories]);
   const childCount = useMemo(() => {
@@ -83,6 +96,7 @@ export default function CategoriesPage() {
       const payload = new FormData();
       payload.append('name', values.name.trim());
       payload.append('parent', values.parent || '');
+      if (values.globalCategory) payload.append('globalCategory', values.globalCategory);
       payload.append('description', values.description || '');
       payload.append('sortOrder', values.sortOrder === '' ? 0 : values.sortOrder);
       payload.append('isActive', values.isActive ? 'true' : 'false');
@@ -148,6 +162,7 @@ export default function CategoriesPage() {
     return {
       name: editingCategory.name,
       parent: editingCategory.parent || '',
+      globalCategory: editingCategory.globalCategory?._id || '',
       slug: editingCategory.slug,
       description: editingCategory.description || '',
       sortOrder: editingCategory.sortOrder || 0,
@@ -165,6 +180,8 @@ export default function CategoriesPage() {
           <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-sm)', background: 'var(--gray-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
             {row.image ? (
               <img src={row.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : row.globalCategory?.icon3d?.assetKey ? (
+              <img src={`/3d/${row.globalCategory.icon3d.assetKey}.png`} alt="" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
             ) : (
               <Tag size={18} color="var(--gray-400)" />
             )}
@@ -182,6 +199,17 @@ export default function CategoriesPage() {
           </div>
         </div>
       ),
+    },
+    {
+      key: 'globalCategory',
+      label: 'Marketplace category',
+      width: 190,
+      render: (v) =>
+        v ? (
+          <span>{v.name}</span>
+        ) : (
+          <StatusBadge status="pending" label="Not mapped" />
+        ),
     },
     {
       key: 'productCount',
@@ -243,6 +271,23 @@ export default function CategoriesPage() {
           </button>
         }
       />
+
+      {unmapped.length > 0 && (
+        <div
+          className="card"
+          role="status"
+          style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start', padding: 'var(--space-4)', marginBottom: 'var(--space-4)', borderLeft: '4px solid var(--warning-text, #B45309)' }}
+        >
+          <AlertTriangle size={18} style={{ flexShrink: 0, color: 'var(--warning-text, #B45309)', marginTop: 2 }} />
+          <div style={{ fontSize: 'var(--text-sm)' }}>
+            <strong>{unmapped.length} categor{unmapped.length === 1 ? 'y isn’t' : 'ies aren’t'} linked to a marketplace category.</strong>
+            <div style={{ color: 'var(--gray-600)', marginTop: 2 }}>
+              Customers browsing the app by category won’t find these products until you pick one:{' '}
+              {unmapped.slice(0, 5).map((c) => c.name).join(', ')}{unmapped.length > 5 ? '…' : ''}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <DataTable
@@ -314,6 +359,17 @@ export default function CategoriesPage() {
               placeholder: 'None — this is a main category',
               options: parentOptions,
               helpText: 'Choose a parent to make this a subcategory, e.g. "Cakes" inside "Sweets & Bakery".',
+            },
+            {
+              name: 'globalCategory',
+              label: 'Marketplace category',
+              type: 'select',
+              required: !(editingCategory ? editingCategory.parent : newParentId),
+              placeholder: (editingCategory ? editingCategory.parent : newParentId)
+                ? 'Same as the parent category'
+                : 'Choose one…',
+              options: globalOptions,
+              helpText: 'Where customers find this aisle when they browse the app by category, e.g. "Bakery".',
             },
             {
               name: 'description',

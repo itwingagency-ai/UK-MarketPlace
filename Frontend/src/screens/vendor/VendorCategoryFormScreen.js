@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { createCategory, getCategories, updateCategory } from '../../api/vendor.api';
+import { getMarketplaceCategories } from '../../api/stores.api';
 import { useCustomAlert } from '../../context/AlertContext';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
@@ -26,6 +27,10 @@ export default function VendorCategoryFormScreen({ navigation, route }) {
   const [newImage, setNewImage] = useState(null); // picker asset
   const [nameError, setNameError] = useState(null);
   const [parentOpen, setParentOpen] = useState(false);
+  // Marketplace category (Category Studio) — where customers find this aisle
+  const [globalCategories, setGlobalCategories] = useState([]);
+  const [globalCategory, setGlobalCategory] = useState('');
+  const [globalOpen, setGlobalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const editing = categories?.find((c) => c._id === categoryId);
@@ -43,10 +48,22 @@ export default function VendorCategoryFormScreen({ navigation, route }) {
           setSortOrder(String(cat.sortOrder || 0));
           setIsActive(cat.isActive);
           setImage(cat.image || null);
+          setGlobalCategory(cat.globalCategory?._id || '');
         }
       })
       .catch(() => setCategories([]));
+    getMarketplaceCategories()
+      .then((res) => setGlobalCategories(res?.data ?? []))
+      .catch(() => setGlobalCategories([]));
   }, [categoryId]);
+
+  const globalOptions = useMemo(
+    () => (parent ? [{ value: '', label: 'Same as the parent category' }] : []).concat(
+      globalCategories.map((g) => ({ value: g.id, label: g.name, depth: g.parent ? 1 : 0 }))
+    ),
+    [globalCategories, parent]
+  );
+  const globalName = globalCategories.find((g) => g.id === globalCategory)?.name;
 
   // A category can't move under itself or anything beneath it
   const parentOptions = useMemo(() => {
@@ -81,11 +98,16 @@ export default function VendorCategoryFormScreen({ navigation, route }) {
       showAlert({ title: 'Check display order', message: 'Use a whole number from 0 to 9999.', icon: 'alert-circle', showCancel: false, confirmText: 'OK' });
       return;
     }
+    if (!globalCategory && !parent) {
+      showAlert({ title: 'Choose a marketplace category', message: 'Select which marketplace category this aisle belongs to so customers can discover your products.', icon: 'alert-circle', showCancel: false, confirmText: 'OK' });
+      return;
+    }
     setNameError(null);
 
     const form = new FormData();
     form.append('name', name.trim());
     form.append('parent', parent || '');
+    if (globalCategory) form.append('globalCategory', globalCategory);
     form.append('description', description.trim());
     form.append('sortOrder', String(order));
     form.append('isActive', isActive ? 'true' : 'false');
@@ -131,6 +153,13 @@ export default function VendorCategoryFormScreen({ navigation, route }) {
                 onPress={() => setParentOpen(true)}
                 help='Choose a parent to make this a subcategory, e.g. "Cakes" inside "Sweets & Bakery".'
               />
+              <SelectField
+                label={parent ? 'Marketplace category' : 'Marketplace category *'}
+                value={globalName}
+                placeholder={parent ? 'Same as the parent category' : 'Choose one…'}
+                onPress={() => setGlobalOpen(true)}
+                help='Where customers find this aisle when they browse the app by category, e.g. "Bakery".'
+              />
               <Input
                 label="Description"
                 placeholder="Optional — shown to customers"
@@ -174,6 +203,15 @@ export default function VendorCategoryFormScreen({ navigation, route }) {
         selected={parent}
         onSelect={(v) => setParent(v || '')}
         onClose={() => setParentOpen(false)}
+      />
+
+      <PickerSheet
+        visible={globalOpen}
+        title="Marketplace category"
+        options={globalOptions}
+        selected={globalCategory}
+        onSelect={(v) => setGlobalCategory(v || '')}
+        onClose={() => setGlobalOpen(false)}
       />
     </View>
   );

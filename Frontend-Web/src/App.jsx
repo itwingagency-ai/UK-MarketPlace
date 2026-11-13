@@ -25,6 +25,7 @@ import NotificationsPage from './pages/admin/NotificationsPage';
 import PlatformSettingsPage from './pages/admin/PlatformSettingsPage';
 import CommissionPage from './pages/admin/CommissionPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
+import CategoryStudioPage from './pages/admin/CategoryStudioPage';
 
 /* ── Vendor Pages ── */
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -70,6 +71,7 @@ export default function App() {
             <Route path="vendor-applications" element={<VendorApplicationsPage />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="orders" element={<AllOrdersPage />} />
+            <Route path="categories" element={<CategoryStudioPage />} />
             <Route path="reviews" element={<ReviewsModerationPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="settings" element={<PlatformSettingsPage />} />

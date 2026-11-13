@@ -6,12 +6,14 @@ import client from './client';
  * @param {string} postcode - e.g. "SW1A 1AA"
  * @param {number} [lat]
  * @param {number} [lng]
+ * @param {string} [category] - marketplace category slug: only stores selling it
  */
-export const getNearbyStores = async ({ postcode, lat, lng } = {}) => {
+export const getNearbyStores = async ({ postcode, lat, lng, category } = {}) => {
   const params = {};
   if (postcode) params.address = postcode;
   if (lat !== undefined) params.lat = lat;
   if (lng !== undefined) params.lng = lng;
+  if (category) params.category = category;
 
   const { data } = await client.get('/stores/nearby', { params });
   return data;
@@ -92,5 +94,14 @@ export const checkDeliverability = async (slug, { address, lat, lng } = {}) => {
  */
 export const getStoreCategories = async (storeIdOrSlug) => {
   const { data } = await client.get(`/stores/${storeIdOrSlug}/categories`);
+  return data;
+};
+
+/**
+ * GET /api/v1/categories — marketplace categories from Category Studio.
+ * @param {object} [params] - { featured: true } for the home-screen tiles
+ */
+export const getMarketplaceCategories = async (params = {}) => {
+  const { data } = await client.get('/categories', { params });
   return data;
 };

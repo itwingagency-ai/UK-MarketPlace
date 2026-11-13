@@ -19,6 +19,30 @@ export const adminService = {
     return data;
   },
 
+  /* ── Category Studio (global categories) ── */
+  getGlobalCategories: async () => {
+    const { data } = await client.get('/admin/global-categories');
+    return data;
+  },
+  createGlobalCategory: async (payload) => {
+    const { data } = await client.post('/admin/global-categories', payload);
+    return data;
+  },
+  updateGlobalCategory: async (id, payload) => {
+    const { data } = await client.patch(`/admin/global-categories/${id}`, payload);
+    return data;
+  },
+  reorderGlobalCategories: async (items) => {
+    const { data } = await client.patch('/admin/global-categories/reorder', { items });
+    return data;
+  },
+  deleteGlobalCategory: async (id, replacement) => {
+    const { data } = await client.delete(`/admin/global-categories/${id}`, {
+      params: replacement ? { replacement } : undefined,
+    });
+    return data;
+  },
+
   /* ── Users ── */
   getUsers: async (params) => {
     const { data } = await client.get('/admin/users', { params });
