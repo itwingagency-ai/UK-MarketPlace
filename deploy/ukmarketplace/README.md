@@ -31,7 +31,7 @@ Edit the env file on the server, then `cd ~/ukmarketplace/deploy/ukmarketplace &
 Build with `EXPO_PUBLIC_API_URL=https://ukmarketplace.itwing.cloud/api/v1`
 (e.g. in `eas.json` → `build.<profile>.env`).
 
-## One-time setup (already done)
+## One-time setup
 1. DNS: A record `ukmarketplace` → 76.13.181.210 in the itwing.cloud zone (personal Hostinger).
 2. As root: env file, `/var/www/ukmarketplace.itwing.cloud` owned by tayyab, nginx vhost enabled.
 3. `certbot --nginx -d ukmarketplace.itwing.cloud --redirect` once DNS resolves.
