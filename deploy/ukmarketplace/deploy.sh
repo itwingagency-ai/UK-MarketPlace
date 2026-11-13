@@ -37,7 +37,8 @@ rsync -a --delete Frontend-Web/dist/ $WEB_ROOT/
 echo "→ Rebuilding API"
 cd deploy/ukmarketplace
 docker compose up -d --build
-docker compose exec -T api node seed-global-categories.js | tail -3
+# </dev/null: exec -T would otherwise swallow the rest of this heredoc
+docker compose exec -T api node seed-global-categories.js </dev/null | tail -3
 
 for i in \$(seq 1 20); do
   if curl -fs http://127.0.0.1:8050/health >/dev/null; then echo "→ API healthy"; break; fi
