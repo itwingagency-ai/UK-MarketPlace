@@ -22,7 +22,10 @@ export function AlertProvider({ children }) {
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
       Animated.timing(scaleAnim, { toValue: 0.9, duration: 150, useNativeDriver: true })
-    ]).start(() => setAlertConfig(null));
+    ]).start(({ finished }) => {
+      // A showAlert() during the fade-out interrupts it; keep the new alert
+      if (finished) setAlertConfig(null);
+    });
   }, [fadeAnim, scaleAnim]);
 
   const handleConfirm = () => {

@@ -3,6 +3,7 @@ const asyncHandler = require("../lib/asyncHandler");
 const {
   appendPaymentEvent,
   applyCommissionSnapshot,
+  refundOrderIfPaid,
   restoreStockForOrderOnce,
 } = require("../lib/paymentService");
 const { computeEstimatedDelivery } = require("../lib/shippingUtils");
@@ -238,9 +239,15 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
 
   await order.save();
 
-  // Cancelled items go back on the shelf
+  // Cancelled items go back on the shelf, and card payments are refunded
+  let refund = null;
   if (nextStatus === "cancelled") {
     await restoreStockForOrderOnce(order);
+    refund = await refundOrderIfPaid(order, {
+      by: req.user.id,
+      byRole: req.user.role,
+      reason: "Refunded after cancellation",
+    });
   }
 
   // Live update for anyone watching the order, and an alert to the customer
@@ -265,7 +272,10 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   }
 
   res.status(200).json({
-    message: "Order status updated",
+    message:
+      refund && !refund.refunded && refund.reason !== "not_paid_online"
+        ? `Order cancelled, but the refund needs attention: ${refund.reason}`
+        : "Order status updated",
     data: order,
   });
 });

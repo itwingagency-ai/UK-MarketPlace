@@ -15,3 +15,9 @@ export const reorder = async (id) => {
   const response = await client.post(`/customer/orders/${id}/reorder`);
   return response.data;
 };
+
+// Cancel an order the store hasn't accepted yet (card payments are refunded)
+export const cancelMyOrder = async (id, reason) => {
+  const response = await client.post(`/customer/orders/${id}/cancel`, reason ? { reason } : {});
+  return response.data;
+};

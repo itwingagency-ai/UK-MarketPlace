@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 import { Feather } from '@expo/vector-icons';
-import { getMyOrderById, reorder } from '../api/orders.api';
+import { getMyOrderById, reorder, cancelMyOrder } from '../api/orders.api';
 import { useCart } from '../context/CartContext';
 import { useLiveEvent } from '../context/NotificationsContext';
 import Button from '../components/Button';
@@ -41,6 +41,7 @@ export default function OrderDetailScreen({ route, navigation }) {
 
   const { fetchCart } = useCart();
   const [reordering, setReordering] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     fetchOrder();
@@ -77,6 +78,31 @@ export default function OrderDetailScreen({ route, navigation }) {
     } finally {
       setReordering(false);
     }
+  };
+
+  const handleCancel = () => {
+    showAlert({
+      title: 'Cancel this order?',
+      message: order?.paymentStatus === 'paid'
+        ? 'The store hasn\'t accepted it yet. Your card payment will be refunded.'
+        : 'The store hasn\'t accepted it yet, so you can still cancel.',
+      icon: 'x-circle',
+      confirmText: 'Cancel order',
+      cancelText: 'Keep order',
+      onConfirm: async () => {
+        setCancelling(true);
+        try {
+          const res = await cancelMyOrder(orderId);
+          await fetchOrder({ silent: true });
+          showAlert({ title: 'Order cancelled', message: res.message, icon: 'check-circle', showCancel: false, confirmText: 'OK' });
+        } catch (err) {
+          await fetchOrder({ silent: true });
+          showAlert({ title: "Couldn't cancel", message: err.response?.data?.message || 'Please try again.', icon: 'alert-circle', showCancel: false, confirmText: 'OK' });
+        } finally {
+          setCancelling(false);
+        }
+      },
+    });
   };
 
   const fetchOrder = async ({ silent = false } = {}) => {
@@ -356,6 +382,18 @@ export default function OrderDetailScreen({ route, navigation }) {
           </View>
         )}
         ListFooterComponent={
+          <>
+          {order.orderStatus === 'pending' && (
+            <Button
+              title="Cancel order"
+              variant="danger"
+              size="full"
+              loading={cancelling}
+              onPress={handleCancel}
+              icon={<Feather name="x-circle" size={16} color={Colors.white} />}
+              style={{ marginTop: Spacing.base }}
+            />
+          )}
           <Button
             title="Order again"
             variant="outline"
@@ -365,6 +403,7 @@ export default function OrderDetailScreen({ route, navigation }) {
             icon={<Feather name="rotate-ccw" size={16} color={Colors.primary} />}
             style={{ marginTop: Spacing.base, marginBottom: 120 }}
           />
+          </>
         }
       />
 

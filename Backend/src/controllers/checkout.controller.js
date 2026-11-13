@@ -20,6 +20,7 @@ const {
 const Cart = require("../models/Cart");
 const Order = require("../models/Order");
 const PaymentTransaction = require("../models/PaymentTransaction");
+const PlatformSettings = require("../models/PlatformSettings");
 const Product = require("../models/Product");
 const StoreSettings = require("../models/StoreSettings");
 const Store = require("../models/Store");
@@ -578,6 +579,15 @@ const createStripePaymentIntentForOrders = async ({ orders, user, transactionId 
 
 const placeOrder = asyncHandler(async (req, res) => {
   validateCheckoutPayload(req.body);
+
+  // Admin can switch payment methods off platform-wide
+  const { features = {} } = await PlatformSettings.getOrInit();
+  if (req.body.paymentMethod === "cod" && features.codEnabled === false) {
+    throw new ApiError(400, "Cash on delivery is currently unavailable");
+  }
+  if (req.body.paymentMethod === "online" && features.onlinePaymentEnabled === false) {
+    throw new ApiError(400, "Card payments are currently unavailable");
+  }
 
   if (req.body.paymentMethod === "online" && !isStripeConfigured()) {
     throw new ApiError(

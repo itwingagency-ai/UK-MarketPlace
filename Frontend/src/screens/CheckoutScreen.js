@@ -20,6 +20,7 @@ const SECTION_IN = Array.from({ length: 4 }, (_, i) =>
   FadeInDown.delay(60 + i * Motion.stagger.cards).springify().damping(Motion.springs.gentle.damping)
 );
 import { previewCheckout, placeOrder, cancelTransaction, confirmTransaction } from '../api/checkout.api';
+import client from '../api/client';
 import { getMyAddresses, addMyAddress } from '../api/profile.api';
 import { useCart } from '../context/CartContext';
 import { useCustomAlert } from '../context/AlertContext';
@@ -152,6 +153,22 @@ export default function CheckoutScreen({ navigation }) {
 
   // Form State
   const [paymentMethod, setPaymentMethod] = useState('cod'); // 'online' or 'cod'
+  // Which methods the admin has switched on (platform settings → features)
+  const [enabledMethods, setEnabledMethods] = useState({ online: true, cod: true });
+
+  useEffect(() => {
+    client.get('/platform/settings')
+      .then((res) => {
+        const features = res.data?.data?.features || {};
+        const next = {
+          online: features.onlinePaymentEnabled !== false,
+          cod: features.codEnabled !== false,
+        };
+        setEnabledMethods(next);
+        setPaymentMethod((current) => (next[current] ? current : next.cod ? 'cod' : 'online'));
+      })
+      .catch(() => {}); // Fall back to showing both; the server still enforces it
+  }, []);
   const [address, setAddress] = useState({
     fullName: user?.name || '',
     phone: user?.phone || '',
@@ -659,7 +676,7 @@ export default function CheckoutScreen({ navigation }) {
           {[
             ['online', 'Card', 'Pay securely with Stripe', 'credit-card'],
             ['cod', 'Cash on delivery', 'Pay the rider when it arrives', 'dollar-sign'],
-          ].map(([key, label, hint, icon]) => {
+          ].filter(([key]) => enabledMethods[key]).map(([key, label, hint, icon]) => {
             const active = paymentMethod === key;
             return (
               <Pressable

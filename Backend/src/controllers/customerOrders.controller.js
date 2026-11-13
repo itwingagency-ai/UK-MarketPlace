@@ -9,6 +9,13 @@ const {
   resolveProductForCart,
 } = require("../lib/cartUtils");
 const { ALLOWED_STATUSES } = require("../validators/order.validator");
+const {
+  refundOrderIfPaid,
+  restoreStockForOrderOnce,
+} = require("../lib/paymentService");
+const { notifyOrderStatus } = require("../lib/appNotifications");
+const { emitOrderStatusChanged } = require("../lib/orderEvents");
+const { onOrderCancelled } = require("../lib/notificationHooks");
 
 const PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded"];
 
@@ -216,7 +223,72 @@ const reorder = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * POST /customer/orders/:id/cancel
+ * A customer can cancel only while the store hasn't accepted the order yet.
+ * Stock goes back on the shelf and a card payment is refunded.
+ */
+const cancelMyOrder = asyncHandler(async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    throw new ApiError(400, "Invalid order id");
+  }
+
+  const reason =
+    typeof req.body?.reason === "string" && req.body.reason.trim()
+      ? req.body.reason.trim().slice(0, 500)
+      : "Cancelled by customer";
+  const now = new Date();
+
+  // Conditional update, so a vendor accepting at the same moment wins cleanly
+  const order = await Order.findOneAndUpdate(
+    { _id: req.params.id, customer: req.user.id, orderStatus: "pending" },
+    {
+      $set: {
+        orderStatus: "cancelled",
+        "tracking.cancelledAt": now,
+        "tracking.cancellationReason": reason,
+      },
+      $push: {
+        statusHistory: {
+          status: "cancelled",
+          changedBy: req.user.id,
+          changedByRole: "customer",
+          changedAt: now,
+          note: reason,
+        },
+      },
+    },
+    { new: true }
+  );
+
+  if (!order) {
+    const current = await Order.findOne({ _id: req.params.id, customer: req.user.id }).select("orderStatus");
+    if (!current) throw new ApiError(404, "Order not found");
+    if (current.orderStatus === "cancelled") throw new ApiError(409, "This order is already cancelled");
+    throw new ApiError(409, "This order can no longer be cancelled — the store has already accepted it");
+  }
+
+  await restoreStockForOrderOnce(order);
+  const refund = await refundOrderIfPaid(order, {
+    by: req.user.id,
+    byRole: "customer",
+    reason: "Refunded after customer cancellation",
+  });
+
+  emitOrderStatusChanged(order, "pending");
+  notifyOrderStatus(order);
+  onOrderCancelled(order, { reason });
+
+  res.status(200).json({
+    message: refund.refunded
+      ? "Order cancelled. Your refund is on its way."
+      : "Order cancelled",
+    data: order,
+  });
+});
+
 module.exports = {
+  cancelMyOrder,
   reorder,
   listMyOrders,
   getMyOrderById,

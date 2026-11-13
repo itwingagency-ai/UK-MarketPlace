@@ -17,6 +17,7 @@ const Product = require("../models/Product");
 const PaymentTransaction = require("../models/PaymentTransaction");
 const Store = require("../models/Store");
 const User = require("../models/User");
+const { getStripeClient, isStripeConfigured } = require("./stripeClient");
 
 const restoreStockForOrder = async (order) => {
   for (const item of order.items || []) {
@@ -52,6 +53,76 @@ const restoreStockForOrderOnce = async (order) => {
   if (order.tracking) order.tracking.stockRestoredAt = claimedAt;
   await restoreStockForOrder(order);
   return true;
+};
+
+/**
+ * Refund a cancelled order that was paid by card. One Stripe payment can
+ * cover several store orders, so each order refunds only its own total.
+ *
+ * Never throws: a failed refund is recorded on the order (payment stays
+ * "paid") so an admin can see it and refund by hand.
+ *
+ * @returns {Promise<{refunded: boolean, reason?: string}>}
+ */
+const refundOrderIfPaid = async (order, { by = null, byRole = "system", reason = "" } = {}) => {
+  if (order.paymentMethod !== "online" || order.paymentStatus !== "paid") {
+    return { refunded: false, reason: "not_paid_online" };
+  }
+
+  const recordFailure = async (note) => {
+    appendPaymentEvent(order, { status: "paid", provider: "stripe", by, byRole, note });
+    await order.save().catch(() => {});
+    console.error(`[refund] order ${order.orderNumber}: ${note}`);
+    return { refunded: false, reason: note };
+  };
+
+  const tx = await PaymentTransaction.findOne({
+    orders: order._id,
+    provider: "stripe",
+    status: { $in: ["succeeded", "refunded"] },
+  });
+  if (!tx || !tx.providerIntentId) {
+    return recordFailure("Refund needed: no Stripe payment found for this order");
+  }
+  if (!isStripeConfigured()) {
+    return recordFailure("Refund needed: Stripe is not configured on this server");
+  }
+
+  let refund;
+  try {
+    refund = await getStripeClient().refunds.create(
+      {
+        payment_intent: tx.providerIntentId,
+        amount: Math.round(Number(order.total)),
+        metadata: { orderId: String(order._id), orderNumber: order.orderNumber || "" },
+      },
+      // Same order can never be refunded twice, even if this runs again
+      { idempotencyKey: `refund-order-${order._id}` }
+    );
+  } catch (err) {
+    return recordFailure(`Refund failed: ${err.message}`);
+  }
+
+  order.paymentStatus = "refunded";
+  appendPaymentEvent(order, {
+    status: "refunded",
+    provider: "stripe",
+    providerRef: refund.id,
+    by,
+    byRole,
+    note: reason || "Refunded after cancellation",
+  });
+  await order.save();
+
+  const siblings = await Order.find({ _id: { $in: tx.orders } }).select("paymentStatus");
+  const allRefunded = siblings.every((o) => o.paymentStatus === "refunded");
+  if (allRefunded) tx.status = "refunded";
+  await recordTransactionEvent(tx, {
+    type: "stripe.refund.created",
+    note: `Refunded ${order.orderNumber} (${refund.id})`,
+  });
+
+  return { refunded: true };
 };
 
 const appendPaymentEvent = (order, event) => {
@@ -112,6 +183,13 @@ const markOrdersPaid = async ({
     });
     // eslint-disable-next-line no-await-in-loop
     await order.save();
+
+    // Payment landed after the order was cancelled: give the money back
+    if (order.orderStatus === "cancelled") {
+      // eslint-disable-next-line no-await-in-loop
+      await refundOrderIfPaid(order, { reason: "Paid after cancellation" });
+      continue;
+    }
     onOrderPaymentSucceeded(order);
 
     if (order.paymentMethod === "online") {
@@ -208,6 +286,7 @@ const finalizeTransaction = async (
 module.exports = {
   restoreStockForOrder,
   restoreStockForOrderOnce,
+  refundOrderIfPaid,
   appendPaymentEvent,
   appendStatusHistory,
   markOrdersPaid,
