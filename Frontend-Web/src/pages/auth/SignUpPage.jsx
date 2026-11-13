@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import authService from '../../api/authService';
@@ -7,6 +7,7 @@ import client from '../../api/client';
 const STEPS = [
   { id: 1, title: 'Account Details' },
   { id: 2, title: 'Store Information' },
+  { id: 3, title: 'Verify Email' },
 ];
 
 export default function SignUpPage() {
@@ -35,6 +36,13 @@ export default function SignUpPage() {
   const [addressCity, setAddressCity] = useState('');
   const [addressPostalCode, setAddressPostalCode] = useState('');
   const [addressCountry, setAddressCountry] = useState('');
+
+  // Step 3 – Email verification
+  const [otp, setOtp] = useState('');
+  const [otpNotice, setOtpNotice] = useState('');
+  // Tokens from a successful verification, kept so a failed application
+  // (e.g. slug taken) can be retried without a second OTP.
+  const verifiedTokens = useRef(null);
 
   /* ── Auto-generate slug from store name ──────────────────────────── */
   const handleStoreNameChange = (val) => {
@@ -120,17 +128,51 @@ export default function SignUpPage() {
       return;
     }
 
-    setSubmitting(true);
-    const err = await validateStep2();
-    if (err) {
-      setError(err);
-      setSubmitting(false);
+    if (step === 2) {
+      setSubmitting(true);
+      const err = await validateStep2();
+      if (err) {
+        setError(err);
+        setSubmitting(false);
+        return;
+      }
+      if (verifiedTokens.current) {
+        setSubmitting(false);
+        setStep(3);
+        return;
+      }
+      try {
+        // Register starts as an unverified customer and emails a 6-digit OTP;
+        // no tokens are issued until the email is verified.
+        await authService.register(name.trim(), email.trim(), password);
+        setOtp('');
+        setOtpNotice(`We sent a 6-digit code to ${email.trim()}.`);
+        setStep(3);
+      } catch (err) {
+        setError(
+          err.response?.data?.message ||
+            err.response?.data?.error ||
+            'Registration failed. Please try again.'
+        );
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
+
+    if (!verifiedTokens.current && !/^\d{6}$/.test(otp.trim())) {
+      setError('Enter the 6-digit code from your email.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      // 1. Register as a customer
-      const registerRes = await authService.register(name.trim(), email.trim(), password);
-      const { accessToken, refreshToken } = registerRes.data;
+      // 1. Verify the email — this activates the account and returns tokens
+      if (!verifiedTokens.current) {
+        const verifyRes = await authService.verifySignup(email.trim(), otp.trim());
+        verifiedTokens.current = verifyRes.data;
+      }
+      const { accessToken, refreshToken } = verifiedTokens.current;
 
       // Store tokens temporarily so we can make the vendor application call
       localStorage.setItem('accessToken', accessToken);
@@ -153,25 +195,33 @@ export default function SignUpPage() {
         },
       });
 
-      // 3. Clear tokens — vendor cannot use the portal until admin approves
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-
       setSuccess(true);
     } catch (err) {
       const msg =
         err.response?.data?.message ||
         err.response?.data?.error ||
-        'Registration failed. Please try again.';
-      setError(msg);
-
-      // If registration succeeded but application failed, clean tokens
+        'Verification failed. Please try again.';
+      setError(
+        verifiedTokens.current
+          ? `Email verified, but the application failed: ${msg} Go back to fix the store details, or retry.`
+          : msg
+      );
+    } finally {
+      // Vendor cannot use the portal until admin approves
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
-    } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setError('');
+    try {
+      await authService.resendSignupOtp(email.trim());
+      setOtpNotice(`A new code was sent to ${email.trim()}.`);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not resend the code. Please try again.');
     }
   };
 
@@ -463,7 +513,7 @@ export default function SignUpPage() {
                     type="submit"
                     className="btn btn-primary"
                     disabled={submitting}
-                    id="signup-submit-btn"
+                    id="signup-send-code-btn"
                   >
                     {submitting ? (
                       <>
@@ -476,11 +526,79 @@ export default function SignUpPage() {
                             borderTopColor: '#fff',
                           }}
                         />
-                        Submitting…
+                        Sending code…
                       </>
                     ) : (
-                      'Submit Application'
+                      'Next: Verify Email'
                     )}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {step === 3 && (
+              <>
+                {otpNotice && (
+                  <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-500)', margin: 0 }}>
+                    {otpNotice} It expires in 10 minutes.
+                  </p>
+                )}
+
+                {!verifiedTokens.current && (
+                <div className="auth-form-row">
+                  <label className="form-label" htmlFor="signup-otp">
+                    Verification Code*
+                  </label>
+                  <input
+                    id="signup-otp"
+                    className="form-input"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="123456"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                    autoFocus
+                  />
+                </div>
+                )}
+
+                <div
+                  className="auth-form-actions"
+                  style={{ display: 'flex', gap: 'var(--space-3)' }}
+                >
+                  {verifiedTokens.current ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => { setError(''); setStep(2); }}
+                      id="signup-back-to-store-btn"
+                    >
+                      <ArrowLeft size={14} /> Store details
+                    </button>
+                  ) : (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={handleResendOtp}
+                    disabled={submitting}
+                    id="signup-resend-btn"
+                  >
+                    Resend code
+                  </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={submitting}
+                    id="signup-submit-btn"
+                  >
+                    {submitting
+                      ? 'Submitting…'
+                      : verifiedTokens.current
+                        ? 'Retry Application'
+                        : 'Verify & Submit Application'}
                   </button>
                 </div>
               </>

@@ -9,6 +9,10 @@ const authService = {
 
   register: (name, email, password) =>
     client.post('/auth/register', { name, email, password }),
+
+  verifySignup: (email, otp) => client.post('/auth/verify-signup', { email, otp }),
+
+  resendSignupOtp: (email) => client.post('/auth/resend-signup-otp', { email }),
 };
 
 export default authService;

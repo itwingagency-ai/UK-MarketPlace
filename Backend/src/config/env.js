@@ -60,6 +60,12 @@ const env = {
   // Google Maps Geocoding API — optional but required for address-based store discovery
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || "",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  // Every OAuth client ID whose Google ID tokens we accept (web, Android, iOS).
+  // GOOGLE_CLIENT_ID may hold a comma-separated list.
+  googleClientIds: (process.env.GOOGLE_CLIENT_ID || "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean),
 };
 
 module.exports = env;

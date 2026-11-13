@@ -19,7 +19,7 @@ const { onAccountWelcome } = require("../lib/notificationHooks");
 const { sendEmail } = require("../lib/emailClient");
 const { OAuth2Client } = require("google-auth-library");
 
-const googleClient = new OAuth2Client(); // Takes client IDs in verifyIdToken if needed
+const googleClient = new OAuth2Client();
 
 const getTokenExpiryDate = (expiresIn) =>
   new Date(Date.now() + Number(ms(expiresIn)));
@@ -164,9 +164,14 @@ const forgotPassword = asyncHandler(async (req, res) => {
   if (!email) throw new ApiError(400, "Email is required");
   const normalizedEmail = email.trim().toLowerCase();
 
+  // Same response whether or not the email exists, so this endpoint can't be
+  // used to find out who has an account.
+  const genericResponse = { message: "If an account exists, an OTP has been sent." };
+
   const user = await User.findOne({ email: normalizedEmail });
   if (!user) {
-    throw new ApiError(404, "No account found with this email address");
+    res.status(200).json(genericResponse);
+    return;
   }
 
   await Otp.deleteMany({ email: normalizedEmail, purpose: "reset_password" });
@@ -179,7 +184,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
     body: `Your password reset code is: ${otp}. It will expire in 10 minutes.`,
   });
 
-  res.status(200).json({ message: "If an account exists, an OTP has been sent." });
+  res.status(200).json(genericResponse);
 });
 
 const verifyResetOtp = asyncHandler(async (req, res) => {
@@ -269,18 +274,28 @@ const googleLogin = asyncHandler(async (req, res) => {
   const { idToken } = req.body;
   if (!idToken) throw new ApiError(400, "Google ID token is required");
 
+  // Without an audience check, an ID token minted for *any* Google app would
+  // be accepted here, so refuse to run unconfigured.
+  if (env.googleClientIds.length === 0) {
+    throw new ApiError(503, "Google sign-in is not configured");
+  }
+
   let payload;
   try {
-    // Accept tokens issued to any client ID in our Google Cloud project
-    // The Android app's idToken may have the Android client ID as audience,
-    // not the web client ID, depending on GoogleSignin configuration
+    // The mobile app configures GoogleSignin with the web client ID, so its
+    // tokens carry that audience; Android/iOS client IDs can be listed too.
     const ticket = await googleClient.verifyIdToken({
       idToken,
+      audience: env.googleClientIds,
     });
     payload = ticket.getPayload();
   } catch (err) {
     console.error("Google token verification failed:", err.message);
-    throw new ApiError(401, "Invalid Google token: " + err.message);
+    throw new ApiError(401, "Invalid Google token");
+  }
+
+  if (!payload?.email || payload.email_verified !== true) {
+    throw new ApiError(401, "Google account email is not verified");
   }
 
   const { email, name, sub: googleId } = payload;
