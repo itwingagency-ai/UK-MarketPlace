@@ -3,6 +3,7 @@ const ApiError = require("../lib/ApiError");
 const asyncHandler = require("../lib/asyncHandler");
 const { resolveTargetStoreId } = require("../middleware/storeScope.middleware");
 const Category = require("../models/Category");
+const GlobalCategory = require("../models/GlobalCategory");
 const Product = require("../models/Product");
 const {
   parseBoolean,
@@ -28,6 +29,18 @@ const ensureUniqueSlug = async (storeId, baseSlug, ignoreId = null) => {
   }
 
   throw new ApiError(409, "Could not generate a unique category slug");
+};
+
+const MISSING_MAPPING =
+  "Select which marketplace category this aisle belongs to so customers can discover your products.";
+
+// Returns the global category id, or null when the field is empty
+const resolveGlobalCategory = async (value) => {
+  if (value === undefined || value === null || value === "" || value === "null") return null;
+  if (!mongoose.Types.ObjectId.isValid(value)) throw new ApiError(400, MISSING_MAPPING);
+  const global = await GlobalCategory.findOne({ _id: value, isActive: true }).select("_id").lean();
+  if (!global) throw new ApiError(400, "That marketplace category is no longer available.");
+  return global._id;
 };
 
 const findOwnedCategory = async (id, storeId) => {
@@ -56,7 +69,11 @@ const listCategories = asyncHandler(async (req, res) => {
     filter.name = new RegExp(escaped, "i");
   }
 
-  const categories = (await Category.find(filter).lean()).sort(compareCategories);
+  const categories = (
+    await Category.find(filter)
+      .populate("globalCategory", "name slug icon3d accentColor isActive")
+      .lean()
+  ).sort(compareCategories);
 
   // Direct product counts so the dashboard can show what each category holds
   // and warn before a delete that would be refused.
@@ -92,13 +109,19 @@ const createCategory = asyncHandler(async (req, res) => {
   }
 
   let parentId = null;
+  let parent = null;
   if (req.body.parent && req.body.parent !== "null" && req.body.parent !== "") {
-    const parent = await findOwnedCategory(req.body.parent, storeId);
+    parent = await findOwnedCategory(req.body.parent, storeId);
     if (!parent) {
       throw new ApiError(400, "Parent category does not belong to your store");
     }
     parentId = parent._id;
   }
+
+  // Every aisle maps to a marketplace category; a sub-aisle may inherit its parent's
+  const globalCategory =
+    (await resolveGlobalCategory(req.body.globalCategory)) || parent?.globalCategory || null;
+  if (!globalCategory) throw new ApiError(400, MISSING_MAPPING);
 
   const slug = await ensureUniqueSlug(storeId, baseSlug);
 
@@ -112,6 +135,7 @@ const createCategory = asyncHandler(async (req, res) => {
     name: req.body.name.trim(),
     slug,
     parent: parentId,
+    globalCategory,
     description: req.body.description || "",
     image,
     isActive:
@@ -176,6 +200,12 @@ const updateCategory = asyncHandler(async (req, res) => {
 
       category.parent = parent._id;
     }
+  }
+
+  if (req.body.globalCategory !== undefined) {
+    const globalCategory = await resolveGlobalCategory(req.body.globalCategory);
+    if (!globalCategory) throw new ApiError(400, MISSING_MAPPING);
+    category.globalCategory = globalCategory;
   }
 
   if (req.body.description !== undefined) {

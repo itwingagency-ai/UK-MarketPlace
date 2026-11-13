@@ -48,6 +48,14 @@ const {
   updateStatus: adminUpdateReviewStatus,
 } = require("../controllers/adminReviews.controller");
 
+const {
+  createGlobalCategory,
+  deleteGlobalCategory,
+  listGlobalCategories,
+  reorderGlobalCategories,
+  updateGlobalCategory,
+} = require("../controllers/globalCategories.controller");
+
 const router = express.Router();
 
 router.get("/overview", overview);
@@ -70,6 +78,12 @@ router.patch("/stores/:storeId/commission", setStoreCommission);
 
 router.get("/orders", listAllOrders);
 router.get("/orders/:id", getOrderById);
+
+router.get("/global-categories", listGlobalCategories);
+router.post("/global-categories", createGlobalCategory);
+router.patch("/global-categories/reorder", reorderGlobalCategories);
+router.patch("/global-categories/:id", updateGlobalCategory);
+router.delete("/global-categories/:id", deleteGlobalCategory);
 
 router.get("/settings", getSettings);
 router.patch("/settings", updateSettings);

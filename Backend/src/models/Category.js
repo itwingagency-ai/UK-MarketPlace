@@ -28,6 +28,14 @@ const categorySchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    // Marketplace category this aisle belongs to (Category Studio). Required
+    // for new categories; older ones are mapped by seed-global-categories.js.
+    globalCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "GlobalCategory",
+      default: null,
+      index: true,
+    },
     description: {
       type: String,
       default: "",

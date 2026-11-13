@@ -68,6 +68,10 @@ app.use("/api/v1/track", orderTrackingRoutes);
 app.use("/api/v1/products", productSearchRoutes);  // search + suggest + detail
 app.use("/api/v1/products", publicReviewsRoutes);   // /:productId/reviews
 app.use("/api/v1/stores", storeDiscoveryRoutes);
+app.get(
+  "/api/v1/categories",
+  require("./controllers/globalCategories.controller").listPublicGlobalCategories
+);
 app.use(
   "/api/v1/vendor-applications",
   authenticate,

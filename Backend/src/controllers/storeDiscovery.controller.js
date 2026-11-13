@@ -30,6 +30,10 @@ const Store = require("../models/Store");
 const Product = require("../models/Product");
 const Category = require("../models/Category");
 const {
+  findStoreIdsSellingGlobal,
+  resolveGlobalBranch,
+} = require("../lib/globalCategories");
+const {
   buildChildMap,
   collectSubtree,
   compareCategories,
@@ -114,6 +118,7 @@ const formatStore = (store, distanceKm, status, branding, reviewData = null, shi
  *   limit     — results per page (max 50, default 20)
  *   page      — page number
  *   timezone  — IANA timezone string for open/closed status (default "UTC")
+ *   category  — global category slug/id: only stores selling something in it
  */
 const getNearbyStores = asyncHandler(async (req, res) => {
   validateNearbyQuery(req.query);
@@ -152,10 +157,19 @@ const getNearbyStores = asyncHandler(async (req, res) => {
   // $nearSphere returns documents sorted nearest → furthest and filters by maxDistance
   const geoFilter = buildNearQuery(lng, lat, searchRadius);
 
+  // Optional marketplace-category filter (Category Studio)
+  let categoryStoreIds = null;
+  if (req.query.category) {
+    const branch = await resolveGlobalBranch(req.query.category);
+    if (branch.length === 0) throw new ApiError(404, "Category not found");
+    categoryStoreIds = Array.from(await findStoreIdsSellingGlobal(branch));
+  }
+
   const candidates = await Store.find({
     ...geoFilter,
     status: "active",
     locationSet: true,
+    ...(categoryStoreIds && { _id: { $in: categoryStoreIds } }),
   }).select(
     "name slug status contact address location deliveryRadiusKm operatingHours branding timezone ordersPausedUntil"
   );
@@ -521,7 +535,8 @@ const getStoreCategories = asyncHandler(async (req, res) => {
 
   const [allCategories, counts] = await Promise.all([
     Category.find({ store: store._id })
-      .select("name slug parent description image isActive sortOrder")
+      .select("name slug parent description image isActive sortOrder globalCategory")
+      .populate("globalCategory", "name slug icon3d accentColor isActive")
       .lean(),
     Product.aggregate([
       { $match: { store: store._id, isActive: true, category: { $ne: null } } },
@@ -564,6 +579,16 @@ const getStoreCategories = asyncHandler(async (req, res) => {
           description: cat.description || "",
           image: cat.image || "",
           sortOrder: cat.sortOrder || 0,
+          // Marketplace category; apps show its 3D icon when there's no image
+          globalCategory: cat.globalCategory
+            ? {
+                id: cat.globalCategory._id,
+                name: cat.globalCategory.name,
+                slug: cat.globalCategory.slug,
+                iconKey: cat.globalCategory.icon3d?.assetKey || "",
+                accentColor: cat.globalCategory.accentColor,
+              }
+            : null,
           productCount: countMap.get(id) || 0,
           totalProductCount: totalFor(id),
         };
