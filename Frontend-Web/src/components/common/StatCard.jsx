@@ -9,9 +9,9 @@ import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
  *   trend      – number | null (percentage change, +/-)
  *   trendLabel – string (e.g. "vs last month")
  *   icon       – ReactNode (Lucide icon)
- *   color      – string (accent color for icon bg, default green)
+ *   color      – string (accent color for icon bg, default brand purple)
  */
-export default function StatCard({ label, value, trend, trendLabel, icon, color = '#5B9F12' }) {
+export default function StatCard({ label, value, trend, trendLabel, icon, color = 'var(--color-brand-primary)' }) {
   const trendDir = trend > 0 ? 'up' : trend < 0 ? 'down' : 'flat';
 
   return (
@@ -24,7 +24,7 @@ export default function StatCard({ label, value, trend, trendLabel, icon, color 
         {icon && (
           <div
             className="stat-card-icon"
-            style={{ background: `${color}15`, color }}
+            style={{ background: `color-mix(in srgb, ${color} 10%, transparent)`, color }}
           >
             {icon}
           </div>

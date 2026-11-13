@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { vendorService } from '../../api/vendorService';
 import {
   PageHeader,
@@ -8,32 +9,58 @@ import {
   FormBuilder,
   Modal
 } from '../../components/common';
-import { formatDate } from '../../utils/formatters';
-import { Package, Plus, Edit2, Trash2, Archive, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
+import { formatCurrency, formatDate } from '../../utils/formatters';
+import { categoryOptions, flattenCategoryTree } from '../../utils/categoryTree';
+import { LOW_STOCK_THRESHOLD } from '../../utils/constants';
+import ProductImageManager from './ProductImageManager';
+import ProductVariantEditor, {
+  fromPriceFields,
+  toPriceFields,
+  variantPayload,
+  variantStateFromProduct,
+} from './ProductVariantEditor';
+import StockBadge, { stockLevel } from './StockBadge';
+import { Package, Plus, Edit2, Trash2, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const EMPTY_PRODUCT = {
+  title: '',
+  description: '',
+  category: '',
+  size: '',
+  regularPrice: '',
+  salePrice: '',
+  stock: 0,
+  isActive: true,
+};
+
+const NO_VARIANTS = { enabled: false, optionName: 'Size', rows: [], combined: false };
+
 export default function ProductsPage() {
+  const [searchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Table filters and pagination
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || '');
+  const [stockFilter, setStockFilter] = useState(searchParams.get('stock') || '');
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [localVariants, setLocalVariants] = useState([]);
+  const [photos, setPhotos] = useState({ kept: [], added: [] });
+  const [variantState, setVariantState] = useState(NO_VARIANTS);
   const [submitting, setSubmitting] = useState(false);
 
   // Modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
+  const [deletingProduct, setDeletingProduct] = useState(null);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -44,6 +71,7 @@ export default function ProductsPage() {
         search: search || undefined,
         active: statusFilter === 'active' ? 'true' : statusFilter === 'inactive' ? 'false' : undefined,
         category: categoryFilter || undefined,
+        stock: stockFilter || undefined,
       };
       const res = await vendorService.getProducts(params);
       setProducts(res.data || []);
@@ -53,7 +81,7 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, categoryFilter]);
+  }, [page, search, statusFilter, categoryFilter, stockFilter]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -71,6 +99,12 @@ export default function ProductsPage() {
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
+
+  const categoryPaths = useMemo(
+    () => new Map(flattenCategoryTree(categories).map((c) => [String(c._id), c.path])),
+    [categories]
+  );
+  const categorySelectOptions = useMemo(() => categoryOptions(categories), [categories]);
 
   // Handle Search and Filters reset page
   const handleSearch = (val) => {
@@ -101,13 +135,12 @@ export default function ProductsPage() {
     try {
       setLoading(true);
       const promises = Array.from(selectedIds).map((id) => {
-        if (action === 'activate') return vendorService.restoreProduct(id);
-        if (action === 'deactivate') return vendorService.updateProduct(id, { isActive: false });
-        if (action === 'delete') return vendorService.deleteProduct(id); // Soft delete
+        if (action === 'show') return vendorService.restoreProduct(id);
+        if (action === 'hide') return vendorService.updateProduct(id, { isActive: false });
         return Promise.resolve();
       });
       await Promise.all(promises);
-      toast.success(`Bulk action completed for ${selectedIds.size} products`);
+      toast.success(`${selectedIds.size} product${selectedIds.size === 1 ? '' : 's'} ${action === 'show' ? 'shown in' : 'hidden from'} your shop`);
       setSelectedIds(new Set());
       fetchProducts();
     } catch (err) {
@@ -119,89 +152,83 @@ export default function ProductsPage() {
   /* ── Drawer Actions ─────────────────────────────────────────────────── */
   const handleOpenCreate = () => {
     setEditingProduct(null);
-    setLocalVariants([]);
+    setPhotos({ kept: [], added: [] });
+    setVariantState(NO_VARIANTS);
     setDrawerOpen(true);
   };
 
   const handleOpenEdit = (product) => {
-    setEditingProduct({
-      ...product,
-      price: product.price !== undefined ? (product.price / 100).toFixed(2) : '',
-      compareAtPrice: product.compareAtPrice !== undefined && product.compareAtPrice !== null 
-        ? (product.compareAtPrice / 100).toFixed(2) 
-        : '',
-      category: product.category?._id || '',
-      images: product.images?.join(', ') || ''
-    });
-    
-    // Also convert variant prices to pounds
-    const mappedVariants = (product.variants || []).map(v => ({
-      ...v,
-      price: v.price !== undefined ? (v.price / 100).toFixed(2) : '',
-      compareAtPrice: v.compareAtPrice !== undefined && v.compareAtPrice !== null 
-        ? (v.compareAtPrice / 100).toFixed(2) 
-        : ''
-    }));
-    setLocalVariants(mappedVariants);
+    setEditingProduct(product);
+    setPhotos({ kept: product.images || [], added: [] });
+    setVariantState(variantStateFromProduct(product));
     setDrawerOpen(true);
   };
 
   const handleCloseDrawer = () => {
+    photos.added.forEach((a) => URL.revokeObjectURL(a.preview));
     setDrawerOpen(false);
     setEditingProduct(null);
   };
 
+  // Memoised: FormBuilder resets its values whenever this object changes
+  const initialValues = useMemo(() => {
+    if (!editingProduct) return EMPTY_PRODUCT;
+    return {
+      title: editingProduct.title,
+      description: editingProduct.description || '',
+      category: editingProduct.category?._id || '',
+      size: editingProduct.size || '',
+      ...toPriceFields(editingProduct.price, editingProduct.compareAtPrice),
+      stock: editingProduct.stock ?? 0,
+      isActive: editingProduct.isActive,
+    };
+  }, [editingProduct]);
+
   const handleSave = async (values) => {
+    const payload = new FormData();
+    payload.append('title', values.title.trim());
+    payload.append('description', values.description || '');
+    payload.append('category', values.category || '');
+    payload.append('isActive', values.isActive ? 'true' : 'false');
+
+    if (variantState.enabled) {
+      const built = variantPayload(variantState);
+      if (built.error) return toast.error(built.error);
+      payload.append('options', JSON.stringify(built.options));
+      payload.append('variants', JSON.stringify(built.variants));
+      payload.append('size', '');
+    } else {
+      const prices = fromPriceFields(values.regularPrice, values.salePrice);
+      if (prices.error) return toast.error(prices.error);
+      const stock = Number(values.stock);
+      if (!Number.isInteger(stock) || stock < 0) return toast.error('Stock must be a whole number, 0 or more');
+
+      payload.append('size', (values.size || '').trim());
+      payload.append('price', prices.price);
+      payload.append('compareAtPrice', prices.compareAtPrice ?? '');
+      const hadVariants = (editingProduct?.variants?.length || 0) > 0;
+      if (hadVariants) {
+        payload.append('options', '[]');
+        payload.append('variants', '[]');
+      }
+      // Only send stock the shopkeeper changed, so a sale made while the form
+      // was open isn't overwritten by the stale number.
+      if (!editingProduct || hadVariants || String(values.stock) !== String(editingProduct.stock)) {
+        payload.append('stock', stock);
+      }
+    }
+
+    if (editingProduct) payload.append('images', JSON.stringify(photos.kept));
+    photos.added.forEach((a) => payload.append('productImages', a.file));
+
     try {
       setSubmitting(true);
-      
-      const payload = new FormData();
-      
-      Object.keys(values).forEach(key => {
-        if (key === 'imageFiles') {
-          if (values.imageFiles) {
-            let files = Array.isArray(values.imageFiles) ? values.imageFiles : [values.imageFiles];
-            if (files instanceof FileList) {
-               files = Array.from(files);
-            }
-            files.forEach(f => payload.append('productImages', f));
-          }
-        } else if (key !== 'images' && key !== 'variants' && key !== 'options' && key !== 'price' && key !== 'compareAtPrice') {
-          if (values[key] !== null && values[key] !== undefined && values[key] !== "") {
-            payload.append(key, values[key]);
-          }
-        }
-      });
-
-      // Handle prices (convert pounds to pence)
-      if (values.price !== undefined && values.price !== "") {
-        payload.append('price', Math.round(Number(values.price) * 100));
-      }
-      if (values.compareAtPrice !== undefined) {
-        if (values.compareAtPrice === "" || values.compareAtPrice === null) {
-          payload.append('compareAtPrice', "");
-        } else {
-          payload.append('compareAtPrice', Math.round(Number(values.compareAtPrice) * 100));
-        }
-      }
-
-      // let existingImages = typeof values.images === 'string' ? values.images.split(',').map(u => u.trim()).filter(Boolean) : (values.images || []);
-      // payload.append('images', JSON.stringify(existingImages));
-
-      const variantsData = localVariants.map(v => ({
-        ...v,
-        price: Math.round(Number(v.price || 0) * 100),
-        stock: Number(v.stock) || 0,
-        compareAtPrice: v.compareAtPrice ? Math.round(Number(v.compareAtPrice) * 100) : null
-      }));
-      payload.append('variants', JSON.stringify(variantsData));
-
       if (editingProduct) {
         await vendorService.updateProduct(editingProduct._id, payload);
-        toast.success('Product updated successfully');
+        toast.success('Product updated');
       } else {
         await vendorService.createProduct(payload);
-        toast.success('Product created successfully');
+        toast.success('Product created');
       }
       handleCloseDrawer();
       fetchProducts();
@@ -213,33 +240,34 @@ export default function ProductsPage() {
   };
 
   /* ── Single Actions ─────────────────────────────────────────────────── */
-  const handleDeleteClick = (id) => {
-    setDeletingId(id);
+  const handleToggleVisibility = async (product) => {
+    try {
+      if (product.isActive) await vendorService.deleteProduct(product._id); // soft delete = hide
+      else await vendorService.restoreProduct(product._id);
+      toast.success(product.isActive ? 'Hidden from your shop' : 'Visible in your shop again');
+      fetchProducts();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update product');
+    }
+  };
+
+  const handleDeleteClick = (product) => {
+    setDeletingProduct(product);
     setDeleteModalOpen(true);
   };
 
   const confirmDelete = async () => {
     try {
       setSubmitting(true);
-      await vendorService.deleteProduct(deletingId);
-      toast.success('Product archived successfully');
+      await vendorService.deleteProduct(deletingProduct._id, { hard: true });
+      toast.success('Product deleted');
       setDeleteModalOpen(false);
-      setDeletingId(null);
+      setDeletingProduct(null);
       fetchProducts();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to archive product');
+      toast.error(err.response?.data?.message || 'Failed to delete product');
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleRestore = async (id) => {
-    try {
-      await vendorService.restoreProduct(id);
-      toast.success('Product restored successfully');
-      fetchProducts();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to restore product');
     }
   };
 
@@ -267,7 +295,9 @@ export default function ProductsPage() {
         <div>
           <strong style={{ color: 'var(--gray-900)' }}>{v}</strong>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)', marginTop: 2 }}>
-            {row.category ? row.category.name : 'Uncategorized'}
+            {row.category ? categoryPaths.get(String(row.category._id)) || row.category.name : 'No category'}
+            {row.size ? ` · ${row.size}` : ''}
+            {row.variants?.length ? ` · ${row.variants.length} options` : ''}
           </div>
         </div>
       ),
@@ -278,10 +308,13 @@ export default function ProductsPage() {
       sortable: true,
       render: (v, row) => (
         <div>
-          <strong style={{ color: 'var(--gray-900)' }}>£{v / 100}</strong>
-          {row.compareAtPrice && (
+          <strong style={{ color: 'var(--gray-900)' }}>
+            {row.variants?.length ? <span style={{ fontWeight: 400, color: 'var(--gray-500)' }}>from </span> : null}
+            {formatCurrency(v)}
+          </strong>
+          {row.compareAtPrice > v && (
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)', textDecoration: 'line-through' }}>
-              £{row.compareAtPrice / 100}
+              {formatCurrency(row.compareAtPrice)}
             </div>
           )}
         </div>
@@ -292,14 +325,12 @@ export default function ProductsPage() {
       label: 'Stock',
       sortable: true,
       render: (v, row) => {
-        const stockVal = row.totalStock !== undefined ? row.totalStock : row.stock;
+        const level = stockLevel(row);
         return (
-          <span style={{ 
-            color: stockVal <= 5 ? 'var(--aa-red)' : 'inherit', 
-            fontWeight: stockVal <= 5 ? '600' : 'normal' 
-          }}>
-            {stockVal} {stockVal <= 5 && <span style={{ fontSize: 'var(--text-xs)' }}>(Low)</span>}
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+            <span style={{ fontWeight: level.out || level.low ? 600 : 'normal' }}>{level.stock}</span>
+            <StockBadge {...level} />
+          </div>
         );
       },
     },
@@ -308,7 +339,7 @@ export default function ProductsPage() {
       label: 'Status',
       sortable: true,
       width: 120,
-      render: (v) => <StatusBadge status={v ? 'active' : 'archived'} />,
+      render: (v) => <StatusBadge status={v ? 'active' : 'inactive'} label={v ? 'Visible' : 'Hidden'} />,
     },
     {
       key: 'createdAt',
@@ -319,36 +350,36 @@ export default function ProductsPage() {
     },
   ];
 
-  const categoryOptions = useMemo(() => {
-    return [
-      { value: '', label: 'Uncategorized' },
-      ...categories.map(c => ({ value: c._id, label: c.name }))
-    ];
-  }, [categories]);
-
   const renderVariants = (row) => {
     if (!row.variants || row.variants.length === 0) {
-      return <div style={{ color: 'var(--gray-500)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-2)' }}>No variants available for this product. Click Edit to add some.</div>;
+      return (
+        <div style={{ color: 'var(--gray-500)', fontSize: 'var(--text-sm)', padding: 'var(--space-2) var(--space-4)' }}>
+          Single product{row.size ? ` (${row.size})` : ''} — {row.stock} in stock. Edit it to add sizes or options.
+        </div>
+      );
     }
     return (
-      <div style={{ padding: 'var(--space-2) var(--space-4)' }}>
-        <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: 'var(--space-2)' }}>Product Variants</h4>
+      <div style={{ padding: 'var(--space-2) var(--space-4)', overflowX: 'auto' }}>
         <table style={{ width: '100%', fontSize: 'var(--text-sm)', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ color: 'var(--gray-500)', borderBottom: '1px solid var(--border-color)' }}>
-              <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 500 }}>Description</th>
-              <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 500 }}>SKU</th>
+              <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 500 }}>Option</th>
               <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 500 }}>Price</th>
               <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 500 }}>Stock</th>
+              <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 500 }}>Status</th>
             </tr>
           </thead>
           <tbody>
             {row.variants.map((v, i) => (
               <tr key={v._id || i} style={{ borderBottom: '1px solid var(--gray-200)' }}>
-                <td style={{ padding: '8px' }}>{v.attributes?.description || `Variant #${i + 1}`}</td>
-                <td style={{ padding: '8px' }}>{v.sku || '-'}</td>
-                <td style={{ textAlign: 'right', padding: '8px' }}>£{v.price / 100}</td>
+                <td style={{ padding: '8px' }}>{Object.values(v.attributes || {}).join(' / ') || `Option ${i + 1}`}</td>
+                <td style={{ textAlign: 'right', padding: '8px' }}>{formatCurrency(v.price)}</td>
                 <td style={{ textAlign: 'right', padding: '8px' }}>{v.stock}</td>
+                <td style={{ padding: '8px' }}>
+                  {v.isActive === false
+                    ? <StatusBadge status="inactive" label="Unavailable" size="sm" />
+                    : <StockBadge stock={v.stock} out={v.stock <= 0} low={v.stock > 0 && v.stock <= LOW_STOCK_THRESHOLD} />}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -357,11 +388,83 @@ export default function ProductsPage() {
     );
   };
 
+  const formFields = [
+    {
+      name: 'title',
+      label: 'Product Name',
+      type: 'text',
+      required: true,
+      placeholder: 'e.g. Chocolate Fudge Cake',
+    },
+    {
+      name: 'description',
+      label: 'Description',
+      type: 'textarea',
+      placeholder: 'What customers should know: ingredients, flavour, serving size…',
+      rows: 4,
+    },
+    {
+      name: 'category',
+      label: 'Category',
+      type: 'select',
+      placeholder: 'No category',
+      options: categorySelectOptions,
+      helpText: categories.length === 0
+        ? 'You have no categories yet — create them on the Categories page.'
+        : 'Pick the most specific one, e.g. "Sweets & Bakery › Cakes › Cupcakes".',
+    },
+    ...(variantState.enabled
+      ? []
+      : [
+          {
+            name: 'size',
+            label: 'Size / weight',
+            type: 'text',
+            placeholder: 'e.g. 500 g, 1 kg, Box of 6',
+          },
+          {
+            name: 'regularPrice',
+            label: 'Regular price (£)',
+            type: 'number',
+            required: true,
+            placeholder: '0.00',
+            step: '0.01',
+            min: '0',
+          },
+          {
+            name: 'salePrice',
+            label: 'Sale price (£)',
+            type: 'number',
+            placeholder: 'Optional',
+            helpText: 'Fill this in to put the product on offer — customers see the regular price crossed out.',
+            step: '0.01',
+            min: '0',
+          },
+          {
+            name: 'stock',
+            label: 'Quantity in stock',
+            type: 'number',
+            required: true,
+            placeholder: '0',
+            min: '0',
+            step: '1',
+            helpText: 'Shows as "Out of stock" automatically when it reaches 0.',
+          },
+        ]),
+    {
+      name: 'isActive',
+      label: 'Visible to customers',
+      type: 'switch',
+    },
+  ];
+
+  const activeFilters = statusFilter || categoryFilter || stockFilter;
+
   return (
     <div className="page-content animate-fade-in">
       <PageHeader
         title="Products"
-        subtitle="Manage your inventory and catalog"
+        subtitle="Add products, set prices and sizes, and choose what customers see"
         breadcrumbs={[
           { label: 'Dashboard', to: '/vendor/dashboard' },
           { label: 'Products' },
@@ -375,46 +478,61 @@ export default function ProductsPage() {
 
       <div className="card">
         {/* Table Toolbar / Bulk Actions */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-4)', borderBottom: '1px solid var(--border-color)', background: 'var(--gray-50)' }}>
-          <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <select 
-                className="form-input" 
-                value={statusFilter} 
-                onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-                style={{ height: 36, py: 0 }}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', justifyContent: 'space-between', padding: 'var(--space-4)', borderBottom: '1px solid var(--border-color)', background: 'var(--gray-50)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+            <select
+              className="form-select"
+              value={statusFilter}
+              onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+              style={{ height: 36, width: 'auto' }}
+              aria-label="Filter by visibility"
+            >
+              <option value="">Visible & hidden</option>
+              <option value="active">Visible</option>
+              <option value="inactive">Hidden</option>
+            </select>
+            <select
+              className="form-select"
+              value={categoryFilter}
+              onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
+              style={{ height: 36, width: 'auto', maxWidth: 260 }}
+              aria-label="Filter by category"
+            >
+              <option value="">All categories</option>
+              <option value="none">No category</option>
+              {categorySelectOptions.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+            <select
+              className="form-select"
+              value={stockFilter}
+              onChange={e => { setStockFilter(e.target.value); setPage(1); }}
+              style={{ height: 36, width: 'auto' }}
+              aria-label="Filter by stock"
+            >
+              <option value="">Any stock level</option>
+              <option value="low">Low stock</option>
+              <option value="out">Out of stock</option>
+            </select>
+            {activeFilters && (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => { setStatusFilter(''); setCategoryFilter(''); setStockFilter(''); setPage(1); }}
               >
-                <option value="">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Archived</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <select 
-                className="form-input" 
-                value={categoryFilter} 
-                onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
-                style={{ height: 36, py: 0 }}
-              >
-                <option value="">All Categories</option>
-                {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-              </select>
-            </div>
+                Clear filters
+              </button>
+            )}
           </div>
-          
+
           {selectedIds.size > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-600)' }}>
                 {selectedIds.size} selected
               </span>
-              <button className="btn btn-ghost btn-sm" onClick={() => handleBulkAction('activate')} title="Activate Selected">
-                <CheckCircle size={14} /> Activate
+              <button className="btn btn-ghost btn-sm" onClick={() => handleBulkAction('show')} title="Show selected in your shop">
+                <Eye size={14} /> Show
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => handleBulkAction('deactivate')} title="Deactivate Selected">
-                <XCircle size={14} /> Deactivate
-              </button>
-              <button className="btn btn-danger btn-sm" onClick={() => handleBulkAction('delete')} title="Archive Selected">
-                <Archive size={14} /> Archive
+              <button className="btn btn-ghost btn-sm" onClick={() => handleBulkAction('hide')} title="Hide selected from your shop">
+                <EyeOff size={14} /> Hide
               </button>
             </div>
           )}
@@ -436,34 +554,34 @@ export default function ProductsPage() {
           onSelect={handleSelect}
           onSelectAll={handleSelectAll}
           rowKey="_id"
-          // expandable={renderVariants}
+          expandable={renderVariants}
           emptyIcon={<Package />}
           emptyTitle="No Products Found"
-          emptyText="You haven't added any products matching this criteria yet."
+          emptyText={activeFilters || search ? 'No products match these filters.' : "You haven't added any products yet."}
           actions={(row) => (
-            <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-1)', justifyContent: 'flex-end' }}>
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={() => handleOpenEdit(row)}
-                title="Edit Product"
+                title="Edit product"
               >
                 <Edit2 size={14} />
               </button>
-              {row.isActive ? (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => handleToggleVisibility(row)}
+                title={row.isActive ? 'Hide from your shop' : 'Show in your shop'}
+              >
+                {row.isActive ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+              {!row.isActive && (
                 <button
-                  className="btn btn-danger btn-sm"
-                  onClick={() => handleDeleteClick(row._id)}
-                  title="Archive Product"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => handleDeleteClick(row)}
+                  title="Delete permanently"
+                  style={{ color: 'var(--danger-text)' }}
                 >
-                  <Archive size={14} />
-                </button>
-              ) : (
-                <button
-                  className="btn btn-success btn-sm"
-                  onClick={() => handleRestore(row._id)}
-                  title="Restore Product"
-                >
-                  <RefreshCw size={14} />
+                  <Trash2 size={14} />
                 </button>
               )}
             </div>
@@ -478,197 +596,31 @@ export default function ProductsPage() {
         width={600}
       >
         <FormBuilder
-          fields={[
-            {
-              name: 'title',
-              label: 'Product Title',
-              type: 'text',
-              required: true,
-              placeholder: 'e.g. Wireless Noise-Cancelling Headphones',
-            },
-            {
-              name: 'description',
-              label: 'Description',
-              type: 'textarea',
-              placeholder: 'Detailed product description',
-              rows: 5,
-            },
-            {
-              name: 'category',
-              label: 'Category',
-              type: 'select',
-              options: categoryOptions,
-            },
-            {
-              name: 'price',
-              label: 'Price (£)',
-              type: 'number',
-              required: true,
-              placeholder: '0.00',
-              step: '0.01',
-              min: '0',
-            },
-            {
-              name: 'compareAtPrice',
-              label: 'Compare at Price (£)',
-              type: 'number',
-              placeholder: '0.00',
-              helpText: 'Used to show a discount (crossed-out price).',
-              step: '0.01',
-              min: '0',
-            },
-            {
-              name: 'stock',
-              label: 'Inventory Stock',
-              type: 'number',
-              required: true,
-              placeholder: '0',
-              min: '0',
-            },
-            {
-              name: 'imageFiles',
-              label: 'Product Photos',
-              type: 'file',
-              accept: 'image/*',
-              multiple: true,
-              helpText: 'Select up to 5 images to upload.',
-              previewUrls: editingProduct?.images ? editingProduct.images.split(',').map(u => u.trim()).filter(Boolean) : undefined,
-            },
-            {
-              name: 'isActive',
-              label: 'Active (Visible to customers)',
-              type: 'switch',
-            },
-          ]}
-          initialValues={
-            editingProduct || {
-              title: '',
-              description: '',
-              category: '',
-              price: '',
-              compareAtPrice: '',
-              stock: 0,
-              images: '',
-              isActive: true,
-            }
-          }
+          fields={formFields}
+          initialValues={initialValues}
           onSubmit={handleSave}
           submitLabel={editingProduct ? 'Save Changes' : 'Create Product'}
           submitting={submitting}
         >
-          {/* Variants Section */}
-          {/* <div style={{ marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
-              <h3 style={{ fontSize: 'var(--text-md)', fontWeight: '600' }}>Product Variants</h3>
-              <button 
-                type="button" 
-                className="btn btn-ghost btn-sm" 
-                onClick={() => setLocalVariants([...localVariants, { sku: '', price: '', stock: 0, attributes: { description: '' } }])}
-              >
-                <Plus size={14} /> Add Variant
-              </button>
-            </div>
-            
-            {localVariants.length === 0 ? (
-              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-500)', padding: 'var(--space-4)', textAlign: 'center', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
-                No variants added. The base product details will be used.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                {localVariants.map((v, i) => (
-                  <div key={i} style={{ padding: 'var(--space-3)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: 'var(--gray-50)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
-                      <strong style={{ fontSize: 'var(--text-sm)' }}>Variant #{i + 1}</strong>
-                      <button 
-                        type="button" 
-                        className="btn btn-ghost btn-sm" 
-                        style={{ color: 'var(--aa-red)', padding: '4px' }}
-                        onClick={() => {
-                          const updated = [...localVariants];
-                          updated.splice(i, 1);
-                          setLocalVariants(updated);
-                        }}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                      <div>
-                        <label style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-600)', marginBottom: 4, display: 'block' }}>Attributes / Description</label>
-                        <input 
-                          type="text" 
-                          className="form-input" 
-                          style={{ fontSize: 'var(--text-sm)', height: 32 }}
-                          placeholder="e.g. Size: M, Color: Red"
-                          value={v.attributes?.description || ''}
-                          onChange={(e) => {
-                            const updated = [...localVariants];
-                            updated[i] = { ...updated[i], attributes: { ...updated[i].attributes, description: e.target.value } };
-                            setLocalVariants(updated);
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-600)', marginBottom: 4, display: 'block' }}>SKU</label>
-                        <input 
-                          type="text" 
-                          className="form-input" 
-                          style={{ fontSize: 'var(--text-sm)', height: 32 }}
-                          placeholder="Variant SKU"
-                          value={v.sku || ''}
-                          onChange={(e) => {
-                            const updated = [...localVariants];
-                            updated[i] = { ...updated[i], sku: e.target.value };
-                            setLocalVariants(updated);
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-600)', marginBottom: 4, display: 'block' }}>Price (£) *</label>
-                        <input 
-                          type="number" 
-                          className="form-input" 
-                          style={{ fontSize: 'var(--text-sm)', height: 32 }}
-                          min="0" step="0.01" required
-                          value={v.price !== undefined ? v.price : ''}
-                          onWheel={(e) => e.target.blur()}
-                          onChange={(e) => {
-                            const updated = [...localVariants];
-                            updated[i] = { ...updated[i], price: e.target.value };
-                            setLocalVariants(updated);
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-600)', marginBottom: 4, display: 'block' }}>Stock</label>
-                        <input 
-                          type="number" 
-                          className="form-input" 
-                          style={{ fontSize: 'var(--text-sm)', height: 32 }}
-                          min="0"
-                          value={v.stock !== undefined ? v.stock : ''}
-                          onWheel={(e) => e.target.blur()}
-                          onChange={(e) => {
-                            const updated = [...localVariants];
-                            updated[i] = { ...updated[i], stock: e.target.value };
-                            setLocalVariants(updated);
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div> */}
+          <ProductImageManager
+            kept={photos.kept}
+            added={photos.added}
+            onChange={setPhotos}
+            disabled={submitting}
+          />
+          <ProductVariantEditor state={variantState} onChange={setVariantState} disabled={submitting} />
+          {editingProduct && (
+            <p className="form-help" style={{ marginTop: 'var(--space-3)' }}>
+              Need to top up stock quickly? Use the <Link to="/vendor/inventory">Inventory</Link> page.
+            </p>
+          )}
         </FormBuilder>
       </Drawer>
 
       <Modal
         open={deleteModalOpen}
         onClose={() => !submitting && setDeleteModalOpen(false)}
-        title="Archive Product"
+        title="Delete Product"
         size="sm"
         footer={
           <>
@@ -676,14 +628,15 @@ export default function ProductsPage() {
               Cancel
             </button>
             <button className="btn btn-danger" onClick={confirmDelete} disabled={submitting}>
-              {submitting ? 'Archiving...' : 'Confirm Archive'}
+              {submitting ? 'Deleting…' : 'Delete permanently'}
             </button>
           </>
         }
       >
-        <p>Are you sure you want to archive this product?</p>
+        <p>Permanently delete <strong>{deletingProduct?.title}</strong>?</p>
         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-500)', marginTop: 'var(--space-2)' }}>
-          Archived products will not be visible to customers. You can restore them later.
+          Its photos are removed too and this can’t be undone. Past orders keep their record of it.
+          To take it off sale for now, leaving it hidden is enough.
         </p>
       </Modal>
     </div>

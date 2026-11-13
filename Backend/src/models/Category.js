@@ -42,11 +42,17 @@ const categorySchema = new mongoose.Schema(
       default: true,
       index: true,
     },
+    // Display order among siblings (lower first); ties fall back to name.
+    sortOrder: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );
 
 categorySchema.index({ store: 1, slug: 1 }, { unique: true });
 categorySchema.index({ store: 1, name: 1 });
+categorySchema.index({ store: 1, parent: 1, sortOrder: 1 });
 
 module.exports = mongoose.model("Category", categorySchema);

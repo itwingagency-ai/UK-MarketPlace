@@ -14,8 +14,9 @@ import {
 } from 'lucide-react';
 
 /* ── Chart Colors ─────────────────────────────────────────────────── */
-const COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#ede9fe'];
-const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+// Chart colours from the design tokens (recharts needs literal values)
+const COLORS = ['#50178E', '#6920C2', '#8432E3', '#A35EF0', '#C194F7', '#DBC2FB'];
+const PIE_COLORS = ['#50178E', '#10B981', '#F59E0B', '#EF4444', '#A35EF0', '#0EA5E9'];
 
 /* ── Period presets ────────────────────────────────────────────────── */
 const PERIODS = [
@@ -118,29 +119,49 @@ export default function VendorAnalyticsPage() {
       const dateParams = buildDateParams();
       const params = { ...dateParams, compareToPrevious: 'true' };
 
-      const [ovRes, trendRes, orderBrRes, catRes, custRes] = await Promise.allSettled([
+      const [ovRes, trendRes, orderBrRes, catRes, custRes, topRes] = await Promise.allSettled([
         vendorService.getAnalyticsOverviewFull(params),
-        vendorService.getSalesTrend({ ...dateParams, granularity: 'daily' }),
+        vendorService.getSalesTrend({ ...dateParams, granularity: 'day' }),
         vendorService.getOrderBreakdown(dateParams),
         vendorService.getCategoryBreakdown(dateParams),
         vendorService.getCustomerInsights(dateParams),
+        vendorService.getTopProducts({ ...dateParams, limit: 6, sortBy: 'revenue' }),
       ]);
 
-      if (ovRes.status === 'fulfilled') {
-        setOverview(ovRes.value);
-        setTopProducts((ovRes.value?.topProducts || []).slice(0, 6));
-      }
-      if (trendRes.status === 'fulfilled') setSalesTrend(trendRes.value?.data || []);
-      if (orderBrRes.status === 'fulfilled') {
-        const raw = orderBrRes.value?.data || {};
-        setOrderBreakdown(
-          Object.entries(raw)
-            .filter(([, v]) => v > 0)
-            .map(([name, value]) => ({ name, value }))
+      if (ovRes.status === 'fulfilled') setOverview(ovRes.value?.data || null);
+      if (topRes.status === 'fulfilled') {
+        setTopProducts(
+          (topRes.value?.data?.products || []).map((p) => ({
+            name: p.title,
+            revenue: p.revenue,
+            sales: p.quantitySold,
+          }))
         );
       }
-      if (catRes.status === 'fulfilled') setCategoryBreakdown(catRes.value?.data || []);
-      if (custRes.status === 'fulfilled') setCustomerInsights(custRes.value?.data || null);
+      if (trendRes.status === 'fulfilled') {
+        setSalesTrend(
+          (trendRes.value?.data?.series || []).map((point) => ({ ...point, date: point.bucket }))
+        );
+      }
+      if (orderBrRes.status === 'fulfilled') {
+        setOrderBreakdown(
+          (orderBrRes.value?.data?.byOrderStatus || [])
+            .filter((b) => b.count > 0)
+            .map((b) => ({ name: b.status, value: b.count }))
+        );
+      }
+      if (catRes.status === 'fulfilled') {
+        setCategoryBreakdown(
+          (catRes.value?.data?.categories || []).map((c) => ({
+            name: c.categoryName,
+            revenue: c.revenue,
+          }))
+        );
+      }
+      if (custRes.status === 'fulfilled') {
+        const insights = custRes.value?.data;
+        setCustomerInsights(insights ? { ...insights, totalCustomers: insights.total } : null);
+      }
     } catch {
       toast.error('Failed to load analytics');
     } finally {
@@ -154,8 +175,11 @@ export default function VendorAnalyticsPage() {
 
   if (loading) return <AnalyticsSkeleton />;
 
-  const current = overview?.current || overview || {};
-  const delta = overview?.comparison?.delta || {};
+  const current = overview?.current || {};
+  // StatCard expects a plain percentage; the API returns { change, percentChange }
+  const delta = Object.fromEntries(
+    Object.entries(overview?.comparison?.delta || {}).map(([k, v]) => [k, v?.percentChange ?? null])
+  );
 
   // Prepare top products for bar chart
   const topProductsChart = topProducts.map(p => ({
@@ -194,7 +218,7 @@ export default function VendorAnalyticsPage() {
           trend={delta.revenue}
           trendLabel="vs prev period"
           icon={<DollarSign size={18} />}
-          color="#6366f1"
+          color="var(--color-brand-primary)"
         />
         <StatCard
           label="Net Payout"
@@ -202,7 +226,7 @@ export default function VendorAnalyticsPage() {
           trend={delta.netPayout}
           trendLabel="vs prev period"
           icon={<TrendingUp size={18} />}
-          color="#10b981"
+          color="var(--color-success-solid)"
         />
         <StatCard
           label="Total Orders"
@@ -210,7 +234,7 @@ export default function VendorAnalyticsPage() {
           trend={delta.totalOrders}
           trendLabel="vs prev period"
           icon={<ShoppingCart size={18} />}
-          color="#8b5cf6"
+          color="var(--color-brand-500)"
         />
         <StatCard
           label="Avg Order Value"
@@ -218,7 +242,7 @@ export default function VendorAnalyticsPage() {
           trend={delta.averageOrderValue}
           trendLabel="vs prev period"
           icon={<BarChart3 size={18} />}
-          color="#f59e0b"
+          color="var(--color-warning-solid)"
         />
         <StatCard
           label="Items Sold"
@@ -226,7 +250,7 @@ export default function VendorAnalyticsPage() {
           trend={delta.itemsSold}
           trendLabel="vs prev period"
           icon={<Package size={18} />}
-          color="#ef4444"
+          color="var(--color-accent-primary)"
         />
         <StatCard
           label="Unique Customers"
@@ -234,7 +258,7 @@ export default function VendorAnalyticsPage() {
           trend={delta.uniqueCustomers}
           trendLabel="vs prev period"
           icon={<Users size={18} />}
-          color="#06b6d4"
+          color="var(--color-info-solid)"
         />
       </div>
 
@@ -255,8 +279,8 @@ export default function VendorAnalyticsPage() {
                 <AreaChart data={salesTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#50178E" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#50178E" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--aa-panel-border)" />
@@ -265,10 +289,10 @@ export default function VendorAnalyticsPage() {
                   <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
                     axisLine={false} tickLine={false} tickFormatter={v => `£${Math.round(v / 100)}`} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2.5}
+                  <Area type="monotone" dataKey="revenue" stroke="#50178E" strokeWidth={2.5}
                     fill="url(#revenueGradient)"
-                    dot={{ r: 3, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 }}
-                    activeDot={{ r: 5, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 }} />
+                    dot={{ r: 3, fill: '#50178E', stroke: '#fff', strokeWidth: 2 }}
+                    activeDot={{ r: 5, fill: '#50178E', stroke: '#fff', strokeWidth: 2 }} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -374,19 +398,19 @@ export default function VendorAnalyticsPage() {
           <div className="card-body">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-4)' }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: '#6366f1' }}>
+                <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--color-brand-primary)' }}>
                   {customerInsights.totalCustomers || 0}
                 </div>
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-500)' }}>Total Customers</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: '#10b981' }}>
+                <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--color-success-fg)' }}>
                   {customerInsights.newCustomers || 0}
                 </div>
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-500)' }}>New Customers</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: '#8b5cf6' }}>
+                <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--color-brand-500)' }}>
                   {customerInsights.returningCustomers || 0}
                 </div>
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-500)' }}>Returning Customers</div>

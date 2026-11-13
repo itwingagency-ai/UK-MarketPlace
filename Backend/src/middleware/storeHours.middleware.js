@@ -20,6 +20,7 @@
 
 const ApiError = require("../lib/ApiError");
 const { computeOpenStatus } = require("../lib/geoUtils");
+const { applyBusyStatus, isOrdersPaused } = require("../lib/storeAvailability");
 const Store = require("../models/Store");
 const Cart = require("../models/Cart");
 
@@ -40,7 +41,7 @@ const requireStoresOpen = async (req, res, next) => {
     if (storeIds.length === 0) return next();
 
     const stores = await Store.find({ _id: { $in: storeIds } }).select(
-      "name slug operatingHours timezone status"
+      "name slug operatingHours timezone status ordersPausedUntil"
     );
 
     const closedStores = [];
@@ -53,10 +54,14 @@ const requireStoresOpen = async (req, res, next) => {
           ? store.operatingHours.size > 0
           : Object.keys(store.operatingHours).length > 0);
 
-      if (!hasHours) continue; // no hours configured → treat as always open
+      // A busy (paused) store is closed even if it has no hours configured
+      if (!hasHours && !isOrdersPaused(store)) continue; // no hours configured → treat as always open
 
       const timezone = store.timezone || "UTC";
-      const status = computeOpenStatus(store.operatingHours, timezone);
+      const status = applyBusyStatus(
+        hasHours ? computeOpenStatus(store.operatingHours, timezone) : { isOpen: true },
+        store
+      );
 
       if (!status.isOpen) {
         closedStores.push({

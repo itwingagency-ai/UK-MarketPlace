@@ -2,6 +2,8 @@ const env = require("../config/env");
 const Store = require("../models/Store");
 const User = require("../models/User");
 const { notifyAsync } = require("./notificationDispatcher");
+const { notifyNewOrder } = require("./appNotifications");
+const { emitOrderCreated } = require("./orderEvents");
 
 const formatMoney = (value, currency) => {
   const n = Number(value || 0) / 100;
@@ -79,6 +81,9 @@ const onOrderPlacedToCustomer = async (order, user) => {
 
 const onOrderPlacedToVendor = async (order, customer) => {
   if (!order?.store) return;
+  // In-app alert + live dashboard refresh for the shop's phones
+  notifyNewOrder(order);
+  emitOrderCreated(order);
   try {
     const store = await Store.findById(order.store).populate("owner");
     if (!store?.owner) return;

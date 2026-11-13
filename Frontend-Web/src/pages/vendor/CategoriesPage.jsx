@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { vendorService } from '../../api/vendorService';
 import {
   PageHeader,
@@ -8,9 +8,18 @@ import {
   FormBuilder,
   Modal
 } from '../../components/common';
-import { formatDate } from '../../utils/formatters';
-import { Tag, Plus, Edit2, Trash2 } from 'lucide-react';
+import { flattenCategoryTree, descendantIds } from '../../utils/categoryTree';
+import { Tag, Plus, Edit2, Trash2, Eye, EyeOff, CornerDownRight, FolderPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+const EMPTY_CATEGORY = {
+  name: '',
+  parent: '',
+  slug: '',
+  description: '',
+  sortOrder: 0,
+  isActive: true,
+};
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState([]);
@@ -20,11 +29,12 @@ export default function CategoriesPage() {
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [newParentId, setNewParentId] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // Delete modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
+  const [deletingCategory, setDeletingCategory] = useState(null);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -42,8 +52,18 @@ export default function CategoriesPage() {
     fetchCategories();
   }, [fetchCategories]);
 
-  const handleOpenCreate = () => {
+  const tree = useMemo(() => flattenCategoryTree(categories), [categories]);
+  const childCount = useMemo(() => {
+    const counts = new Map();
+    for (const c of categories) {
+      if (c.parent) counts.set(String(c.parent), (counts.get(String(c.parent)) || 0) + 1);
+    }
+    return counts;
+  }, [categories]);
+
+  const handleOpenCreate = (parentId = '') => {
     setEditingCategory(null);
+    setNewParentId(parentId);
     setDrawerOpen(true);
   };
 
@@ -61,20 +81,20 @@ export default function CategoriesPage() {
     try {
       setSubmitting(true);
       const payload = new FormData();
-      Object.keys(values).forEach((key) => {
-        if (key === 'imageFile') {
-          if (values.imageFile) payload.append('categoryImage', values.imageFile);
-        } else {
-          payload.append(key, values[key]);
-        }
-      });
+      payload.append('name', values.name.trim());
+      payload.append('parent', values.parent || '');
+      payload.append('description', values.description || '');
+      payload.append('sortOrder', values.sortOrder === '' ? 0 : values.sortOrder);
+      payload.append('isActive', values.isActive ? 'true' : 'false');
+      if (values.slug && values.slug.trim()) payload.append('slug', values.slug.trim().toLowerCase());
+      if (values.imageFile) payload.append('categoryImage', values.imageFile);
 
       if (editingCategory) {
         await vendorService.updateCategory(editingCategory._id, payload);
-        toast.success('Category updated successfully');
+        toast.success('Category updated');
       } else {
         await vendorService.createCategory(payload);
-        toast.success('Category created successfully');
+        toast.success(values.parent ? 'Subcategory created' : 'Category created');
       }
       handleCloseDrawer();
       fetchCategories();
@@ -85,18 +105,28 @@ export default function CategoriesPage() {
     }
   };
 
-  const handleDeleteClick = (id) => {
-    setDeletingId(id);
+  const handleToggleVisibility = async (category) => {
+    try {
+      await vendorService.updateCategory(category._id, { isActive: !category.isActive });
+      toast.success(category.isActive ? `"${category.name}" is now hidden from customers` : `"${category.name}" is visible again`);
+      fetchCategories();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update category');
+    }
+  };
+
+  const handleDeleteClick = (category) => {
+    setDeletingCategory(category);
     setDeleteModalOpen(true);
   };
 
   const confirmDelete = async () => {
     try {
       setSubmitting(true);
-      await vendorService.deleteCategory(deletingId);
-      toast.success('Category deleted successfully');
+      await vendorService.deleteCategory(deletingCategory._id);
+      toast.success('Category deleted');
       setDeleteModalOpen(false);
-      setDeletingId(null);
+      setDeletingCategory(null);
       fetchCategories();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete category');
@@ -105,76 +135,110 @@ export default function CategoriesPage() {
     }
   };
 
+  // A category can't move under itself or anything beneath it
+  const parentOptions = useMemo(() => {
+    const blocked = editingCategory ? descendantIds(categories, editingCategory._id) : new Set();
+    return tree
+      .filter((c) => !blocked.has(String(c._id)))
+      .map((c) => ({ value: c._id, label: `${'— '.repeat(c.depth)}${c.name}` }));
+  }, [tree, categories, editingCategory]);
+
+  const initialValues = useMemo(() => {
+    if (!editingCategory) return { ...EMPTY_CATEGORY, parent: newParentId };
+    return {
+      name: editingCategory.name,
+      parent: editingCategory.parent || '',
+      slug: editingCategory.slug,
+      description: editingCategory.description || '',
+      sortOrder: editingCategory.sortOrder || 0,
+      isActive: editingCategory.isActive,
+    };
+  }, [editingCategory, newParentId]);
+
   const columns = [
     {
-      key: 'image',
-      label: 'Image',
-      width: 60,
-      render: (v) => (
-        <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-sm)', background: 'var(--gray-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-          {v ? (
-            <img src={v} alt="Category" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : (
-            <Tag size={20} color="var(--gray-400)" />
-          )}
-        </div>
-      )
-    },
-    {
       key: 'name',
-      label: 'Category Name',
-      sortable: true,
+      label: 'Category',
       render: (v, row) => (
-        <div>
-          <strong style={{ color: 'var(--gray-900)' }}>{v}</strong>
-          {row.description && (
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)', marginTop: 2 }}>
-              {row.description.length > 50 ? `${row.description.substring(0, 50)}...` : row.description}
-            </div>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', paddingLeft: row.depth * 24 }}>
+          {row.depth > 0 && <CornerDownRight size={14} color="var(--gray-400)" style={{ flexShrink: 0 }} />}
+          <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-sm)', background: 'var(--gray-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+            {row.image ? (
+              <img src={row.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <Tag size={18} color="var(--gray-400)" />
+            )}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <strong style={{ color: 'var(--gray-900)' }}>{v}</strong>
+            {search && row.depth > 0 && (
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>{row.path}</div>
+            )}
+            {row.description && (
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)', marginTop: 2 }}>
+                {row.description.length > 60 ? `${row.description.substring(0, 60)}…` : row.description}
+              </div>
+            )}
+          </div>
         </div>
       ),
     },
     {
-      key: 'slug',
-      label: 'Slug',
-      sortable: true,
-      render: (v) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--primary)' }}>{v}</span>,
+      key: 'productCount',
+      label: 'Products',
+      width: 100,
+      render: (v, row) => {
+        const subs = childCount.get(String(row._id)) || 0;
+        return (
+          <div>
+            <span>{v || 0}</span>
+            {subs > 0 && (
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>
+                {subs} subcategor{subs === 1 ? 'y' : 'ies'}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'sortOrder',
+      label: 'Order',
+      width: 80,
+      render: (v) => <span style={{ color: 'var(--gray-500)' }}>{v || 0}</span>,
     },
     {
       key: 'isActive',
       label: 'Status',
-      sortable: true,
       width: 120,
-      render: (v) => (
-        <StatusBadge status={v ? 'active' : 'inactive'} />
-      ),
-    },
-    {
-      key: 'createdAt',
-      label: 'Created',
-      sortable: true,
-      width: 140,
-      render: (v) => formatDate(v),
+      render: (v) => <StatusBadge status={v ? 'active' : 'inactive'} label={v ? 'Visible' : 'Hidden'} />,
     },
   ];
 
-  // Filtering for search
-  const filteredCategories = categories.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) || c.slug.toLowerCase().includes(search.toLowerCase())
-  );
+  const q = search.trim().toLowerCase();
+  const visibleRows = q
+    ? tree.filter((c) => c.path.toLowerCase().includes(q) || c.slug.includes(q))
+    : tree;
+
+  const deleteBlockers = deletingCategory
+    ? {
+        products: deletingCategory.productCount || 0,
+        children: childCount.get(String(deletingCategory._id)) || 0,
+      }
+    : { products: 0, children: 0 };
+  const deleteBlocked = deleteBlockers.products > 0 || deleteBlockers.children > 0;
 
   return (
     <div className="page-content animate-fade-in">
       <PageHeader
         title="Categories"
-        subtitle="Organise your products into categories"
+        subtitle="Organise your products into categories and subcategories"
         breadcrumbs={[
           { label: 'Dashboard', to: '/vendor/dashboard' },
           { label: 'Categories' },
         ]}
         actions={
-          <button className="btn btn-primary" onClick={handleOpenCreate}>
+          <button className="btn btn-primary" onClick={() => handleOpenCreate()}>
             <Plus size={16} /> Add Category
           </button>
         }
@@ -183,30 +247,45 @@ export default function CategoriesPage() {
       <div className="card">
         <DataTable
           columns={columns}
-          data={filteredCategories}
+          data={visibleRows}
           loading={loading}
           searchable
           searchValue={search}
           onSearch={setSearch}
           rowKey="_id"
           emptyIcon={<Tag />}
-          emptyTitle="No Categories"
-          emptyText="You haven't created any product categories yet."
+          emptyTitle={q ? 'No matching categories' : 'No Categories'}
+          emptyText={q ? 'Try a different search.' : 'Create your first category, then add subcategories inside it.'}
           actions={(row) => (
-            <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-1)', justifyContent: 'flex-end', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => handleOpenCreate(row._id)}
+                title={`Add a subcategory inside ${row.name}`}
+              >
+                <FolderPlus size={14} /> Sub
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => handleToggleVisibility(row)}
+                title={row.isActive ? 'Hide from customers' : 'Show to customers'}
+              >
+                {row.isActive ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={() => handleOpenEdit(row)}
-                title="Edit Category"
+                title="Edit category"
               >
-                <Edit2 size={14} /> Edit
+                <Edit2 size={14} />
               </button>
               <button
-                className="btn btn-danger btn-sm"
-                onClick={() => handleDeleteClick(row._id)}
-                title="Delete Category"
+                className="btn btn-ghost btn-sm"
+                onClick={() => handleDeleteClick(row)}
+                title="Delete category"
+                style={{ color: 'var(--danger-text)' }}
               >
-                <Trash2 size={14} /> Delete
+                <Trash2 size={14} />
               </button>
             </div>
           )}
@@ -216,8 +295,8 @@ export default function CategoriesPage() {
       <Drawer
         open={drawerOpen}
         onClose={handleCloseDrawer}
-        title={editingCategory ? 'Edit Category' : 'Add Category'}
-        width={400}
+        title={editingCategory ? 'Edit Category' : newParentId ? 'Add Subcategory' : 'Add Category'}
+        width={440}
       >
         <FormBuilder
           fields={[
@@ -226,45 +305,53 @@ export default function CategoriesPage() {
               label: 'Category Name',
               type: 'text',
               required: true,
-              placeholder: 'e.g. Electronics',
+              placeholder: 'e.g. Sweets & Bakery',
             },
             {
-              name: 'slug',
-              label: 'URL Slug',
-              type: 'text',
-              required: true,
-              placeholder: 'e.g. electronics',
-              helpText: 'Must be lowercase and use hyphens instead of spaces.',
+              name: 'parent',
+              label: 'Inside category',
+              type: 'select',
+              placeholder: 'None — this is a main category',
+              options: parentOptions,
+              helpText: 'Choose a parent to make this a subcategory, e.g. "Cakes" inside "Sweets & Bakery".',
             },
             {
               name: 'description',
               label: 'Description',
               type: 'textarea',
-              placeholder: 'Optional description of this category',
+              placeholder: 'Optional — shown to customers',
               rows: 3,
             },
             {
+              name: 'sortOrder',
+              label: 'Display order',
+              type: 'number',
+              min: '0',
+              step: '1',
+              helpText: 'Lower numbers appear first. Categories with the same number are sorted A–Z.',
+            },
+            {
               name: 'isActive',
-              label: 'Active (Visible to customers)',
+              label: 'Visible to customers',
               type: 'switch',
             },
             {
               name: 'imageFile',
               label: 'Category Image',
               type: 'file',
-              accept: 'image/*',
-              helpText: 'Upload a banner for this category',
+              accept: 'image/jpeg,image/png,image/webp,image/gif',
+              helpText: 'JPEG, PNG, WebP or GIF up to 5 MB.',
               previewUrls: editingCategory?.image ? [editingCategory.image] : undefined,
             },
+            {
+              name: 'slug',
+              label: 'Web address (optional)',
+              type: 'text',
+              placeholder: 'Created from the name if left blank',
+              helpText: 'Lowercase letters, numbers and hyphens only.',
+            },
           ]}
-          initialValues={
-            editingCategory || {
-              name: '',
-              slug: '',
-              description: '',
-              isActive: true,
-            }
-          }
+          initialValues={initialValues}
           onSubmit={handleSave}
           submitLabel={editingCategory ? 'Save Changes' : 'Create Category'}
           submitting={submitting}
@@ -279,18 +366,48 @@ export default function CategoriesPage() {
         footer={
           <>
             <button className="btn btn-ghost" onClick={() => setDeleteModalOpen(false)} disabled={submitting}>
-              Cancel
+              {deleteBlocked ? 'Close' : 'Cancel'}
             </button>
-            <button className="btn btn-danger" onClick={confirmDelete} disabled={submitting}>
-              {submitting ? 'Deleting...' : 'Confirm Delete'}
-            </button>
+            {deleteBlocked ? (
+              deletingCategory?.isActive && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => { setDeleteModalOpen(false); handleToggleVisibility(deletingCategory); }}
+                >
+                  <EyeOff size={14} /> Hide instead
+                </button>
+              )
+            ) : (
+              <button className="btn btn-danger" onClick={confirmDelete} disabled={submitting}>
+                {submitting ? 'Deleting…' : 'Delete'}
+              </button>
+            )}
           </>
         }
       >
-        <p>Are you sure you want to delete this category?</p>
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-500)', marginTop: 'var(--space-2)' }}>
-          This action cannot be undone. Products currently in this category will lose their category association.
-        </p>
+        {deleteBlocked ? (
+          <>
+            <p><strong>{deletingCategory?.name}</strong> can’t be deleted yet.</p>
+            <ul style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-600)', margin: 'var(--space-2) 0 0', paddingLeft: 'var(--space-5)' }}>
+              {deleteBlockers.children > 0 && (
+                <li>It has {deleteBlockers.children} subcategor{deleteBlockers.children === 1 ? 'y' : 'ies'} — move or delete them first.</li>
+              )}
+              {deleteBlockers.products > 0 && (
+                <li>It holds {deleteBlockers.products} product{deleteBlockers.products === 1 ? '' : 's'} — move them to another category first.</li>
+              )}
+            </ul>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-500)', marginTop: 'var(--space-3)' }}>
+              To take it off your shop without deleting anything, hide it instead.
+            </p>
+          </>
+        ) : (
+          <>
+            <p>Delete <strong>{deletingCategory?.name}</strong>?</p>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--gray-500)', marginTop: 'var(--space-2)' }}>
+              This category is empty. Deleting it can’t be undone.
+            </p>
+          </>
+        )}
       </Modal>
     </div>
   );

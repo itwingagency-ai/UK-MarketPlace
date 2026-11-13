@@ -52,3 +52,11 @@ export const DAYS_OF_WEEK = [
   'saturday',
   'sunday',
 ];
+
+// Matches LOW_STOCK_THRESHOLD in Backend/src/lib/inventory.js
+export const LOW_STOCK_THRESHOLD = 5;
+
+// Product photo limits, matching the backend validator and upload middleware
+export const MAX_PRODUCT_IMAGES = 10;
+export const MAX_IMAGES_PER_UPLOAD = 5;
+export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';

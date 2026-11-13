@@ -13,8 +13,10 @@ export const getCart = async () => {
  * @param {string} productId
  * @param {number} quantity
  */
-export const addItem = async (productId, quantity = 1) => {
-  const { data } = await client.post('/cart/items', { productId, quantity });
+export const addItem = async (productId, quantity = 1, variantId = null) => {
+  const body = { productId, quantity };
+  if (variantId) body.variantId = variantId;
+  const { data } = await client.post('/cart/items', body);
   return data.data ?? data;
 };
 

@@ -6,9 +6,19 @@ const notFoundHandler = (req, res) => {
   });
 };
 
+const MULTER_MESSAGES = {
+  LIMIT_FILE_SIZE: "Each image must be 5 MB or smaller",
+  LIMIT_FILE_COUNT: "Too many images in one upload",
+  LIMIT_UNEXPECTED_FILE: "Too many images in one upload",
+};
+
 const errorHandler = (err, req, res, next) => {
-  const statusCode = err.statusCode || 500;
-  const message = err.message || "Internal server error";
+  const isUploadError = err.name === "MulterError";
+  const statusCode = err.statusCode || (isUploadError ? 400 : 500);
+  const message =
+    (isUploadError && MULTER_MESSAGES[err.code]) ||
+    err.message ||
+    "Internal server error";
 
   if (env.nodeEnv !== "test") {
     // eslint-disable-next-line no-console

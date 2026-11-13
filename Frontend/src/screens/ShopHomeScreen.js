@@ -1,318 +1,219 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   FlatList,
   StatusBar,
   TextInput,
-  Platform,
-  Dimensions,
   RefreshControl,
-  ActivityIndicator,
   ImageBackground,
-  Modal,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInRight,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from '../context/LocationContext';
+import { useCustomAlert } from '../context/AlertContext';
 import { getNearbyStores } from '../api/stores.api';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
-import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useFavorites } from '../context/FavoritesContext';
-
-const { width } = Dimensions.get('window');
-const BOTTOM_TAB_HEIGHT = 70;
-
-// ─── Simple Search Icon (pure View) ──────────────────────────────────────────
-
-function SearchIcon({ size = 16, color = Colors.muted }) {
-  return (
-    <View style={{ width: size, height: size, position: 'relative' }}>
-      <View
-        style={{
-          width: size * 0.65,
-          height: size * 0.65,
-          borderRadius: size * 0.325,
-          borderWidth: 2,
-          borderColor: color,
-        }}
-      />
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          right: 0,
-          width: size * 0.38,
-          height: 2,
-          backgroundColor: color,
-          borderRadius: 1,
-          transform: [{ rotate: '45deg' }],
-        }}
-      />
-    </View>
-  );
-}
-
-// ─── Store Banner (Foodpanda Style) ───────────────────────────────────────────
+import Asset3D from '../components/Asset3D';
+import Button from '../components/Button';
+import { Colors, Spacing, Typography, Radius, Shadow, Motion } from '../theme';
 
 const DEFAULT_STORE_IMAGE = 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800&auto=format&fit=crop';
 
-function StoreBanner({ store, onPress, isFavorited, onToggleFavorite }) {
-  const imageUrl = store.branding?.bannerUrl || store.branding?.logoUrl || store.imageUrl || DEFAULT_STORE_IMAGE;
+// Entrance animations are built once: a new builder per render remounts views.
+const HEADER_IN = FadeInDown.springify().damping(Motion.springs.gentle.damping);
+const CARD_IN = Array.from({ length: 24 }, (_, i) =>
+  FadeInDown.delay(120 + i * Motion.stagger.cards).springify().damping(Motion.springs.gentle.damping)
+);
+const TILE_IN = Array.from({ length: 12 }, (_, i) =>
+  FadeInRight.delay(80 + i * Motion.stagger.list).springify().damping(Motion.springs.gentle.damping)
+);
+const FADE_IN = FadeIn.duration(300);
 
-  // Build rating display — use exact data from backend or fallback to 0
-  const rating = store.averageRating ?? 0;
-  const ratingCount = store.ratingCount ?? 0;
-  const ratingDisplay = rating > 0 ? Number(rating).toFixed(1) : '0';
-
-  // Delivery time estimate (from shipping methods if available, else derive from distance)
-  const deliveryTime = store.deliveryTime
-    || (store.distanceKm != null
-      ? `From ${Math.max(10, Math.round(store.distanceKm * 5))} min`
-      : 'From 15 min');
-
-  // Delivery fee
-  const deliveryFee = store.deliveryFee ?? store.shippingFee ?? null;
-
-  // Category / type label
-  const categoryLabel = store.category || store.storeType || 'Grocery';
-
-  let closedText = null;
-  if (store.isOpen === false) {
-    if (store.nextOpenDay && store.nextOpenTime) {
-      if (store.nextOpenDay === 'Today' || store.nextOpenDay === 'Tomorrow') {
-        closedText = `Opens at ${store.nextOpenTime}`;
-      } else {
-        closedText = `Opens at ${store.nextOpenDay}, ${store.nextOpenTime}`;
-      }
-    } else {
-      closedText = 'Currently Closed';
-    }
-  }
-
-  return (
-    <TouchableOpacity
-      style={bannerStyles.card}
-      onPress={onPress}
-      activeOpacity={0.95}
-    >
-      {/* ── Banner Image ── */}
-      <View style={bannerStyles.imageContainer}>
-        <ImageBackground
-          source={{ uri: imageUrl }}
-          style={bannerStyles.bgImage}
-          imageStyle={bannerStyles.imageRounded}
-        >
-          {/* Carousel dots (visual only)
-          <View style={bannerStyles.dotsRow}>
-            <View style={[bannerStyles.dot, bannerStyles.dotActive]} />
-            <View style={bannerStyles.dot} />
-            <View style={bannerStyles.dot} />
-            <View style={bannerStyles.dot} />
-          </View> */}
-
-          {/* Closed Overlay (rendered last to cover dots) */}
-          {store.isOpen === false && closedText && (
-            <View style={bannerStyles.closedOverlay}>
-              <Text style={bannerStyles.closedText}>{closedText}</Text>
-            </View>
-          )}
-
-          {/* Favorite Button */}
-          <TouchableOpacity
-            style={bannerStyles.heartBtn}
-            activeOpacity={0.8}
-            onPress={(e) => {
-              e.stopPropagation();
-              onToggleFavorite();
-            }}
-          >
-            <Ionicons
-              name={isFavorited ? "heart" : "heart-outline"}
-              size={20}
-              color={isFavorited ? '#50178E' : '#333'}
-            />
-          </TouchableOpacity>
-        </ImageBackground>
-      </View>
-
-      {/* ── Store Info Section ── */}
-      <View style={bannerStyles.infoSection}>
-        {/* Row 1: Store name + Rating */}
-        <View style={bannerStyles.nameRow}>
-          <Text style={bannerStyles.storeName} numberOfLines={1}>
-            {store.name}
-          </Text>
-          <View style={bannerStyles.ratingBadge}>
-            <Text style={bannerStyles.ratingStar}>⭐</Text>
-            <Text style={bannerStyles.ratingValue}>{ratingDisplay}</Text>
-            <Text style={bannerStyles.ratingCount}>({ratingCount})</Text>
-          </View>
-        </View>
-
-        {/* Row 2: Delivery time · distance · category */}
-        <Text style={bannerStyles.metaText} numberOfLines={1}>
-          {deliveryTime}
-          {store.distanceKm != null ? ` · ${store.distanceKm.toFixed(1)} km` : ''}
-          {` · ${categoryLabel}`}
-        </Text>
-
-        {/* Row 3: Delivery charges */}
-        {deliveryFee != null ? (
-          <View style={bannerStyles.deliveryRow}>
-            <Text style={bannerStyles.bikeIcon}>🛵</Text>
-            <Text style={bannerStyles.deliveryFee}>£{Number(deliveryFee).toFixed(2)}</Text>
-          </View>
-        ) : store.deliveryRadiusKm != null ? (
-          <View style={bannerStyles.deliveryRow}>
-            <Text style={bannerStyles.bikeIcon}>🛵</Text>
-            <Text style={bannerStyles.deliveryFee}>Free delivery</Text>
-          </View>
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// ─── Empty / Error / Loading states ──────────────────────────────────────────
-
-function LoadingState({ postcode }) {
-  return (
-    <View style={styles.centeredState}>
-      <ActivityIndicator size="large" color="#50178E" />
-      <Text style={styles.stateTitle}>Finding stores…</Text>
-      <Text style={styles.stateSub}>Looking for stores near {postcode}</Text>
-    </View>
-  );
-}
-
-function EmptyState({ postcode, onRefresh }) {
-  return (
-    <View style={styles.centeredState}>
-      <Text style={styles.stateEmoji}>🏪</Text>
-      <Text style={styles.stateTitle}>No stores found</Text>
-      <Text style={styles.stateSub}>
-        No stores currently deliver to{'\n'}{postcode}
-      </Text>
-      <TouchableOpacity style={styles.retryBtn} onPress={onRefresh} activeOpacity={0.85}>
-        <Text style={styles.retryBtnText}>Try again</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function ErrorState({ onRetry }) {
-  return (
-    <View style={styles.centeredState}>
-      <Text style={styles.stateEmoji}>⚠️</Text>
-      <Text style={styles.stateTitle}>Something went wrong</Text>
-      <Text style={styles.stateSub}>Couldn't load stores. Check your connection.</Text>
-      <TouchableOpacity style={styles.retryBtn} onPress={onRetry} activeOpacity={0.85}>
-        <Text style={styles.retryBtnText}>Retry</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-// ─── Promo Carousel ────────────────────────────────────────────────────────────
-
-const PROMO_BANNERS = [
-  {
-    id: '1',
-    title: 'SNAPPY SHOPPER',
-    subtitle: 'Shopping Made Effortless.',
-    bg: '#50178E', // Purple
-    textColor: '#FFFFFF',
-    icon1: 'shopping-outline',
-    icon2: 'ticket-percent-outline'
-  },
-  {
-    id: '2',
-    title: 'CRACK INTO PLEASURE',
-    subtitle: 'Exclusive deals',
-    bg: '#D81B60', // Pink/Red
-    textColor: '#FFFFFF',
-    icon1: 'gift-outline',
-    icon2: 'heart-outline'
-  },
-  {
-    id: '3',
-    title: 'FRESH & FAST',
-    subtitle: 'Groceries at your door in minutes',
-    bg: '#FFFFFF', // White
-    textColor: '#1E1B4B',
-    icon1: 'basket-outline',
-    icon2: 'clock-outline',
-    hasBorder: true,
-  }
+const CATEGORIES = [
+  ['cat-fruit-veg', 'Fruit & Veg'],
+  ['cat-bakery', 'Bakery'],
+  ['cat-dairy-eggs', 'Dairy & Eggs'],
+  ['cat-drinks', 'Drinks'],
+  ['cat-snacks-sweets', 'Snacks'],
+  ['cat-household', 'Household'],
+  ['cat-frozen', 'Frozen'],
+  ['cat-pharmacy', 'Pharmacy'],
 ];
 
-function PromoCarousel() {
-  const flatListRef = React.useRef(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const bannerWidth = width - Spacing.base * 2;
+const FILTERS = [
+  ['open', 'Open now', 'clock'],
+  ['free', 'Free delivery', 'truck'],
+  ['rated', 'Top rated', 'star'],
+];
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      let nextIndex = currentIndex + 1;
-      if (nextIndex >= PROMO_BANNERS.length) {
-        nextIndex = 0;
-      }
-      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
-      setCurrentIndex(nextIndex);
-    }, 2000);
-    return () => clearInterval(timer);
-  }, [currentIndex]);
+const storeId = (store) => store._id || store.id;
 
-  const onMomentumScrollEnd = (e) => {
-    const contentOffset = e.nativeEvent.contentOffset.x;
-    const index = Math.round(contentOffset / bannerWidth);
-    setCurrentIndex(index);
+// Shared with the store page: "£2.49 delivery · free over £15"
+export function deliveryText(store) {
+  const fee = store.deliveryFee;
+  if (fee == null) return 'Delivery available';
+  if (fee === 0) return 'Free delivery';
+  const base = `£${Number(fee).toFixed(2)} delivery`;
+  return store.freeDeliveryOver ? `${base} · free over £${Number(store.freeDeliveryOver).toFixed(0)}` : base;
+}
+
+function busyUntilText(store) {
+  if (!store.busyUntil) return 'Busy right now';
+  const time = new Date(store.busyUntil).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return `Busy · back at ${time}`;
+}
+
+function statusText(store) {
+  if (store.isBusy) return busyUntilText(store);
+  if (store.isOpen) return store.closesAt ? `Open · until ${store.closesAt}` : 'Open now';
+  if (store.nextOpenDay && store.nextOpenTime) {
+    return ['Today', 'Tomorrow'].includes(store.nextOpenDay)
+      ? `Opens ${store.nextOpenDay.toLowerCase()} ${store.nextOpenTime}`
+      : `Opens ${store.nextOpenDay} ${store.nextOpenTime}`;
+  }
+  return 'Closed';
+}
+
+// ─── Store card ───────────────────────────────────────────────────────────────
+
+function StoreCard({ store, index, onPress, isFavorited, onToggleFavorite }) {
+  const scale = useSharedValue(1);
+  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const heart = useSharedValue(1);
+  const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heart.value }] }));
+
+  const imageUrl = store.branding?.bannerUrl || store.branding?.logoUrl || DEFAULT_STORE_IMAGE;
+  const rating = Number(store.averageRating || 0);
+  const fee = store.deliveryFee;
+
+  const handleHeart = () => {
+    heart.value = 0.7;
+    heart.value = withSpring(1, Motion.springs.bouncy);
+    onToggleFavorite();
   };
 
   return (
-    <View style={carouselStyles.container}>
-      <FlatList
-        ref={flatListRef}
-        data={PROMO_BANNERS}
-        keyExtractor={item => item.id}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={onMomentumScrollEnd}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              carouselStyles.promoBanner,
-              { backgroundColor: item.bg, width: bannerWidth },
-              item.hasBorder && carouselStyles.promoBannerBorder
-            ]}
-            activeOpacity={0.9}
-          >
-            <View style={carouselStyles.promoContent}>
-              <Text style={[carouselStyles.promoTitle, { color: item.textColor }]}>{item.title}</Text>
-              <View style={carouselStyles.promoActionRow}>
-                <Text style={{ color: item.textColor, opacity: 0.8, fontSize: 13, fontWeight: '600' }}>{item.subtitle}</Text>
+    <Animated.View entering={CARD_IN[Math.min(index, CARD_IN.length - 1)]} style={pressStyle}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => { scale.value = withSpring(0.97, Motion.springs.snappy); }}
+        onPressOut={() => { scale.value = withSpring(1, Motion.springs.snappy); }}
+        style={styles.card}
+        accessibilityRole="button"
+        accessibilityLabel={`${store.name}, ${statusText(store)}`}
+      >
+        <ImageBackground
+          source={{ uri: imageUrl }}
+          style={styles.cardImage}
+          imageStyle={styles.cardImageRadius}
+        >
+          <View style={styles.cardScrim} />
+          {!store.isOpen ? <View style={styles.closedVeil} /> : null}
+          <View style={styles.cardTopRow}>
+          <View style={[styles.statusPill, !store.isOpen && styles.statusPillClosed]}>
+            <View style={[styles.statusDot, !store.isOpen && styles.statusDotClosed]} />
+            <Text style={[styles.statusText, !store.isOpen && styles.statusTextClosed]}>
+              {statusText(store)}
+            </Text>
+          </View>
+          <Pressable onPress={handleHeart} hitSlop={8} style={styles.heartBtn}>
+            <Animated.View style={heartStyle}>
+              <Ionicons
+                name={isFavorited ? 'heart' : 'heart-outline'}
+                size={19}
+                color={isFavorited ? Colors.accent : Colors.text}
+              />
+            </Animated.View>
+          </Pressable>
+          </View>
+        </ImageBackground>
+
+        <View style={styles.cardBody}>
+          <View style={styles.cardTitleRow}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{store.name}</Text>
+            <View style={styles.ratingChip}>
+              <Ionicons name="star" size={12} color={Colors.warning} />
+              <Text style={styles.ratingText}>{rating > 0 ? rating.toFixed(1) : 'New'}</Text>
+              {store.ratingCount > 0 ? <Text style={styles.ratingCount}>({store.ratingCount})</Text> : null}
+            </View>
+          </View>
+
+          <View style={styles.metaRow}>
+            {store.deliveryTime ? (
+              <View style={styles.metaItem}>
+                <Feather name="clock" size={13} color={Colors.textSecondary} />
+                <Text style={styles.metaText}>{store.deliveryTime}</Text>
               </View>
+            ) : null}
+            {store.distanceKm != null ? (
+              <View style={styles.metaItem}>
+                <Feather name="map-pin" size={13} color={Colors.textSecondary} />
+                <Text style={styles.metaText}>{Number(store.distanceKm).toFixed(1)} km</Text>
+              </View>
+            ) : null}
+            <View style={styles.metaItem}>
+              <Feather name="truck" size={13} color={fee === 0 ? Colors.successText : Colors.textSecondary} />
+              <Text style={[styles.metaText, fee === 0 && styles.metaFree]}>
+                {deliveryText(store)}
+              </Text>
             </View>
-            <View style={carouselStyles.promoGraphicPlaceholder}>
-              <MaterialCommunityIcons name={item.icon1} size={60} color={item.textColor === '#FFFFFF' ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.06)"} />
-              <MaterialCommunityIcons name={item.icon2} size={35} color={item.textColor === '#FFFFFF' ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.08)"} style={carouselStyles.promoTicketIcon} />
-            </View>
-          </TouchableOpacity>
-        )}
-      />
-      <View style={carouselStyles.dotsRow}>
-        {PROMO_BANNERS.map((_, index) => (
-          <View
-            key={index}
-            style={[carouselStyles.dot, currentIndex === index && carouselStyles.dotActive]}
-          />
-        ))}
-      </View>
+          </View>
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+// ─── Loading / empty / error ─────────────────────────────────────────────────
+
+function Shimmer({ style }) {
+  const opacity = useSharedValue(0.5);
+  useEffect(() => {
+    opacity.value = withRepeat(withTiming(1, { duration: 700 }), -1, true);
+  }, [opacity]);
+  const animated = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return <Animated.View style={[styles.skeleton, style, animated]} />;
+}
+
+function LoadingState() {
+  return (
+    <View style={styles.listPad}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={styles.skeletonCard}>
+          <Shimmer style={{ height: 150, borderRadius: Radius.xl }} />
+          <Shimmer style={{ height: 18, width: '60%', marginTop: Spacing.md }} />
+          <Shimmer style={{ height: 14, width: '80%', marginTop: Spacing.sm }} />
+        </View>
+      ))}
     </View>
+  );
+}
+
+function StateMessage({ asset, title, body, actionLabel, onAction }) {
+  return (
+    <Animated.View entering={FADE_IN} style={styles.stateWrap}>
+      <Asset3D name={asset} size={132} float />
+      <Text style={styles.stateTitle}>{title}</Text>
+      <Text style={styles.stateBody}>{body}</Text>
+      {onAction ? (
+        <Button title={actionLabel} onPress={onAction} style={{ marginTop: Spacing.lg }} />
+      ) : null}
+    </Animated.View>
   );
 }
 
@@ -323,7 +224,9 @@ export default function ShopHomeScreen({ route, navigation }) {
   const postcode = route.params?.postcode || location?.postcode || '';
   const locationLabel = route.params?.locationLabel || location?.label || '';
   const initialStores = route.params?.stores ?? [];
+
   const { isAuthenticated } = useAuth();
+  const { showAlert } = useCustomAlert();
   const { favoriteStores, toggleFavoriteStore } = useFavorites();
 
   const [stores, setStores] = useState(initialStores);
@@ -331,160 +234,222 @@ export default function ShopHomeScreen({ route, navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loginModalVisible, setLoginModalVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState([]);
 
   const displayLocation = locationLabel || postcode;
 
-  // ── Filter stores by search ───────────────────────────────────────────────
-  const visibleStores = searchQuery.trim()
-    ? stores.filter((s) =>
-      s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.address?.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.address?.line1?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    : stores;
+  const visibleStores = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    // Open stores first, then nearest
+    const ordered = [...stores].sort(
+      (a, b) => Number(Boolean(b.isOpen)) - Number(Boolean(a.isOpen)) || (a.distanceKm ?? 0) - (b.distanceKm ?? 0)
+    );
+    return ordered.filter((s) => {
+      if (q && ![s.name, s.address?.city, s.address?.line1].some((v) => v?.toLowerCase().includes(q))) {
+        return false;
+      }
+      if (activeFilters.includes('open') && !s.isOpen) return false;
+      if (activeFilters.includes('free') && s.deliveryFee !== 0) return false;
+      if (activeFilters.includes('rated') && !(Number(s.averageRating) >= 4.5)) return false;
+      return true;
+    });
+  }, [stores, searchQuery, activeFilters]);
 
-  // ── Fetch from backend ────────────────────────────────────────────────────
+  // Prefer coordinates: the server-side postcode geocoder needs a Google key.
   const fetchStores = useCallback(async (isRefresh = false) => {
-    if (!postcode) return;
+    const query = location?.lat != null && location?.lng != null
+      ? { lat: location.lat, lng: location.lng }
+      : postcode ? { postcode } : null;
+    if (!query) return;
     setHasError(false);
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
-
     try {
-      const data = await getNearbyStores({ postcode });
-      const fetched = data?.data?.stores ?? data?.stores ?? [];
-      setStores(fetched);
+      const data = await getNearbyStores(query);
+      setStores(data?.data?.stores ?? data?.stores ?? []);
     } catch {
       setHasError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [postcode]);
+  }, [location?.lat, location?.lng, postcode]);
 
-  // Auto-fetch on mount only when no initial stores were passed
   useEffect(() => {
-    if (initialStores.length === 0 && postcode) {
-      fetchStores(false);
-    }
+    if (initialStores.length === 0) fetchStores(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleStorePress = (store) => {
-    navigation.navigate('StoreCategories', { store });
+  const openStore = (store) => navigation.navigate('StoreCategories', { store });
+
+  const openCategory = () => {
+    const target = visibleStores.find((s) => s.isOpen) || visibleStores[0];
+    if (target) openStore(target);
   };
 
-  // ── List header ───────────────────────────────────────────────────────────
-  const ListHeader = () => (
-    <View style={styles.listHeader}>
-      <PromoCarousel />
+  const toggleFilter = (key) =>
+    setActiveFilters((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
 
-      <Text style={styles.resultsCount}>
-        {visibleStores.length}{' '}
-        {visibleStores.length === 1 ? 'store' : 'stores'} near{' '}
-        <Text style={styles.resultsCountAccent}>{postcode}</Text>
+  const handleFavourite = (store) => {
+    if (!isAuthenticated) {
+      showAlert({
+        title: 'Log in to save stores',
+        message: 'Create an account or log in to keep your favourite stores in one place.',
+        icon: 'heart',
+        confirmText: 'Log in',
+        onConfirm: () => navigation.navigate('Login'),
+      });
+      return;
+    }
+    toggleFavoriteStore(storeId(store));
+  };
+
+  const isFavourite = (store) =>
+    favoriteStores.some((s) => s?._id === storeId(store) || s === storeId(store));
+
+  const header = (
+    <View>
+      {/* Category tiles */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Shop by category</Text>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tilesRow}
+      >
+        {CATEGORIES.map(([asset, label], i) => (
+          <Animated.View key={asset} entering={TILE_IN[i]}>
+            <Pressable onPress={openCategory} style={styles.tile} accessibilityRole="button" accessibilityLabel={label}>
+              <Asset3D name={asset} size={58} />
+              <Text style={styles.tileLabel} numberOfLines={1}>{label}</Text>
+            </Pressable>
+          </Animated.View>
+        ))}
+      </ScrollView>
+
+      {/* Brand banner */}
+      <View style={styles.banner}>
+        <View style={styles.bannerBlob} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.bannerEyebrow}>From your high street</Text>
+          <Text style={styles.bannerTitle}>Local shops, delivered to your door</Text>
+        </View>
+        <Asset3D name="hero-delivery-scooter" size={96} float />
+      </View>
+
+      {/* Filters */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersRow}>
+        {FILTERS.map(([key, label, icon]) => {
+          const active = activeFilters.includes(key);
+          return (
+            <Pressable
+              key={key}
+              onPress={() => toggleFilter(key)}
+              style={[styles.chip, active && styles.chipActive]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+            >
+              <Feather name={icon} size={13} color={active ? Colors.white : Colors.text} />
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <Text style={styles.resultsTitle}>
+        {visibleStores.length} {visibleStores.length === 1 ? 'store' : 'stores'} near{' '}
+        <Text style={styles.resultsAccent}>{postcode || 'you'}</Text>
       </Text>
-      {!loading && stores.length > 0 && (
-        <Text style={styles.resultsHint}>Tap a store to browse categories</Text>
-      )}
     </View>
   );
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* ── Header ── */}
-        <View style={styles.header}>
-          {/* Brand */}
-          <View style={styles.brand}>
-            <Text style={styles.brandLine1}>snappy</Text>
-            <Text style={styles.brandLine2}>shopper</Text>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
+      <SafeAreaView edges={['top']} style={styles.top}>
+        <Animated.View entering={HEADER_IN} style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerEyebrow}>Delivering to</Text>
+            <Pressable
+              style={styles.locationRow}
+              onPress={() => navigation.getParent()?.getParent()?.navigate('Home')}
+              hitSlop={6}
+            >
+              <Feather name="map-pin" size={16} color={Colors.primary} />
+              <Text style={styles.locationText} numberOfLines={1}>{displayLocation}</Text>
+              <Feather name="chevron-down" size={16} color={Colors.text} />
+            </Pressable>
           </View>
-
-          {/* Location pill */}
-          <View style={styles.locationPill}>
-            <Text style={styles.locationPillIcon}>📍</Text>
-            <View style={styles.locationPillText}>
-              <Text style={styles.locationPillLabel}>Delivering to</Text>
-              <Text style={styles.locationPillValue} numberOfLines={1}>
-                {displayLocation}
-              </Text>
-            </View>
-          </View>
-
-          {/* Change postcode */}
-          <TouchableOpacity
-            style={styles.changeBtn}
+          <Pressable
             onPress={() => navigation.getParent()?.getParent()?.navigate('Home')}
-            activeOpacity={0.8}
+            style={styles.changeBtn}
           >
-            <Text style={styles.changeBtnText}>Change</Text>
-          </TouchableOpacity>
-        </View>
+            <Text style={styles.changeText}>Change</Text>
+          </Pressable>
+        </Animated.View>
 
-        {/* ── Search bar ── */}
         <View style={styles.searchBar}>
-          <SearchIcon size={18} color={Colors.muted} />
+          <Feather name="search" size={18} color={Colors.muted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search Stores"
+            placeholder="Search stores near you"
             placeholderTextColor={Colors.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="search"
-            clearButtonMode="while-editing"
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtn}>
-              <Text style={styles.clearBtnText}>✕</Text>
-            </TouchableOpacity>
-          )}
+          {searchQuery.length > 0 ? (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={10}>
+              <Feather name="x-circle" size={18} color={Colors.muted} />
+            </Pressable>
+          ) : null}
         </View>
       </SafeAreaView>
 
-      {/* ── Content ── */}
       {loading ? (
-        <LoadingState postcode={postcode} />
+        <LoadingState />
       ) : hasError ? (
-        <ErrorState onRetry={() => fetchStores(false)} />
+        <StateMessage
+          asset="illo-error-cone"
+          title="Something went wrong"
+          body="We couldn't load stores. Check your connection and try again."
+          actionLabel="Try again"
+          onAction={() => fetchStores(false)}
+        />
       ) : stores.length === 0 ? (
-        <EmptyState postcode={postcode} onRefresh={() => fetchStores(false)} />
+        <StateMessage
+          asset="illo-no-stores"
+          title="No stores here yet"
+          body={`No stores deliver to ${postcode || 'your area'} right now. New stores join every week.`}
+          actionLabel="Change postcode"
+          onAction={() => navigation.getParent()?.getParent()?.navigate('Home')}
+        />
       ) : (
         <FlatList
           data={visibleStores}
-          keyExtractor={(item, i) => item._id ?? item.id ?? String(i)}
-          renderItem={({ item }) => (
-            <StoreBanner
+          keyExtractor={(item, i) => String(storeId(item) ?? i)}
+          renderItem={({ item, index }) => (
+            <StoreCard
               store={item}
-              onPress={() => handleStorePress(item)}
-              isFavorited={favoriteStores.some(s => s._id === (item._id || item.id) || s === (item._id || item.id))}
-              onToggleFavorite={() => {
-                if (!isAuthenticated) {
-                  setLoginModalVisible(true);
-                } else {
-                  toggleFavoriteStore(item._id || item.id);
-                }
-              }}
+              index={index}
+              onPress={() => openStore(item)}
+              isFavorited={isFavourite(item)}
+              onToggleFavorite={() => handleFavourite(item)}
             />
           )}
-          numColumns={1}
-          contentContainerStyle={styles.list}
-          ListHeaderComponent={<ListHeader />}
+          ListHeaderComponent={header}
           ListEmptyComponent={
-            searchQuery ? (
-              <View style={styles.centeredState}>
-                <View style={styles.searchEmptyIcon}>
-                  <SearchIcon size={28} color={Colors.muted} />
-                </View>
-                <Text style={styles.stateTitle}>No matching stores</Text>
-                <Text style={styles.stateSub}>Try a different search term</Text>
-              </View>
-            ) : null
+            <StateMessage
+              asset="illo-search-empty"
+              title="No matching stores"
+              body="Try a different search or clear your filters."
+            />
           }
+          contentContainerStyle={styles.listPad}
+          ItemSeparatorComponent={() => <View style={{ height: Spacing.base }} />}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -495,40 +460,6 @@ export default function ShopHomeScreen({ route, navigation }) {
           }
         />
       )}
-
-      {/* Login Required Modal */}
-      <Modal visible={loginModalVisible} transparent animationType="fade">
-        <View style={styles.centerModalOverlay}>
-          <View style={styles.centerModalContent}>
-            <View style={styles.modalIconWrapper}>
-              <Feather name="lock" size={28} color={Colors.primary} />
-            </View>
-            <Text style={styles.centerModalTitle}>Login Required</Text>
-            <Text style={styles.centerModalText}>
-              Please log in or create an account to favorite stores.
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnSecondary]}
-                activeOpacity={0.8}
-                onPress={() => setLoginModalVisible(false)}
-              >
-                <Text style={styles.modalBtnTextSecondary}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnPrimary]}
-                activeOpacity={0.8}
-                onPress={() => {
-                  setLoginModalVisible(false);
-                  navigation.navigate('Login');
-                }}
-              >
-                <Text style={styles.modalBtnTextPrimary}>Log In</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -536,442 +467,322 @@ export default function ShopHomeScreen({ route, navigation }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.white },
-  safeArea: {
-    backgroundColor: Colors.white,
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  root: { flex: 1, backgroundColor: Colors.bg },
+  top: {
+    backgroundColor: Colors.bg,
     paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.md,
-    gap: Spacing.sm,
+    paddingBottom: Spacing.sm,
   },
-  brand: { marginRight: 'auto' },
-  brandLine1: {
-    fontSize: 13, fontWeight: '800', color: '#50178E',
-    lineHeight: 15, letterSpacing: -0.2,
-  },
-  brandLine2: {
-    fontSize: 17, fontWeight: '900', color: '#50178E',
-    lineHeight: 18, letterSpacing: -0.3,
-  },
-  locationPill: {
-    flex: 1,
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    marginLeft: Spacing.sm,
+    paddingTop: Spacing.sm,
   },
-  locationPillIcon: { fontSize: 12 },
-  locationPillText: { flex: 1 },
-  locationPillLabel: {
-    fontSize: 9, color: Colors.muted, fontWeight: '600',
-    letterSpacing: 0.4, textTransform: 'uppercase',
+  headerEyebrow: {
+    fontFamily: Typography.family.mono,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: Colors.textTertiary,
   },
-  locationPillValue: {
-    fontSize: 12, fontWeight: '700', color: Colors.text,
-    letterSpacing: 0.2,
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  locationText: {
+    fontFamily: Typography.family.displayExtrabold,
+    fontSize: 20,
+    letterSpacing: -0.4,
+    color: Colors.text,
+    flexShrink: 1,
   },
   changeBtn: {
-    paddingHorizontal: 12, paddingVertical: 7,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
     borderRadius: Radius.full,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primarySubtle,
   },
-  changeBtnText: {
-    fontSize: Typography.size.xs, fontWeight: Typography.weight.bold,
-    color: Colors.white, letterSpacing: 0.3,
+  changeText: {
+    fontFamily: Typography.family.bold,
+    fontSize: 13,
+    color: Colors.primary,
   },
-
-  // Search
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: Spacing.base,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.full,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Platform.OS === 'ios' ? 11 : 8,
     gap: Spacing.sm,
+    height: 50,
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.base,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   searchInput: {
     flex: 1,
-    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.regular,
+    fontSize: 15,
     color: Colors.text,
-    fontWeight: Typography.weight.medium,
   },
-  clearBtn: {
-    width: 22, height: 22, borderRadius: 11,
-    backgroundColor: Colors.border,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  clearBtnText: { fontSize: 10, fontWeight: '700', color: Colors.textSecondary },
-
-  // List
-  list: {
+  listPad: {
     paddingHorizontal: Spacing.base,
-    paddingTop: Spacing.base,
-    paddingBottom: BOTTOM_TAB_HEIGHT + 20,
+    paddingBottom: 130,
   },
-  listHeader: { marginBottom: Spacing.lg },
-
-  // Carousel
-  resultsCount: {
-    fontSize: Typography.size.lg,
-    fontWeight: Typography.weight.extrabold,
-    color: Colors.text,
-    letterSpacing: -0.3,
-  },
-  resultsCountAccent: { color: Colors.primary },
-  resultsHint: {
-    fontSize: Typography.size.xs, color: Colors.muted,
-    fontWeight: Typography.weight.medium, marginTop: 3,
-  },
-
-  // States
-  centeredState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing['3xl'],
-    gap: Spacing.sm,
-  },
-  searchEmptyIcon: {
-    marginBottom: Spacing.md,
-  },
-  stateEmoji: { fontSize: 56, marginBottom: Spacing.sm },
-  stateTitle: {
-    fontSize: Typography.size.xl, fontWeight: Typography.weight.extrabold,
-    color: Colors.text, textAlign: 'center',
-  },
-  stateSub: {
-    fontSize: Typography.size.sm, color: Colors.muted,
-    textAlign: 'center', lineHeight: 20,
-  },
-  retryBtn: {
-    marginTop: Spacing.lg,
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.full,
-    paddingVertical: 13,
-    paddingHorizontal: Spacing['3xl'],
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  retryBtnText: {
-    fontSize: Typography.size.base, fontWeight: Typography.weight.bold,
-    color: Colors.white,
-  },
-  centerModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xl,
-  },
-  centerModalContent: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.xl,
-    padding: Spacing.xl,
-    width: '100%',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  modalIconWrapper: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  centerModalTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Colors.text,
+  sectionHeader: {
+    marginTop: Spacing.base,
     marginBottom: Spacing.sm,
-    textAlign: 'center',
   },
-  centerModalText: {
-    fontSize: 15,
-    color: Colors.muted,
-    textAlign: 'center',
-    marginBottom: Spacing.xl,
-    lineHeight: 22,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    width: '100%',
-  },
-  modalBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalBtnSecondary: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  modalBtnTextSecondary: {
+  sectionTitle: {
+    fontFamily: Typography.family.display,
+    fontSize: 18,
+    letterSpacing: -0.3,
     color: Colors.text,
-    fontSize: 15,
-    fontWeight: '700',
   },
-  modalBtnPrimary: {
-    backgroundColor: Colors.primary,
+  tilesRow: {
+    gap: Spacing.md,
+    paddingRight: Spacing.base,
+    paddingVertical: Spacing.xs,
   },
-  modalBtnTextPrimary: {
-    color: Colors.white,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-});
-
-// ─── Store Banner Styles (Foodpanda Style) ────────────────────────────────────
-
-const bannerStyles = StyleSheet.create({
-  card: {
-    width: '100%',
-    marginBottom: Spacing.lg,
-    paddingBottom: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-    backgroundColor: 'transparent',
-  },
-
-  // Image section
-  imageContainer: {
-    width: '100%',
-    height: 180,
-    borderRadius: 16,
+  tile: {
+    width: 84,
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
+    borderColor: Colors.borderSubtle,
+  },
+  tileLabel: {
+    fontFamily: Typography.family.semibold,
+    fontSize: 12,
+    color: Colors.text,
+    marginTop: Spacing.xs,
+  },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.lg,
+    padding: Spacing.base,
+    paddingRight: Spacing.sm,
+    borderRadius: Radius['2xl'],
+    backgroundColor: Colors.primary,
     overflow: 'hidden',
   },
-  bgImage: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'flex-end',
+  bannerBlob: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    right: -60,
+    top: -90,
+    backgroundColor: 'rgba(163, 94, 240, 0.45)',
   },
-  imageRounded: {
-    borderRadius: 16,
+  bannerEyebrow: {
+    fontFamily: Typography.family.mono,
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.75)',
   },
-  closedOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  closedText: {
+  bannerTitle: {
+    fontFamily: Typography.family.displayExtrabold,
+    fontSize: 20,
+    lineHeight: 25,
+    letterSpacing: -0.4,
     color: Colors.white,
+    marginTop: 4,
+  },
+  filtersRow: {
+    gap: Spacing.sm,
+    marginTop: Spacing.lg,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 36,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  chipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  chipText: {
+    fontFamily: Typography.family.semibold,
+    fontSize: 13,
+    color: Colors.text,
+  },
+  chipTextActive: {
+    color: Colors.white,
+  },
+  resultsTitle: {
+    fontFamily: Typography.family.display,
     fontSize: 18,
-    fontWeight: '800',
-    textAlign: 'center',
-    paddingHorizontal: 16,
+    letterSpacing: -0.3,
+    color: Colors.text,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  resultsAccent: {
+    color: Colors.primary,
+  },
+  card: {
+    borderRadius: Radius['2xl'],
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    ...Shadow.md,
+  },
+  cardImage: {
+    height: 156,
+    padding: Spacing.md,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  cardImageRadius: {
+    borderTopLeftRadius: Radius['2xl'],
+    borderTopRightRadius: Radius['2xl'],
+  },
+  cardScrim: {
+    ...StyleSheet.absoluteFillObject,
+    borderTopLeftRadius: Radius['2xl'],
+    borderTopRightRadius: Radius['2xl'],
+    backgroundColor: 'rgba(15,23,42,0.08)',
+  },
+  closedVeil: {
+    ...StyleSheet.absoluteFillObject,
+    borderTopLeftRadius: Radius['2xl'],
+    borderTopRightRadius: Radius['2xl'],
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
+  },
+  statusPillClosed: {
+    backgroundColor: Colors.text,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: Colors.success,
+  },
+  statusDotClosed: {
+    backgroundColor: Colors.warning,
+  },
+  statusText: {
+    fontFamily: Typography.family.bold,
+    fontSize: 12,
+    color: Colors.successText,
+  },
+  statusTextClosed: {
+    color: Colors.white,
   },
   heartBtn: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: Colors.white,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    zIndex: 20,
+    backgroundColor: Colors.surface,
   },
-
-  // Carousel dots
-  dotsRow: {
-    flexDirection: 'row',
-    alignSelf: 'center',
-    alignItems: 'center',
-    gap: 5,
-    marginBottom: 12,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: Radius.full,
+  cardBody: {
+    padding: Spacing.base,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  dotActive: {
-    width: 18,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.white,
-  },
-
-  // Info section (below image)
-  infoSection: {
-    paddingHorizontal: 2, // Tiny padding so it's not flush to the absolute edge if the image has a border
-    paddingVertical: Spacing.sm,
-  },
-
-  // Name + Rating row
-  nameRow: {
+  cardTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 3,
+    gap: Spacing.sm,
   },
-  storeName: {
+  cardTitle: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '800',
+    fontFamily: Typography.family.display,
+    fontSize: 18,
+    letterSpacing: -0.3,
     color: Colors.text,
-    letterSpacing: -0.2,
-    marginRight: Spacing.sm,
   },
-  ratingBadge: {
+  ratingChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.warningBg,
   },
-  ratingStar: {
-    fontSize: 13,
-  },
-  ratingValue: {
-    fontSize: 14,
-    fontWeight: '700',
+  ratingText: {
+    fontFamily: Typography.family.bold,
+    fontSize: 12,
     color: Colors.text,
   },
   ratingCount: {
+    fontFamily: Typography.family.regular,
     fontSize: 12,
-    fontWeight: '500',
-    color: Colors.muted,
-  },
-
-  // Meta row
-  metaText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-
-  // Delivery row
-  deliveryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  bikeIcon: {
-    fontSize: 14,
-  },
-  deliveryFee: {
-    fontSize: 13,
-    fontWeight: '600',
     color: Colors.textSecondary,
   },
-});
-
-// ─── Carousel Styles ───────────────────────────────────────────────────────────
-
-const carouselStyles = StyleSheet.create({
-  container: {
-    marginBottom: Spacing.xl,
-  },
-  promoBanner: {
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
+  metaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    overflow: 'hidden',
-    height: 120, // fixed height for consistency
+    flexWrap: 'wrap',
+    columnGap: Spacing.md,
+    rowGap: 4,
+    marginTop: Spacing.sm,
   },
-  promoBannerBorder: {
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  promoContent: {
-    flex: 1,
-    paddingRight: Spacing.md,
-    zIndex: 2,
-    justifyContent: 'center',
-  },
-  promoTitle: {
-    fontSize: Typography.size.lg,
-    fontWeight: '800',
-    lineHeight: 24,
-    marginBottom: Spacing.sm,
-    textTransform: 'uppercase',
-  },
-  promoActionRow: {
+  metaItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-  },
-  promoGraphicPlaceholder: {
-    position: 'absolute',
-    right: -20,
-    bottom: -15,
-    width: 120,
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  promoTicketIcon: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    transform: [{ rotate: '-15deg' }]
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    alignSelf: 'center',
     alignItems: 'center',
     gap: 5,
-    marginTop: 10,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.border,
+  metaText: {
+    fontFamily: Typography.family.medium,
+    fontSize: 13,
+    color: Colors.textSecondary,
   },
-  dotActive: {
-    width: 18,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.primary,
+  metaFree: {
+    color: Colors.successText,
+  },
+  skeletonCard: {
+    marginTop: Spacing.base,
+  },
+  skeleton: {
+    height: 16,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.surfaceTertiary,
+  },
+  stateWrap: {
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xxl,
+  },
+  stateTitle: {
+    fontFamily: Typography.family.displayExtrabold,
+    fontSize: 21,
+    letterSpacing: -0.4,
+    color: Colors.text,
+    marginTop: Spacing.base,
+    textAlign: 'center',
+  },
+  stateBody: {
+    fontFamily: Typography.family.regular,
+    fontSize: 15,
+    lineHeight: 22,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: Spacing.sm,
   },
 });
-

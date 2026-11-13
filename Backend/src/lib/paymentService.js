@@ -8,6 +8,9 @@ const {
   onOrderPlacedToCustomer,
   onOrderPlacedToVendor,
 } = require("./notificationHooks");
+const { notifyOrderStatus } = require("./appNotifications");
+const { checkBackInStock } = require("./stockAlerts");
+const { emitOrderStatusChanged } = require("./orderEvents");
 const Order = require("../models/Order");
 const PlatformSettings = require("../models/PlatformSettings");
 const Product = require("../models/Product");
@@ -31,6 +34,24 @@ const restoreStockForOrder = async (order) => {
       ).catch(() => {});
     }
   }
+  // Customers waiting on these items may be able to buy them again
+  checkBackInStock((order.items || []).map((item) => item.product));
+};
+
+/**
+ * Return a cancelled order's items to inventory exactly once. The marker is
+ * claimed atomically, so concurrent cancellations cannot restock twice.
+ */
+const restoreStockForOrderOnce = async (order) => {
+  const claimedAt = new Date();
+  const claim = await Order.updateOne(
+    { _id: order._id, "tracking.stockRestoredAt": null },
+    { $set: { "tracking.stockRestoredAt": claimedAt } }
+  );
+  if (claim.modifiedCount === 0) return false;
+  if (order.tracking) order.tracking.stockRestoredAt = claimedAt;
+  await restoreStockForOrder(order);
+  return true;
 };
 
 const appendPaymentEvent = (order, event) => {
@@ -119,8 +140,9 @@ const cancelOrdersAndRestoreStock = async ({
       continue;
     }
 
+    const previousStatus = order.orderStatus;
     // eslint-disable-next-line no-await-in-loop
-    await restoreStockForOrder(order);
+    await restoreStockForOrderOnce(order);
 
     order.orderStatus = "cancelled";
     order.paymentStatus = "failed";
@@ -144,6 +166,8 @@ const cancelOrdersAndRestoreStock = async ({
     // eslint-disable-next-line no-await-in-loop
     await order.save();
     onOrderPaymentFailed(order, { reason });
+    emitOrderStatusChanged(order, previousStatus);
+    notifyOrderStatus(order);
   }
 };
 
@@ -183,6 +207,7 @@ const finalizeTransaction = async (
 
 module.exports = {
   restoreStockForOrder,
+  restoreStockForOrderOnce,
   appendPaymentEvent,
   appendStatusHistory,
   markOrdersPaid,

@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useCallback } from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
+import { Colors, Spacing, Typography, Radius, Shadow, Motion } from '../theme';
 
 const AlertContext = createContext(null);
 
@@ -14,7 +14,7 @@ export function AlertProvider({ children }) {
     setAlertConfig(config);
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true })
+      Animated.spring(scaleAnim, { toValue: 1, ...Motion.springs.snappy, useNativeDriver: true })
     ]).start();
   }, [fadeAnim, scaleAnim]);
 
@@ -49,11 +49,11 @@ export function AlertProvider({ children }) {
             <Animated.View style={[styles.alertBox, { transform: [{ scale: scaleAnim }] }]}>
               
               {alertConfig.icon !== false && (
-                <View style={[styles.iconWrapper, alertConfig.isDestructive && { backgroundColor: '#FEE2E2' }]}>
+                <View style={[styles.iconWrapper, alertConfig.isDestructive && styles.iconWrapperDestructive]}>
                   <Feather 
                     name={alertConfig.icon || (alertConfig.isDestructive ? 'alert-triangle' : 'info')} 
                     size={28} 
-                    color={alertConfig.isDestructive ? '#EF4444' : Colors.primary} 
+                    color={alertConfig.isDestructive ? Colors.errorText : Colors.primary} 
                   />
                 </View>
               )}
@@ -72,7 +72,7 @@ export function AlertProvider({ children }) {
                 )}
                 
                 <TouchableOpacity 
-                  style={[styles.confirmBtn, alertConfig.isDestructive && { backgroundColor: '#EF4444' }]} 
+                  style={[styles.confirmBtn, alertConfig.isDestructive && styles.confirmBtnDestructive]} 
                   onPress={handleConfirm} 
                   activeOpacity={0.8}
                 >
@@ -93,42 +93,57 @@ export const useCustomAlert = () => useContext(AlertContext);
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: Colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: Spacing.xl,
+    padding: Spacing.lg,
     zIndex: 9999,
   },
   alertBox: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.xl,
-    padding: Spacing.xl,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius['3xl'],
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    padding: Spacing.lg,
+    paddingTop: Spacing.xl,
     width: '100%',
     maxWidth: 340,
     alignItems: 'center',
-    ...Shadow.lg,
+    ...Shadow.xl,
   },
   iconWrapper: {
-    width: 60, height: 60,
-    borderRadius: 30,
-    backgroundColor: '#EEF2FF',
+    width: 64,
+    height: 64,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.primarySubtle,
+    borderWidth: 1,
+    borderColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.base,
+    ...Shadow.morphic3d,
+  },
+  iconWrapperDestructive: {
+    backgroundColor: Colors.errorBg,
+    borderColor: Colors.accentLight,
+    shadowColor: Colors.accent,
   },
   title: {
+    fontFamily: Typography.family.displayExtrabold,
     fontSize: 20,
-    fontWeight: '800',
+    lineHeight: 26,
+    letterSpacing: -0.3,
     color: Colors.text,
     textAlign: 'center',
     marginBottom: Spacing.sm,
   },
   message: {
+    fontFamily: Typography.family.regular,
     fontSize: 15,
+    lineHeight: 22,
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: Spacing.xl,
-    lineHeight: 22,
+    marginBottom: Spacing.lg,
   },
   actions: {
     flexDirection: 'row',
@@ -137,29 +152,31 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    minHeight: 48,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surfaceSecondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelText: {
+    fontFamily: Typography.family.semibold,
     color: Colors.text,
-    fontWeight: '700',
     fontSize: 15,
   },
   confirmBtn: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: Radius.full,
+    minHeight: 48,
+    borderRadius: Radius.lg,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  confirmBtnDestructive: {
+    backgroundColor: Colors.accent,
+  },
   confirmText: {
+    fontFamily: Typography.family.bold,
     color: Colors.white,
-    fontWeight: '700',
     fontSize: 15,
   },
 });

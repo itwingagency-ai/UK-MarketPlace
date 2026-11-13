@@ -10,12 +10,14 @@
  *   PUT    /operating-hours            — replace full week schedule
  *   PATCH  /operating-hours/:day       — update a single day
  *   DELETE /operating-hours/:day       — mark a day as closed (isClosed=true)
+ *   PATCH  /busy                       — pause new orders for N minutes, or resume
  *   GET    /operating-hours/status     — live open/closed status (for dashboard widget)
  */
 
 const asyncHandler = require("../lib/asyncHandler");
 const ApiError = require("../lib/ApiError");
 const { computeOpenStatus } = require("../lib/geoUtils");
+const { MAX_PAUSE_MINUTES, applyBusyStatus } = require("../lib/storeAvailability");
 const { validateOperatingHoursPayload, validateDayKey } = require("../validators/operatingHours.validator");
 const Store = require("../models/Store");
 
@@ -30,7 +32,7 @@ const resolveStore = async (req) => {
   const storeId = req.storeScopeId;
   if (!storeId) throw new ApiError(400, "No store in scope");
   const store = await Store.findById(storeId).select(
-    "name operatingHours timezone"
+    "name operatingHours timezone ordersPausedUntil"
   );
   if (!store) throw new ApiError(404, "Store not found");
   return store;
@@ -58,7 +60,7 @@ const getOperatingHours = asyncHandler(async (req, res) => {
   const store = await resolveStore(req);
   const timezone = store.timezone || req.query.timezone || "UTC";
 
-  const status = computeOpenStatus(store.operatingHours, timezone);
+  const status = applyBusyStatus(computeOpenStatus(store.operatingHours, timezone), store);
 
   res.status(200).json({
     data: {
@@ -85,11 +87,13 @@ const getOperatingHours = asyncHandler(async (req, res) => {
 const getLiveStatus = asyncHandler(async (req, res) => {
   const store = await resolveStore(req);
   const timezone = store.timezone || req.query.timezone || "UTC";
-  const status = computeOpenStatus(store.operatingHours, timezone);
+  const status = applyBusyStatus(computeOpenStatus(store.operatingHours, timezone), store);
 
   res.status(200).json({
     data: {
       isOpen:            status.isOpen,
+      isBusy:            status.isBusy,
+      busyUntil:         status.busyUntil,
       statusLabel:       status.statusLabel,
       todayDay:          status.todayDay,
       todayHours:        status.todayHours,
@@ -230,7 +234,35 @@ const closeDay = asyncHandler(async (req, res) => {
   });
 });
 
+// ── PATCH /busy ───────────────────────────────────────────────────────────────
+// Body: { minutes } to stop taking new orders for that long (1–480), or
+// { minutes: 0 } to start taking orders again straight away.
+
+const setBusy = asyncHandler(async (req, res) => {
+  const minutes = Number(req.body?.minutes);
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > MAX_PAUSE_MINUTES) {
+    throw new ApiError(400, `minutes must be a whole number from 0 to ${MAX_PAUSE_MINUTES}`);
+  }
+
+  const store = await resolveStore(req);
+  store.ordersPausedUntil = minutes === 0 ? null : new Date(Date.now() + minutes * 60 * 1000);
+  await store.save();
+
+  const timezone = store.timezone || "UTC";
+  const status = applyBusyStatus(computeOpenStatus(store.operatingHours, timezone), store);
+  res.status(200).json({
+    message: minutes === 0 ? "Taking orders again" : `Orders paused for ${minutes} minutes`,
+    data: {
+      isOpen: status.isOpen,
+      isBusy: status.isBusy,
+      busyUntil: status.busyUntil,
+      statusLabel: status.statusLabel,
+    },
+  });
+});
+
 module.exports = {
+  setBusy,
   getOperatingHours,
   getLiveStatus,
   replaceOperatingHours,

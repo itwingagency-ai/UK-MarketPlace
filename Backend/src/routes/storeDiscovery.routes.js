@@ -4,6 +4,7 @@ const {
   getStoreBySlug,
   getStoreStatus,
   getStoreProducts,
+  getStoreCategories,
   checkDeliverability,
 } = require("../controllers/storeDiscovery.controller");
 
@@ -35,6 +36,7 @@ router.get("/nearby", getNearbyStores);
 router.get("/:slug/status", getStoreStatus);
 router.get("/:slug/delivers", checkDeliverability);
 router.get("/:storeId/products", getStoreProducts);
+router.get("/:storeId/categories", getStoreCategories);
 router.get("/:slug", getStoreBySlug);
 
 module.exports = router;

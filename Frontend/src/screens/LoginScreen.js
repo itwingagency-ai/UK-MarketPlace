@@ -73,6 +73,18 @@ export default function LoginScreen({ navigation }) {
     return valid;
   };
 
+  // Inside the Account tab the stack swaps to the account screens by itself.
+  // When Login was pushed on the root stack (home "Log in", basket prompts),
+  // nothing replaces it, so return to where the customer came from.
+  const leaveAfterLogin = (user) => {
+    // Shopkeepers get a whole new navigator (the shop app) instead
+    if (user?.role === 'vendor') return;
+    const state = navigation.getState();
+    if (state?.routeNames?.includes('MainTabs') && navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  };
+
   const handleLogin = async () => {
     if (!validateForm()) {
       shake();
@@ -84,7 +96,9 @@ export default function LoginScreen({ navigation }) {
     if (!result.success) {
       setPasswordError(result.error ?? 'Login failed. Please try again.');
       shake();
+      return;
     }
+    leaveAfterLogin(result.user);
   };
 
   const handleSocialPress = async (provider) => {
@@ -110,6 +124,8 @@ export default function LoginScreen({ navigation }) {
         setIsSubmitting(false);
         if (!result.success) {
           Alert.alert('Login Failed', result.error || 'Google Login failed.');
+        } else {
+          leaveAfterLogin(result.user);
         }
       } catch (error) {
         setIsSubmitting(false);
@@ -144,7 +160,7 @@ export default function LoginScreen({ navigation }) {
       >
         {/* Hero image scrolls naturally with the page */}
         <Image
-          source={require('../../assets/login_hero.png')}
+          source={require('../../assets/login_hero.jpg')}
           style={styles.heroImage}
           resizeMode="cover"
         />

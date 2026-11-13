@@ -163,7 +163,7 @@ export default function LoginPage() {
 
         <div className="auth-info">
           Want to become a vendor?{' '}
-          <Link to="/signup" style={{ color: '#5B9F12', fontWeight: 'var(--weight-semibold)' }}>
+          <Link to="/signup" style={{ color: 'var(--color-text-brand)', fontWeight: 'var(--weight-semibold)' }}>
             Apply Here
           </Link>
         </div>

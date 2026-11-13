@@ -23,6 +23,7 @@ const adminRoutes = require("./routes/admin.routes");
 const publicReviewsRoutes = require("./routes/publicReviews.routes");
 const productSearchRoutes = require("./routes/productSearch.routes");
 const storeDiscoveryRoutes = require("./routes/storeDiscovery.routes");
+const { USE_LOCAL_UPLOADS, LOCAL_UPLOAD_DIR } = require("./middleware/upload.middleware");
 
 const app = express();
 
@@ -43,6 +44,8 @@ app.use(
 );
 
 app.use(express.json());
+// Local-development image storage (see upload.middleware)
+if (USE_LOCAL_UPLOADS) app.use("/uploads", express.static(LOCAL_UPLOAD_DIR));
 app.use(cookieParser());
 
 app.get("/health", (req, res) => {

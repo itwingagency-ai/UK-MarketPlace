@@ -64,6 +64,16 @@ export default function AccountScreen({ navigation }) {
         {/* General Section */}
         <Text style={[styles.sectionTitle, { marginTop: Spacing.xl }]}>General</Text>
         <View style={styles.generalList}>
+          <TouchableOpacity style={styles.generalItem} activeOpacity={0.7} onPress={() => navigation.navigate('BecomeSeller')}>
+            <View style={styles.generalItemLeft}>
+              <Feather name="shopping-bag" size={22} color={Colors.text} />
+              <Text style={styles.generalItemText}>Sell on UK Marketplace</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color={Colors.muted} />
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
           <TouchableOpacity style={styles.generalItem} activeOpacity={0.7} onPress={() => navigation.navigate('HelpCenter')}>
             <View style={styles.generalItemLeft}>
               <Feather name="help-circle" size={22} color={Colors.text} />

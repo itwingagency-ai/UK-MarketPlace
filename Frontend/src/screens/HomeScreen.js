@@ -1,117 +1,64 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
-  Image,
+  Pressable,
   StatusBar,
-  Animated,
-  Alert,
-  ActivityIndicator,
-  Platform,
-  KeyboardAvoidingView,
-  Dimensions,
   Modal,
-  ScrollView,
+  useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import { Feather } from '@expo/vector-icons';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  SlideInDown,
+  useAnimatedKeyboard,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  interpolateColor,
+} from 'react-native-reanimated';
 import { getNearbyStores, decodePostcode } from '../api/stores.api';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from '../context/LocationContext';
 import { useCart } from '../context/CartContext';
 import { useCustomAlert } from '../context/AlertContext';
-import { Colors, Spacing, Typography, Radius } from '../theme';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import Asset3D from '../components/Asset3D';
+import Button from '../components/Button';
+import { Colors, Spacing, Typography, Radius, Shadow, Motion } from '../theme';
 
-const { width, height } = Dimensions.get('window');
+// Built once at module level: a new builder on every render makes Reanimated
+// remount the view, which would drop focus from the postcode input.
+const enter = (delay) => FadeInDown.delay(delay).springify().damping(Motion.springs.gentle.damping);
+const ENTER = { top: enter(0), headline: enter(120), card: enter(220), trust: enter(320) };
+const HERO_FADE = FadeIn.delay(150).duration(500);
 
-// ─── Coming Soon Modal (Account Screen Style) ────────────────────────────────────────────────────────
-function ComingSoonModal({ visible, postcode, onClose }) {
-  const slideAnim = useRef(new Animated.Value(300)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  React.useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          damping: 18,
-          stiffness: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 300, duration: 200, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [visible]);
-
+// ─── "No stores yet" bottom sheet ────────────────────────────────────────────
+function NoStoresSheet({ visible, postcode, onClose }) {
+  if (!visible) return null;
   return (
-    <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-      <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
-        <Animated.View style={[styles.modalCard, { transform: [{ translateY: slideAnim }] }]}>
-          {/* Top Header */}
-          <View style={styles.modalHeaderRow}>
-            <Text style={styles.modalHeaderTitle}>Store Status</Text>
-            <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
-              <Feather name="x" size={20} color={Colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Icon */}
-          <View style={styles.modalIconWrapper}>
-            <Ionicons name="storefront-outline" size={32} color={Colors.primary} />
-          </View>
-
-          {/* Title & Postcode */}
-          <Text style={styles.modalTitle}>No stores in your area yet</Text>
+    <Modal transparent visible animationType="none" onRequestClose={onClose}>
+      <Animated.View entering={FadeIn.duration(200)} style={styles.sheetOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Animated.View entering={SlideInDown.springify().damping(20)} style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+          <Asset3D name="illo-no-stores" size={84} float style={styles.sheetArt} />
+          <Text style={styles.sheetTitle}>No stores here yet</Text>
           {postcode ? (
-            <View style={styles.modalPostcodeBadge}>
-              <Text style={styles.modalPostcodeLabel}>{postcode}</Text>
+            <View style={styles.sheetPostcode}>
+              <Feather name="map-pin" size={13} color={Colors.primary} />
+              <Text style={styles.sheetPostcodeText}>{postcode}</Text>
             </View>
           ) : null}
-          <Text style={styles.modalBody}>
-            We're working hard to bring our marketplace to your neighbourhood. Be the first to know when we launch near you!
+          <Text style={styles.sheetBody}>
+            We're bringing local stores to more neighbourhoods every week. Try a nearby postcode in the meantime.
           </Text>
-
-          {/* Account-style Action Card Box for steps */}
-          <View style={styles.accountActionCard}>
-            <View style={styles.accountActionRow}>
-              <View style={styles.accountActionLeft}>
-                <Feather name="bell" size={20} color={Colors.text} />
-                <Text style={styles.accountActionText}>Get notified when we launch</Text>
-              </View>
-            </View>
-            <View style={styles.accountDivider} />
-            <View style={styles.accountActionRow}>
-              <View style={styles.accountActionLeft}>
-                <Ionicons name="add-circle-outline" size={22} color={Colors.text} />
-                <Text style={styles.accountActionText}>New stores added every week</Text>
-              </View>
-            </View>
-            <View style={styles.accountDivider} />
-            <View style={styles.accountActionRow}>
-              <View style={styles.accountActionLeft}>
-                <Ionicons name="map-outline" size={22} color={Colors.text} />
-                <Text style={styles.accountActionText}>Try a nearby postcode</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Actions */}
-          <TouchableOpacity style={styles.modalPrimaryBtn} onPress={onClose} activeOpacity={0.85}>
-            <Text style={styles.modalPrimaryBtnText}>Try another postcode</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose} activeOpacity={0.7}>
-            <Text style={styles.modalSecondaryBtnText}>Dismiss</Text>
-          </TouchableOpacity>
+          <Button title="Try another postcode" size="full" onPress={onClose} />
+          <Button title="Dismiss" variant="ghost" size="full" onPress={onClose} style={{ marginTop: Spacing.xs }} />
         </Animated.View>
       </Animated.View>
     </Modal>
@@ -120,14 +67,31 @@ function ComingSoonModal({ visible, postcode, onClose }) {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation }) {
-  const { isAuthenticated, logout } = useAuth();
-  const { location, updateLocation } = useLocation();
+  const { isAuthenticated, user, logout } = useAuth();
+  const { updateLocation } = useLocation();
   const [postcode, setPostcode] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
-  const [showComingSoon, setShowComingSoon] = useState(false);
+  const [showNoStores, setShowNoStores] = useState(false);
   const [notFoundPostcode, setNotFoundPostcode] = useState('');
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  // Focus styling runs on the UI thread: re-rendering the input's wrapper
+  // with new style props on focus makes Android drop the input's focus.
+  const inputFocus = useSharedValue(0);
+  const inputWrapStyle = useAnimatedStyle(() => ({
+    borderColor: interpolateColor(inputFocus.value, [0, 1], [Colors.border, Colors.primary]),
+  }));
+  const [cardBottom, setCardBottom] = useState(0);
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  // The window doesn't resize for the keyboard (edge-to-edge), so slide the
+  // content up just enough to keep the search card above it. A transform
+  // keeps the input's layout stable, so it doesn't lose focus mid-animation.
+  const keyboard = useAnimatedKeyboard();
+  const liftStyle = useAnimatedStyle(() => {
+    const overlap = keyboard.height.value - (windowHeight - insets.top - cardBottom) + Spacing.base;
+    return { transform: [{ translateY: -Math.max(0, overlap) }] };
+  });
 
   const { itemCount, clearCart, storeId } = useCart();
   const { showAlert } = useCustomAlert();
@@ -166,56 +130,48 @@ export default function HomeScreen({ navigation }) {
     proceedToShopHome(stores, trimmed, locationLabel, lat, lng);
   };
 
+  const showNoStoresFor = (label) => {
+    setNotFoundPostcode(label);
+    setShowNoStores(true);
+  };
+
   const executeSearch = async (trimmed) => {
     setIsSearching(true);
     try {
-      // Fetch stores + decode postcode to human-readable location in parallel
-      const [storeResult, locationResult] = await Promise.allSettled([
-        getNearbyStores({ postcode: trimmed }),
-        decodePostcode(trimmed),
-      ]);
+      // Resolve the postcode to coordinates with postcodes.io first, so store
+      // discovery works without the server-side Google geocoder.
+      const decoded = await decodePostcode(trimmed);
+      const hasCoords = decoded?.latitude != null && decoded?.longitude != null;
 
-      // Extract stores from response
-      const apiData = storeResult.status === 'fulfilled' ? storeResult.value : null;
+      const apiData = await getNearbyStores(
+        hasCoords ? { lat: decoded.latitude, lng: decoded.longitude } : { postcode: trimmed }
+      ).catch(() => null);
       const stores = apiData?.data?.stores ?? apiData?.stores ?? [];
 
       if (stores.length === 0) {
-        setNotFoundPostcode(trimmed);
-        setShowComingSoon(true);
-        setIsSearching(false);
+        showNoStoresFor(trimmed);
         return;
       }
 
-      // Build human-readable location label from postcodes.io
       let locationLabel = trimmed;
-      if (locationResult.status === 'fulfilled' && locationResult.value) {
-        const loc = locationResult.value;
-        const parts = [loc.admin_ward, loc.admin_district].filter(Boolean);
-        if (parts.length > 0) locationLabel = parts.join(', ');
+      const parts = [decoded?.admin_ward, decoded?.admin_district].filter(Boolean);
+      if (parts.length > 0) {
+        locationLabel = parts.join(', ');
       } else if (apiData?.data?.resolvedLocation?.formattedAddress) {
         locationLabel = apiData.data.resolvedLocation.formattedAddress;
       }
 
-      if (apiData?.data?.resolvedLocation?.lat) {
-        checkCartAndProceed(
-          stores, 
-          trimmed, 
-          locationLabel, 
-          apiData.data.resolvedLocation.lat, 
-          apiData.data.resolvedLocation.lng
-        );
-      } else {
-        checkCartAndProceed(stores, trimmed, locationLabel, null, null);
-      }
-    } catch (err) {
-      setNotFoundPostcode(trimmed);
-      setShowComingSoon(true);
+      const lat = hasCoords ? decoded.latitude : apiData?.data?.resolvedLocation?.lat ?? null;
+      const lng = hasCoords ? decoded.longitude : apiData?.data?.resolvedLocation?.lng ?? null;
+      checkCartAndProceed(stores, trimmed, locationLabel, lat, lng);
+    } catch {
+      showNoStoresFor(trimmed);
     } finally {
       setIsSearching(false);
     }
   };
 
-  const handleSearchPress = async () => {
+  const handleSearchPress = () => {
     if (!postcode.trim()) {
       showAlert({
         title: 'Postcode required',
@@ -226,17 +182,10 @@ export default function HomeScreen({ navigation }) {
       });
       return;
     }
-    
-    Animated.sequence([
-      Animated.timing(scaleAnim, { toValue: 0.97, duration: 80, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
-    ]).start();
-
-    const trimmed = postcode.trim().toUpperCase();
-    executeSearch(trimmed);
+    executeSearch(postcode.trim().toUpperCase());
   };
 
-  const executeLocationSearch = async () => {
+  const handleUseLocation = async () => {
     setIsLocating(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -248,7 +197,6 @@ export default function HomeScreen({ navigation }) {
           showCancel: false,
           confirmText: 'OK'
         });
-        setIsLocating(false);
         return;
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
@@ -257,14 +205,12 @@ export default function HomeScreen({ navigation }) {
       const stores = data?.data?.stores ?? data?.stores ?? [];
 
       if (stores.length === 0) {
-        setNotFoundPostcode('your location');
-        setShowComingSoon(true);
-        setIsLocating(false);
+        showNoStoresFor('your location');
         return;
       }
 
       checkCartAndProceed(stores, 'My Location', 'Your Location', latitude, longitude);
-    } catch (err) {
+    } catch {
       showAlert({
         title: 'Location error',
         message: 'Unable to get your location. Please try entering a postcode.',
@@ -277,11 +223,7 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const handleUseLocation = async () => {
-    executeLocationSearch();
-  };
-
-  const handleLogout = async () => {
+  const handleLogout = () => {
     showAlert({
       title: 'Log out',
       message: 'Are you sure you want to log out?',
@@ -292,389 +234,404 @@ export default function HomeScreen({ navigation }) {
     });
   };
 
+  const busy = isSearching || isLocating;
+  const firstName = user?.name?.split(' ')[0];
+
   return (
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
-      {/* Full-bleed background image (blue blob + all food items) */}
-      <Image
-        source={require('../../assets/home_hero_bg.png')}
-        style={styles.bgImage}
-        resizeMode="cover"
-      />
+      {/* Soft mesh-gradient backdrop */}
+      <View style={[styles.blob, styles.blobViolet]} />
+      <View style={[styles.blob, styles.blobRed]} />
+      <View style={[styles.blob, styles.blobSky]} />
 
-      {/* Overlay so the bottom white section is clear */}
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+          <Animated.ScrollView
+            style={liftStyle}
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Top bar */}
+            <Animated.View entering={ENTER.top} style={styles.topBar}>
+              <View style={styles.brandRow}>
+                <View style={styles.brandMark}>
+                  <Feather name="shopping-bag" size={16} color={Colors.white} />
+                </View>
+                <Text style={styles.brandText}>snappy shopper</Text>
+              </View>
+              {isAuthenticated ? (
+                <Pressable onPress={handleLogout} style={styles.userChip} hitSlop={8}>
+                  <View style={styles.userAvatar}>
+                    <Text style={styles.userAvatarText}>{firstName?.[0]?.toUpperCase() || 'U'}</Text>
+                  </View>
+                  <Feather name="log-out" size={14} color={Colors.textSecondary} />
+                </Pressable>
+              ) : (
+                // Shopkeepers sign in here too — their account opens the shop app
+                <Pressable
+                  onPress={() => navigation.navigate('Login')}
+                  style={[styles.userChip, styles.loginChip]}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                >
+                  <Feather name="user" size={14} color={Colors.primary} />
+                  <Text style={styles.loginChipText}>Log in</Text>
+                </Pressable>
+              )}
+            </Animated.View>
+
+            {/* 3D hero cluster */}
+            <View style={styles.hero}>
+              <View style={styles.heroHalo} />
+              <Asset3D name="cat-bakery" size={64} float delay={300} style={[styles.heroItem, { top: 18, left: 24 }]} />
+              <Asset3D name="cat-fruit-veg" size={56} float delay={900} style={[styles.heroItem, { top: 4, right: 40 }]} />
+              <Asset3D name="cat-dairy-eggs" size={52} float delay={600} style={[styles.heroItem, { bottom: 18, left: 48 }]} />
+              <Asset3D name="cat-drinks" size={58} float delay={1200} style={[styles.heroItem, { bottom: 8, right: 20 }]} />
+              <Animated.View entering={HERO_FADE}>
+                <Asset3D name="hero-delivery-scooter" size={128} float />
+              </Animated.View>
+            </View>
+
+            {/* Headline */}
+            <Animated.View entering={ENTER.headline}>
+              <Text style={styles.eyebrow}>
+                {firstName ? `Welcome back, ${firstName}` : 'Local delivery, done right'}
+              </Text>
+              <Text style={styles.headline}>Your neighbourhood stores, delivered.</Text>
+              <Text style={styles.subhead}>
+                Groceries, bakeries and pharmacies near you — enter your postcode to start.
+              </Text>
+            </Animated.View>
+
+            {/* Search card */}
+            <Animated.View
+              entering={ENTER.card}
+              style={styles.card}
+              onLayout={(e) => setCardBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}
+            >
+              <Text style={styles.inputLabel}>Delivery postcode</Text>
+              <Animated.View style={[styles.inputWrap, inputWrapStyle]}>
+                <Feather name="map-pin" size={18} color={Colors.primary} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. SW1A 1AA"
+                  placeholderTextColor={Colors.muted}
+                  value={postcode}
+                  onChangeText={(text) => setPostcode(text.toUpperCase())}
+                  onFocus={() => { inputFocus.value = withTiming(1, { duration: 160 }); }}
+                  onBlur={() => { inputFocus.value = withTiming(0, { duration: 160 }); }}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                  onSubmitEditing={handleSearchPress}
+                />
+                {postcode ? (
+                  <Pressable onPress={() => setPostcode('')} hitSlop={10}>
+                    <Feather name="x-circle" size={18} color={Colors.muted} />
+                  </Pressable>
+                ) : null}
+              </Animated.View>
+
+              <Button
+                title="Search stores"
+                size="full"
+                onPress={handleSearchPress}
+                loading={isSearching}
+                disabled={busy}
+                icon={<Feather name="search" size={18} color={Colors.white} />}
+                style={{ marginTop: Spacing.md }}
+              />
+
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <Button
+                title="Use my current location"
+                variant="outline"
+                size="full"
+                onPress={handleUseLocation}
+                loading={isLocating}
+                disabled={busy}
+                icon={<Feather name="navigation" size={17} color={Colors.primary} />}
+              />
+            </Animated.View>
+
+            {/* Trust row */}
+            <Animated.View entering={ENTER.trust} style={styles.trustRow}>
+              {[
+                ['zap', 'Fast local delivery'],
+                ['shield', 'Secure checkout'],
+                ['star', 'Rated stores'],
+              ].map(([icon, label]) => (
+                <View key={label} style={styles.trustItem}>
+                  <Feather name={icon} size={14} color={Colors.primary} />
+                  <Text style={styles.trustText}>{label}</Text>
+                </View>
+              ))}
+            </Animated.View>
+          </Animated.ScrollView>
       </SafeAreaView>
 
-      {/* Scrollable content for keyboard avoidance */}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
-          bounces={false}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Spacer to push card down to CARD_TOP */}
-          <View style={{ height: CARD_TOP }} />
-
-          <View style={styles.card}>
-          {/* Brand */}
-          <View style={styles.brandBlock}>
-            <Text style={styles.brandLine1}>snappy</Text>
-            <View style={styles.brandRow}>
-              <Text style={styles.brandLine2}>shopper</Text>
-              <Text style={styles.truckEmoji}> 🚐</Text>
-            </View>
-          </View>
-
-          <Text style={styles.subtitle}>Find your nearest store</Text>
-
-          {/* Postcode input */}
-          <View style={styles.inputWrapper}>
-            <Text style={styles.pinIcon}>📍</Text>
-            <TextInput
-              style={styles.postcodeInput}
-              placeholder="Enter your postcode"
-              placeholderTextColor={Colors.muted}
-              value={postcode}
-              onChangeText={setPostcode}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              returnKeyType="search"
-              onSubmitEditing={handleSearchPress}
-            />
-          </View>
-
-          {/* Search button */}
-          <Animated.View style={[styles.btnContainer, { transform: [{ scale: scaleAnim }] }]}>
-            <TouchableOpacity
-              style={styles.searchBtn}
-              onPress={handleSearchPress}
-              disabled={isSearching || isLocating}
-              activeOpacity={0.85}
-            >
-              {isSearching ? (
-                <ActivityIndicator color={Colors.white} size="small" />
-              ) : (
-                <>
-                  <Text style={styles.searchIcon}>🔍</Text>
-                  <Text style={styles.searchBtnText}>Search stores</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* Use my location link */}
-          <TouchableOpacity
-            style={styles.locationBtn}
-            onPress={handleUseLocation}
-            disabled={isSearching || isLocating}
-            activeOpacity={0.7}
-          >
-            {isLocating ? (
-              <ActivityIndicator color={Colors.white} size="small" style={{ marginRight: 8 }} />
-            ) : (
-              <Text style={styles.locationIconText}>✈️</Text>
-            )}
-            <Text style={styles.locationText}> Use my current location</Text>
-          </TouchableOpacity>
-        </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      {/* Coming Soon Modal */}
-      <ComingSoonModal
-        visible={showComingSoon}
+      <NoStoresSheet
+        visible={showNoStores}
         postcode={notFoundPostcode}
-        onClose={() => setShowComingSoon(false)}
+        onClose={() => setShowNoStores(false)}
       />
     </View>
   );
 }
 
-const CARD_TOP = height * 0.44;
-
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#EFF1F5',
+    backgroundColor: Colors.bg,
+    overflow: 'hidden',
   },
-  bgImage: {
+  blob: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    width,
-    height: CARD_TOP + 40,
+    borderRadius: 999,
   },
-  safeArea: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-    alignItems: 'flex-end',
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'android' ? 44 : 0,
+  blobViolet: {
+    width: 360,
+    height: 360,
+    top: -120,
+    left: -110,
+    backgroundColor: 'rgba(163, 94, 240, 0.16)',
   },
-  logoutBtn: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: Radius.full,
-    borderWidth: 1.5,
-    borderColor: 'rgba(220,230,255,0.8)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+  blobRed: {
+    width: 260,
+    height: 260,
+    top: 40,
+    right: -130,
+    backgroundColor: 'rgba(239, 68, 68, 0.09)',
   },
-  logoutText: {
-    fontSize: Typography.size.sm,
-    fontWeight: Typography.weight.semibold,
-    color: Colors.text,
-    letterSpacing: 0.2,
+  blobSky: {
+    width: 320,
+    height: 320,
+    bottom: -140,
+    left: 20,
+    backgroundColor: 'rgba(14, 165, 233, 0.10)',
   },
-  card: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingHorizontal: Spacing['2xl'],
-    paddingTop: Spacing['2xl'],
-    paddingBottom: Spacing['4xl'],
+  scroll: {
+    flexGrow: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xl,
+  },
+  topBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  brandBlock: {
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
+    justifyContent: 'space-between',
+    paddingTop: Spacing.md,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.sm,
   },
-  brandLine1: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: Colors.white,
-    letterSpacing: -0.8,
-    lineHeight: 40,
-  },
-  brandLine2: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: Colors.white,
-    letterSpacing: -0.8,
-    lineHeight: 40,
-  },
-  truckEmoji: {
-    fontSize: 30,
-    lineHeight: 40,
-  },
-  subtitle: {
-    fontSize: Typography.size.base,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: Spacing.lg,
-    textAlign: 'center',
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: Radius.full,
-    borderWidth: 0,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.md,
-    width: '100%',
-    marginBottom: Spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  pinIcon: {
-    fontSize: 18,
-    marginRight: Spacing.sm,
-  },
-  postcodeInput: {
-    flex: 1,
-    fontSize: Typography.size.base,
-    color: Colors.text,
-    fontWeight: Typography.weight.medium,
-  },
-  btnContainer: {
-    width: '100%',
-    marginBottom: Spacing.md,
-  },
-  searchBtn: {
-    flexDirection: 'row',
+  brandMark: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.full,
-    paddingVertical: 17,
-    width: '100%',
-    shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
+    ...Shadow.morphic3d,
   },
-  searchIcon: {
-    fontSize: 18,
-    marginRight: Spacing.sm,
-  },
-  searchBtnText: {
-    fontSize: Typography.size.md,
-    fontWeight: Typography.weight.bold,
-    color: Colors.white,
-    letterSpacing: 0.3,
-  },
-  locationBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-  },
-  locationIconText: {
-    fontSize: 15,
-  },
-  locationText: {
-    fontSize: Typography.size.sm,
-    fontWeight: Typography.weight.semibold,
-    color: Colors.white,
-  },
-
-  // ── Coming Soon Modal (Account Screen Style) ──────────────────────────────────────────────────────
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xl * 2,
-    paddingTop: 0,
-    alignItems: 'center',
-  },
-  modalHeaderRow: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    marginBottom: Spacing.lg,
-  },
-  modalHeaderTitle: {
-    fontSize: Typography.size.lg,
-    fontWeight: '700',
+  brandText: {
+    fontFamily: Typography.family.displayExtrabold,
+    fontSize: 19,
+    letterSpacing: -0.5,
     color: Colors.text,
   },
-  modalCloseBtn: {
-    padding: 4,
-  },
-  modalIconWrapper: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#EEF2FF',
+  userChip: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
-  },
-  modalTitle: {
-    fontSize: Typography.size.lg,
-    fontWeight: '800',
-    color: Colors.text,
-    textAlign: 'center',
-    marginBottom: Spacing.xs,
-  },
-  modalPostcodeBadge: {
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 12,
+    gap: Spacing.sm,
+    paddingLeft: 4,
+    paddingRight: Spacing.md,
     paddingVertical: 4,
     borderRadius: Radius.full,
-    marginBottom: Spacing.md,
-  },
-  modalPostcodeLabel: {
-    fontSize: Typography.size.sm,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  modalBody: {
-    fontSize: Typography.size.sm,
-    color: '#4B5563',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: Spacing.lg,
-    maxWidth: 300,
-  },
-  accountActionCard: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.xl,
+    borderColor: Colors.border,
   },
-  accountActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
-  },
-  accountActionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  accountActionText: {
-    marginLeft: Spacing.md,
-    fontSize: Typography.size.sm,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  accountDivider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginLeft: 36,
-  },
-  modalPrimaryBtn: {
-    width: '100%',
+  loginChip: { paddingHorizontal: Spacing.md, paddingVertical: 9, gap: 6 },
+  loginChipText: { fontFamily: Typography.family.bold, fontSize: 13, color: Colors.primary },
+  userAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: Colors.primary,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.sm,
   },
-  modalPrimaryBtnText: {
-    fontSize: Typography.size.md,
-    fontWeight: '700',
+  userAvatarText: {
+    fontFamily: Typography.family.bold,
+    fontSize: 12,
     color: Colors.white,
   },
-  modalSecondaryBtn: {
-    paddingVertical: Spacing.sm,
+  hero: {
+    height: 230,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
   },
-  modalSecondaryBtnText: {
-    fontSize: Typography.size.sm,
-    fontWeight: '600',
-    color: '#6B7280',
+  heroHalo: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderWidth: 1,
+    borderColor: Colors.white,
+  },
+  heroItem: {
+    position: 'absolute',
+  },
+  eyebrow: {
+    fontFamily: Typography.family.mono,
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: Colors.primary,
+    marginBottom: Spacing.sm,
+  },
+  headline: {
+    fontFamily: Typography.family.displayExtrabold,
+    fontSize: 32,
+    lineHeight: 38,
+    letterSpacing: -0.8,
+    color: Colors.text,
+  },
+  subhead: {
+    fontFamily: Typography.family.regular,
+    fontSize: 15,
+    lineHeight: 22,
+    color: Colors.textSecondary,
+    marginTop: Spacing.sm,
+  },
+  card: {
+    marginTop: Spacing.lg,
+    padding: Spacing.base,
+    borderRadius: Radius['2xl'],
+    // Solid surface: Android renders child elevation shadows as boxes on translucent parents
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.white,
+    ...Shadow.lg,
+  },
+  inputLabel: {
+    fontFamily: Typography.family.semibold,
+    fontSize: 13,
+    color: Colors.text,
+    marginBottom: Spacing.sm,
+  },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    height: 54,
+    paddingHorizontal: Spacing.base,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  input: {
+    flex: 1,
+    fontFamily: Typography.family.mono,
+    fontSize: 17,
+    letterSpacing: 1,
+    color: Colors.text,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginVertical: Spacing.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  dividerText: {
+    fontFamily: Typography.family.medium,
+    fontSize: 12,
+    color: Colors.muted,
+  },
+  trustRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: Spacing.lg,
+  },
+  trustItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  trustText: {
+    fontFamily: Typography.family.medium,
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  sheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: Colors.overlay,
+  },
+  sheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius['3xl'],
+    borderTopRightRadius: Radius['3xl'],
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xl,
+    alignItems: 'center',
+  },
+  sheetHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: Colors.border,
+    marginBottom: Spacing.lg,
+  },
+  sheetArt: {
+    marginBottom: Spacing.base,
+  },
+  sheetTitle: {
+    fontFamily: Typography.family.displayExtrabold,
+    fontSize: 22,
+    letterSpacing: -0.4,
+    color: Colors.text,
+  },
+  sheetPostcode: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primarySubtle,
+  },
+  sheetPostcodeText: {
+    fontFamily: Typography.family.mono,
+    fontSize: 13,
+    color: Colors.primary,
+  },
+  sheetBody: {
+    fontFamily: Typography.family.regular,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    color: Colors.textSecondary,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.lg,
   },
 });

@@ -11,6 +11,13 @@ const s3 = new S3Client({
 
 const deleteFileFromS3 = async (fileUrl) => {
   if (!fileUrl) return;
+  // Files stored on local disk during development
+  const { USE_LOCAL_UPLOADS, LOCAL_UPLOAD_DIR } = require("../middleware/upload.middleware");
+  const localMatch = USE_LOCAL_UPLOADS && String(fileUrl).match(/\/uploads\/([\w.-]+)$/);
+  if (localMatch) {
+    await require("fs").promises.unlink(require("path").join(LOCAL_UPLOAD_DIR, localMatch[1])).catch(() => {});
+    return;
+  }
   try {
     const bucketName = process.env.AWS_BUCKET_NAME;
     // Extract the key from the URL. S3 URLs look like:

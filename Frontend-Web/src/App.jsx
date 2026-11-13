@@ -35,6 +35,7 @@ import ShippingMethodsPage from './pages/vendor/settings/ShippingMethodsPage';
 import VendorAnalyticsPage from './pages/vendor/VendorAnalyticsPage';
 import ProductsPage from './pages/vendor/ProductsPage';
 import CategoriesPage from './pages/vendor/CategoriesPage';
+import InventoryPage from './pages/vendor/InventoryPage';
 import OrdersPage from './pages/vendor/OrdersPage';
 import ReviewsPage from './pages/vendor/ReviewsPage';
 import ReportsPage from './pages/vendor/ReportsPage';
@@ -95,10 +96,12 @@ export default function App() {
             {/* Phase 5 */}
             <Route path="products" element={<ProductsPage />} />
             <Route path="categories" element={<CategoriesPage />} />
+            <Route path="inventory" element={<InventoryPage />} />
             {/* Phase 6 */}
             <Route path="orders" element={<OrdersPage />} />
             <Route path="reviews" element={<ReviewsPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="analytics" element={<VendorAnalyticsPage />} />
             <Route path="commission" element={<CommissionPageVendor />} />
           </Route>
 

@@ -17,6 +17,8 @@ import {
   resetPassword as apiResetPassword,
   googleLogin as apiGoogleLogin,
 } from '../api/auth.api';
+import client from '../api/client';
+import { unregisterPushToken } from '../api/push.api';
 import { STORAGE_KEYS } from '../constants';
 
 // ─── State & Reducer ──────────────────────────────────────────────────────
@@ -128,7 +130,7 @@ export const AuthProvider = ({ children }) => {
       const data = await apiLogin(email, password);
       await persistTokens(data.accessToken, data.refreshToken, data.user);
       dispatch({ type: AUTH_ACTIONS.LOGIN_SUCCESS, payload: data });
-      return { success: true };
+      return { success: true, user: data.user };
     } catch (err) {
       const message = err.response?.data?.message || 'Login failed. Please try again.';
       dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: message });
@@ -213,7 +215,7 @@ export const AuthProvider = ({ children }) => {
       const data = await apiGoogleLogin(idToken);
       await persistTokens(data.accessToken, data.refreshToken, data.user);
       dispatch({ type: AUTH_ACTIONS.LOGIN_SUCCESS, payload: data });
-      return { success: true };
+      return { success: true, user: data.user };
     } catch (err) {
       const message = err.response?.data?.message || 'Google Login failed.';
       dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: message });
@@ -222,6 +224,8 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(async () => {
+    // While still signed in, stop this phone getting the account's alerts
+    await unregisterPushToken();
     try {
       if (state.refreshToken) {
         await apiLogout(state.refreshToken);
@@ -259,6 +263,25 @@ export const AuthProvider = ({ children }) => {
     }
   }, [state.user, state.accessToken, state.refreshToken]);
 
+  // Re-read the signed-in user from the server, e.g. after an admin approves
+  // their shop application and their role becomes "vendor".
+  const refreshUser = useCallback(async () => {
+    if (!state.accessToken) return null;
+    try {
+      const { data } = await client.get('/customer/me');
+      const fresh = data.data;
+      const updatedUser = { ...state.user, id: fresh.id, name: fresh.name, email: fresh.email, role: fresh.role, status: fresh.status, storeId: fresh.storeId };
+      await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+      dispatch({
+        type: AUTH_ACTIONS.LOGIN_SUCCESS,
+        payload: { user: updatedUser, accessToken: state.accessToken, refreshToken: state.refreshToken },
+      });
+      return updatedUser;
+    } catch {
+      return null;
+    }
+  }, [state.user, state.accessToken, state.refreshToken]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -278,6 +301,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         clearError,
         updateUserContext,
+        refreshUser,
       }}
     >
       {children}

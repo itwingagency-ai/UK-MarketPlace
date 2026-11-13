@@ -13,9 +13,10 @@ import {
   Bell,
   FileText,
   LogOut,
-  Shield,
+  ShoppingBag,
   ClipboardList,
   Tag,
+  Boxes,
   DollarSign,
   MapPin,
   Clock,
@@ -68,6 +69,7 @@ const vendorNav = [
     items: [
       { to: '/vendor/categories', icon: Tag, text: 'Categories' },
       { to: '/vendor/products', icon: Package, text: 'Products' },
+      { to: '/vendor/inventory', icon: Boxes, text: 'Inventory' },
     ],
   },
   {
@@ -76,6 +78,7 @@ const vendorNav = [
       { to: '/vendor/orders', icon: ShoppingCart, text: 'Orders' },
       { to: '/vendor/reviews', icon: Star, text: 'Reviews' },
       { to: '/vendor/reports', icon: FileText, text: 'Reports' },
+      { to: '/vendor/analytics', icon: BarChart3, text: 'Analytics' },
     ],
   },
   {
@@ -115,7 +118,7 @@ export default function Sidebar({ role }) {
       {/* ── Brand ── */}
       <div className="sidebar-brand">
         <div className="sidebar-brand-icon">
-          <Shield size={18} />
+          <ShoppingBag size={18} />
         </div>
         <div>
           <div className="sidebar-brand-text">UK Marketplace</div>

@@ -28,16 +28,16 @@ export default function ApplicationPendingPage({ status = 'pending', storeName =
               width: 56,
               height: 56,
               borderRadius: '50%',
-              background: isPending ? '#fff3e0' : isRejected ? '#ffebee' : '#e8f5e9',
+              background: isPending ? 'var(--color-warning-bg)' : isRejected ? 'var(--color-danger-bg)' : 'var(--color-success-bg)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto var(--space-4)',
             }}
           >
-            {isPending && <Clock size={28} color="#e65100" />}
-            {isRejected && <XCircle size={28} color="#c62828" />}
-            {!isPending && !isRejected && <CheckCircle size={28} color="#5B9F12" />}
+            {isPending && <Clock size={28} style={{ color: 'var(--color-warning-fg)' }} />}
+            {isRejected && <XCircle size={28} style={{ color: 'var(--color-danger-fg)' }} />}
+            {!isPending && !isRejected && <CheckCircle size={28} style={{ color: 'var(--color-success-fg)' }} />}
           </div>
 
           {isPending && (

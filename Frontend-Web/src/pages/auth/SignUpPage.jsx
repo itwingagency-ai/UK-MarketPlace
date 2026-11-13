@@ -189,14 +189,14 @@ export default function SignUpPage() {
                 width: 56,
                 height: 56,
                 borderRadius: '50%',
-                background: '#e8f5e9',
+                background: 'var(--color-success-bg)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto var(--space-4)',
               }}
             >
-              <CheckCircle size={28} color="#5B9F12" />
+              <CheckCircle size={28} style={{ color: 'var(--color-success-fg)' }} />
             </div>
             <h3 style={{ marginBottom: 'var(--space-2)' }}>Thank You!</h3>
             <p style={{ color: 'var(--gray-600)', marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
@@ -245,8 +245,8 @@ export default function SignUpPage() {
                   padding: 'var(--space-2)',
                   fontSize: 'var(--text-sm)',
                   fontWeight: step === s.id ? 'var(--weight-semibold)' : 'var(--weight-normal)',
-                  color: step === s.id ? '#5B9F12' : 'var(--gray-400)',
-                  borderBottom: step === s.id ? '2px solid #5B9F12' : '2px solid transparent',
+                  color: step === s.id ? 'var(--color-text-brand)' : 'var(--gray-400)',
+                  borderBottom: step === s.id ? '2px solid var(--color-brand-primary)' : '2px solid transparent',
                   marginBottom: '-1px',
                 }}
               >
@@ -490,7 +490,7 @@ export default function SignUpPage() {
 
         <div className="auth-info">
           Already have an account?{' '}
-          <Link to="/login" style={{ color: '#5B9F12', fontWeight: 'var(--weight-semibold)' }}>
+          <Link to="/login" style={{ color: 'var(--color-text-brand)', fontWeight: 'var(--weight-semibold)' }}>
             Sign In
           </Link>
         </div>

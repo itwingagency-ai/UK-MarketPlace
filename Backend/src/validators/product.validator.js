@@ -1,5 +1,7 @@
 const ApiError = require("../lib/ApiError");
 
+const MAX_PRODUCT_IMAGES = 10;
+
 const isPlainObject = (value) =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
@@ -23,6 +25,10 @@ const validateOptionsArray = (options) => {
     }
     if (opt.name.trim().length > 40) {
       throw new ApiError(400, `options[${i}].name is too long (max 40)`);
+    }
+    // The name becomes a key in each variant's attributes map
+    if (/[.$]/.test(opt.name)) {
+      throw new ApiError(400, `options[${i}].name cannot contain "." or "$"`);
     }
 
     const nameKey = opt.name.trim().toLowerCase();
@@ -100,19 +106,19 @@ const validateVariantsArray = (variants, options = []) => {
       throw new ApiError(400, `variants[${i}].price is required`);
     }
     const priceNum = Number(variant.price);
-    if (Number.isNaN(priceNum) || priceNum < 0) {
+    if (!Number.isInteger(priceNum) || priceNum < 0) {
       throw new ApiError(
         400,
-        `variants[${i}].price must be a non-negative number`
+        `variants[${i}].price must be a non-negative whole number of pence`
       );
     }
 
     if (variant.compareAtPrice !== undefined && variant.compareAtPrice !== null) {
       const cmp = Number(variant.compareAtPrice);
-      if (Number.isNaN(cmp) || cmp < 0) {
+      if (!Number.isInteger(cmp) || cmp < 0) {
         throw new ApiError(
           400,
-          `variants[${i}].compareAtPrice must be a non-negative number`
+          `variants[${i}].compareAtPrice must be a non-negative whole number of pence`
         );
       }
     }
@@ -227,7 +233,10 @@ const validateProductPayload = (payload, isPatch = false) => {
     throw new ApiError(400, "Invalid product payload");
   }
 
-  const requiredKeys = ["title", "price", "stock"];
+  // Variant products take price and stock from their variants.
+  const hasVariants =
+    Array.isArray(payload.variants) && payload.variants.length > 0;
+  const requiredKeys = hasVariants ? ["title"] : ["title", "price", "stock"];
   if (!isPatch) {
     for (const key of requiredKeys) {
       if (
@@ -258,21 +267,30 @@ const validateProductPayload = (payload, isPatch = false) => {
     }
   }
 
-  if (payload.price !== undefined) {
+  if (payload.size !== undefined && payload.size !== null) {
+    if (typeof payload.size !== "string") {
+      throw new ApiError(400, "size must be a string");
+    }
+    if (payload.size.trim().length > 60) {
+      throw new ApiError(400, "size must be 60 characters or less");
+    }
+  }
+
+  if (payload.price !== undefined && !(hasVariants && payload.price === "")) {
     const n = Number(payload.price);
-    if (Number.isNaN(n) || n < 0) {
-      throw new ApiError(400, "price must be a non-negative number");
+    if (!Number.isInteger(n) || n < 0) {
+      throw new ApiError(400, "price must be a non-negative whole number of pence");
     }
   }
 
   if (payload.compareAtPrice !== undefined && payload.compareAtPrice !== null) {
     const n = Number(payload.compareAtPrice);
-    if (Number.isNaN(n) || n < 0) {
-      throw new ApiError(400, "compareAtPrice must be a non-negative number");
+    if (!Number.isInteger(n) || n < 0) {
+      throw new ApiError(400, "compareAtPrice must be a non-negative whole number of pence");
     }
   }
 
-  if (payload.stock !== undefined) {
+  if (payload.stock !== undefined && !(hasVariants && payload.stock === "")) {
     const n = Number(payload.stock);
     if (!Number.isInteger(n) || n < 0) {
       throw new ApiError(400, "stock must be a non-negative integer");
@@ -282,6 +300,9 @@ const validateProductPayload = (payload, isPatch = false) => {
   if (payload.images !== undefined) {
     if (!Array.isArray(payload.images)) {
       throw new ApiError(400, "images must be an array of URL strings");
+    }
+    if (payload.images.length > MAX_PRODUCT_IMAGES) {
+      throw new ApiError(400, `A product can have at most ${MAX_PRODUCT_IMAGES} images`);
     }
     for (let i = 0; i < payload.images.length; i += 1) {
       if (typeof payload.images[i] !== "string") {
@@ -300,6 +321,7 @@ const validateProductPayload = (payload, isPatch = false) => {
 };
 
 module.exports = {
+  MAX_PRODUCT_IMAGES,
   validateProductPayload,
   validateOptionsArray,
   validateVariantsArray,

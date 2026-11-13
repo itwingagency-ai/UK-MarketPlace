@@ -25,9 +25,16 @@ const {
   computeOpenStatus,
 } = require("../lib/geoUtils");
 const { validateNearbyQuery } = require("../validators/storeDiscovery.validator");
+const { applyBusyStatus } = require("../lib/storeAvailability");
 const Store = require("../models/Store");
 const Product = require("../models/Product");
 const Category = require("../models/Category");
+const {
+  buildChildMap,
+  collectSubtree,
+  compareCategories,
+  getHiddenCategoryIds,
+} = require("../lib/categoryTree");
 
 // How far we cast the initial MongoDB net (km).
 // We then filter per-store by each store's own deliveryRadiusKm.
@@ -48,7 +55,7 @@ const parsePagination = (query) => {
 /**
  * Build the public-facing shape of a store document.
  */
-const formatStore = (store, distanceKm, status, branding, reviewData = null, shippingMethod = null) => {
+const formatStore = (store, distanceKm, status, branding, reviewData = null, shippingMethod = null, shippingSettings = null) => {
   let deliveryFee = null;
   let deliveryTime = null;
 
@@ -86,6 +93,12 @@ const formatStore = (store, distanceKm, status, branding, reviewData = null, shi
     ratingCount:      reviewData ? reviewData.ratingCount : 0,
     deliveryFee,
     deliveryTime,
+    // Orders at or above this (pounds) deliver free; null when there is no offer
+    freeDeliveryOver: Number(shippingSettings?.freeShippingThreshold) > 0
+      ? Number(shippingSettings.freeShippingThreshold)
+      : null,
+    isBusy:           Boolean(status.isBusy),
+    busyUntil:        status.busyUntil || null,
   };
 };
 
@@ -144,7 +157,7 @@ const getNearbyStores = asyncHandler(async (req, res) => {
     status: "active",
     locationSet: true,
   }).select(
-    "name slug status contact address location deliveryRadiusKm operatingHours branding timezone"
+    "name slug status contact address location deliveryRadiusKm operatingHours branding timezone ordersPausedUntil"
   );
   // Note: skip/limit cannot be used with $nearSphere in all MongoDB drivers reliably
   // for large sets; we post-filter and paginate in memory (candidate count is small
@@ -155,8 +168,8 @@ const getNearbyStores = asyncHandler(async (req, res) => {
 
   const StoreSettings = require("../models/StoreSettings");
   const storeIds = candidates.map(c => c._id);
-  const settingsList = await StoreSettings.find({ store: { $in: storeIds } }).select("store branding");
-  const settingsMap = new Map(settingsList.map(s => [s.store.toString(), s.branding]));
+  const settingsList = await StoreSettings.find({ store: { $in: storeIds } }).select("store branding shipping");
+  const settingsMap = new Map(settingsList.map(s => [s.store.toString(), s]));
 
   const eligible = [];
   for (const store of candidates) {
@@ -170,9 +183,9 @@ const getNearbyStores = asyncHandler(async (req, res) => {
 
     if (dist <= effectiveRadius) {
       const storeTimezone = store.timezone || timezone;
-      const status = computeOpenStatus(store.operatingHours, storeTimezone);
-      const branding = settingsMap.get(store._id.toString());
-      eligible.push({ store, dist, status, branding });
+      const status = applyBusyStatus(computeOpenStatus(store.operatingHours, storeTimezone), store);
+      const settings = settingsMap.get(store._id.toString());
+      eligible.push({ store, dist, status, branding: settings?.branding, shipping: settings?.shipping });
     }
   }
 
@@ -209,13 +222,13 @@ const getNearbyStores = asyncHandler(async (req, res) => {
       page,
       limit,
       total,
-      stores: pageSlice.map(({ store, dist, status, branding }) => {
+      stores: pageSlice.map(({ store, dist, status, branding, shipping }) => {
         const storeIdStr = store._id.toString();
         const reviewData = reviewMap.get(storeIdStr) || null;
         const storeShipping = shippingMap.get(storeIdStr) || [];
         const cheapestShipping = storeShipping.sort((a, b) => a.fee - b.fee)[0] || null;
 
-        return formatStore(store, dist, status, branding, reviewData, cheapestShipping);
+        return formatStore(store, dist, status, branding, reviewData, cheapestShipping, shipping);
       }),
     },
   });
@@ -231,7 +244,7 @@ const getStoreBySlug = asyncHandler(async (req, res) => {
   const { slug } = req.params;
 
   const store = await Store.findOne({ slug: slug.toLowerCase(), status: "active" }).select(
-    "name slug status contact address location deliveryRadiusKm operatingHours branding timezone"
+    "name slug status contact address location deliveryRadiusKm operatingHours branding timezone ordersPausedUntil"
   );
 
   if (!store) throw new ApiError(404, "Store not found");
@@ -241,7 +254,7 @@ const getStoreBySlug = asyncHandler(async (req, res) => {
   const ShippingMethod = require("../models/ShippingMethod");
 
   const [settings, reviewAgg, shippingMethods] = await Promise.all([
-    StoreSettings.findOne({ store: store._id }).select("branding"),
+    StoreSettings.findOne({ store: store._id }).select("branding shipping"),
     Review.aggregate([
       { $match: { store: store._id, status: "approved" } },
       { $group: { _id: "$store", averageRating: { $avg: "$rating" }, ratingCount: { $sum: 1 } } }
@@ -254,11 +267,11 @@ const getStoreBySlug = asyncHandler(async (req, res) => {
   const cheapestShipping = shippingMethods.length > 0 ? shippingMethods[0] : null;
 
   const timezone = store.timezone || req.query.timezone || "UTC";
-  const status = computeOpenStatus(store.operatingHours, timezone);
+  const status = applyBusyStatus(computeOpenStatus(store.operatingHours, timezone), store);
 
   res.status(200).json({
     data: {
-      ...formatStore(store, null, status, branding, reviewData, cheapestShipping),
+      ...formatStore(store, null, status, branding, reviewData, cheapestShipping, settings?.shipping),
       weekSchedule: status.weekSchedule,
     },
   });
@@ -271,7 +284,8 @@ const getStoreBySlug = asyncHandler(async (req, res) => {
  * Supports filtering by category and pagination.
  *
  * Query params:
- *   category  — category ID or slug to filter by
+ *   category  — category ID or slug; includes its active subcategories
+ *   search    — case-insensitive title match
  *   limit     — page size (default 20, max 50)
  *   page      — page number
  *   sort      — "price_asc" | "price_desc" | "newest" | "rating" (default "newest")
@@ -294,7 +308,13 @@ const getStoreProducts = asyncHandler(async (req, res) => {
   // Build product filter
   const filter = { store: store._id, isActive: true };
 
-  // Optional category filter
+  // Products filed under a hidden category (or a hidden ancestor) stay off
+  // the storefront, as does the category itself.
+  const hiddenIds = await getHiddenCategoryIds(store._id);
+  const hiddenSet = new Set(hiddenIds.map(String));
+  if (hiddenIds.length > 0) filter.category = { $nin: hiddenIds };
+
+  // Optional category filter — a parent category includes its subcategories
   if (req.query.category) {
     let cat;
     if (/^[a-f\d]{24}$/i.test(req.query.category)) {
@@ -306,8 +326,22 @@ const getStoreProducts = asyncHandler(async (req, res) => {
         isActive: true,
       });
     }
-    if (!cat) throw new ApiError(404, "Category not found in this store");
-    filter.category = cat._id;
+    if (!cat || hiddenSet.has(String(cat._id))) {
+      throw new ApiError(404, "Category not found in this store");
+    }
+    const storeCategories = await Category.find({ store: store._id, isActive: true })
+      .select("_id parent isActive")
+      .lean();
+    const branch = collectSubtree([cat._id], buildChildMap(storeCategories), { activeOnly: true });
+    filter.category = { $in: Array.from(branch) };
+  }
+
+  if (req.query.search && String(req.query.search).trim()) {
+    const escaped = String(req.query.search)
+      .trim()
+      .slice(0, 100)
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    filter.title = new RegExp(escaped, "i");
   }
 
   // Sort mapping
@@ -326,7 +360,7 @@ const getStoreProducts = asyncHandler(async (req, res) => {
       .limit(limit)
       .populate("category", "name slug image")
       .select(
-        "title slug description price compareAtPrice stock images averageRating ratingCount isActive category variants"
+        "title slug description size price compareAtPrice stock images averageRating ratingCount isActive category options variants"
       ),
     Product.countDocuments(filter),
   ]);
@@ -355,22 +389,24 @@ const getStoreStatus = asyncHandler(async (req, res) => {
   let store;
   if (/^[a-f\d]{24}$/i.test(slug)) {
     store = await Store.findOne({ _id: slug, status: "active" })
-      .select("name slug operatingHours timezone");
+      .select("name slug operatingHours timezone ordersPausedUntil");
   } else {
     store = await Store.findOne({ slug: slug.toLowerCase(), status: "active" })
-      .select("name slug operatingHours timezone");
+      .select("name slug operatingHours timezone ordersPausedUntil");
   }
 
   if (!store) throw new ApiError(404, "Store not found");
 
   const timezone = store.timezone || req.query.timezone || "UTC";
-  const status = computeOpenStatus(store.operatingHours, timezone);
+  const status = applyBusyStatus(computeOpenStatus(store.operatingHours, timezone), store);
 
   res.status(200).json({
     data: {
       storeSlug:         store.slug,
       storeName:         store.name,
       isOpen:            status.isOpen,
+      isBusy:            status.isBusy,
+      busyUntil:         status.busyUntil,
       statusLabel:       status.statusLabel,
       todayDay:          status.todayDay,
       todayHours:        status.todayHours,
@@ -469,10 +505,78 @@ const checkDeliverability = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * GET /api/v1/stores/:storeId/categories
+ * Public: a store's active categories with active-product counts.
+ * Accepts a store id or slug. Top-level categories include their children's
+ * counts in `totalProductCount`, so the app can hide branches with nothing to sell.
+ */
+const getStoreCategories = asyncHandler(async (req, res) => {
+  const { storeId } = req.params;
+
+  const store = /^[a-f\d]{24}$/i.test(storeId)
+    ? await Store.findOne({ _id: storeId, status: "active" }).select("_id")
+    : await Store.findOne({ slug: storeId.toLowerCase(), status: "active" }).select("_id");
+  if (!store) throw new ApiError(404, "Store not found");
+
+  const [allCategories, counts] = await Promise.all([
+    Category.find({ store: store._id })
+      .select("name slug parent description image isActive sortOrder")
+      .lean(),
+    Product.aggregate([
+      { $match: { store: store._id, isActive: true, category: { $ne: null } } },
+      { $group: { _id: "$category", count: { $sum: 1 } } },
+    ]),
+  ]);
+
+  // Visible = active with every ancestor active. Walk down from the roots,
+  // stopping at inactive categories so their whole branch drops out.
+  allCategories.sort(compareCategories);
+  const childMap = buildChildMap(allCategories);
+  const roots = allCategories.filter((c) => !c.parent && c.isActive).map((c) => c._id);
+  const visibleIds = collectSubtree(roots, childMap, { activeOnly: true });
+  const categories = allCategories.filter((c) => visibleIds.has(String(c._id)));
+
+  // totalProductCount rolls up every level beneath a category, so the app can
+  // hide branches with nothing to sell.
+  const countMap = new Map(counts.map((c) => [String(c._id), c.count]));
+  const totals = new Map();
+  const totalFor = (id) => {
+    if (totals.has(id)) return totals.get(id);
+    totals.set(id, 0); // cycle guard
+    let total = countMap.get(id) || 0;
+    for (const child of childMap.get(id) || []) {
+      if (visibleIds.has(String(child._id))) total += totalFor(String(child._id));
+    }
+    totals.set(id, total);
+    return total;
+  };
+
+  res.status(200).json({
+    data: {
+      categories: categories.map((cat) => {
+        const id = String(cat._id);
+        return {
+          id: cat._id,
+          name: cat.name,
+          slug: cat.slug,
+          parent: cat.parent || null,
+          description: cat.description || "",
+          image: cat.image || "",
+          sortOrder: cat.sortOrder || 0,
+          productCount: countMap.get(id) || 0,
+          totalProductCount: totalFor(id),
+        };
+      }),
+    },
+  });
+});
+
 module.exports = {
   getNearbyStores,
   getStoreBySlug,
   getStoreStatus,
   getStoreProducts,
+  getStoreCategories,
   checkDeliverability,
 };

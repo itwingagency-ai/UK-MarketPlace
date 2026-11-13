@@ -78,10 +78,10 @@ export const CartProvider = ({ children }) => {
     else dispatch({ type: CART_ACTIONS.CLEAR });
   }, [isAuthenticated, fetchCart]);
 
-  const addItem = useCallback(async (productId, quantity = 1) => {
+  const addItem = useCallback(async (productId, quantity = 1, variantId = null) => {
     if (!isAuthenticated) return { success: false, error: 'Please login to add items to your cart' };
     try {
-      const data = await CartAPI.addItem(productId, quantity);
+      const data = await CartAPI.addItem(productId, quantity, variantId);
       dispatch({ type: CART_ACTIONS.SET_CART, payload: data.cart ?? data });
       return { success: true };
     } catch (err) {

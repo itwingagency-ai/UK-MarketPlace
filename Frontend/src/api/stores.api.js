@@ -84,3 +84,13 @@ export const checkDeliverability = async (slug, { address, lat, lng } = {}) => {
   const { data } = await client.get(`/stores/${slug}/delivers`, { params });
   return data;
 };
+
+/**
+ * GET /api/v1/stores/:storeId/categories
+ * A store's active categories with product counts.
+ * @param {string} storeIdOrSlug
+ */
+export const getStoreCategories = async (storeIdOrSlug) => {
+  const { data } = await client.get(`/stores/${storeIdOrSlug}/categories`);
+  return data;
+};

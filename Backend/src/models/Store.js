@@ -117,6 +117,11 @@ const storeSchema = new mongoose.Schema(
       default: "UTC",
       trim: true,
     },
+    // Busy mode: no new orders until this time (see lib/storeAvailability)
+    ordersPausedUntil: {
+      type: Date,
+      default: null,
+    },
     // Map: day-of-week (lowercase) → { open, close, isClosed }
     operatingHours: {
       type: Map,

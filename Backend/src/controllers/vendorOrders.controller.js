@@ -3,6 +3,7 @@ const asyncHandler = require("../lib/asyncHandler");
 const {
   appendPaymentEvent,
   applyCommissionSnapshot,
+  restoreStockForOrderOnce,
 } = require("../lib/paymentService");
 const { computeEstimatedDelivery } = require("../lib/shippingUtils");
 const {
@@ -13,6 +14,8 @@ const {
   onShipmentEvent,
 } = require("../lib/notificationHooks");
 const Order = require("../models/Order");
+const { notifyOrderStatus } = require("../lib/appNotifications");
+const { emitOrderStatusChanged } = require("../lib/orderEvents");
 const {
   ALLOWED_STATUSES,
   validateOrderStatusPayload,
@@ -136,6 +139,19 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   if (!order) throw new ApiError(404, "Order not found");
 
   const { nextStatus } = validateOrderStatusPayload(req.body, order.orderStatus);
+  const previousStatus = order.orderStatus;
+
+  // Accepting an order can promise a ready time ("ready in 30 min")
+  if (req.body.prepMinutes !== undefined && req.body.prepMinutes !== null) {
+    const prep = Number(req.body.prepMinutes);
+    if (nextStatus !== "confirmed") {
+      throw new ApiError(400, "prepMinutes can only be set when accepting an order");
+    }
+    if (!Number.isInteger(prep) || prep < 5 || prep > 240) {
+      throw new ApiError(400, "prepMinutes must be a whole number from 5 to 240");
+    }
+    order.tracking.estimatedReadyAt = new Date(Date.now() + prep * 60 * 1000);
+  }
 
   order.orderStatus = nextStatus;
 
@@ -221,6 +237,15 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   });
 
   await order.save();
+
+  // Cancelled items go back on the shelf
+  if (nextStatus === "cancelled") {
+    await restoreStockForOrderOnce(order);
+  }
+
+  // Live update for anyone watching the order, and an alert to the customer
+  emitOrderStatusChanged(order, previousStatus);
+  notifyOrderStatus(order);
 
   // Fire-and-forget notifications based on the new status
   if (nextStatus === "shipped") {

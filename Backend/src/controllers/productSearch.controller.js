@@ -28,6 +28,8 @@ const ApiError = require("../lib/ApiError");
 const Product = require("../models/Product");
 const Category = require("../models/Category");
 const Store = require("../models/Store");
+const { getDescendantIds, getHiddenCategoryIds } = require("../lib/categoryTree");
+const { inStockClause, outOfStockClause } = require("../lib/inventory");
 const { validateProductSearchQuery } = require("../validators/productSearch.validator");
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -160,7 +162,21 @@ const searchProducts = asyncHandler(async (req, res) => {
       data: { query: q, page, limit, total: 0, products: [], filters: {} },
     });
   }
-  if (categoryId) filter.category = categoryId;
+  // Hidden categories (and their branches) stay out of results; a parent
+  // category also matches products filed under its subcategories.
+  // ObjectIds, not strings: the filter is reused in an aggregation, which
+  // does not cast.
+  const toObjectIds = (ids) => ids.map((id) => new mongoose.Types.ObjectId(String(id)));
+  const hiddenIds = toObjectIds(await getHiddenCategoryIds(storeId));
+  const categoryClause = {};
+  if (hiddenIds.length > 0) categoryClause.$nin = hiddenIds;
+  if (categoryId) {
+    const cat = await Category.findById(categoryId).select("store").lean();
+    categoryClause.$in = toObjectIds(
+      await getDescendantIds(cat.store, categoryId, { activeOnly: true })
+    );
+  }
+  if (Object.keys(categoryClause).length > 0) filter.category = categoryClause;
 
   // Price range
   if (minPrice !== undefined || maxPrice !== undefined) {
@@ -170,10 +186,11 @@ const searchProducts = asyncHandler(async (req, res) => {
   }
 
   // Stock filter
+  // Variant products are judged on their variants, not the top-level stock
   if (inStock === "true") {
-    filter.stock = { $gt: 0 };
+    filter.$and = [inStockClause()];
   } else if (inStock === "false") {
-    filter.stock = 0;
+    filter.$and = [outOfStockClause()];
   }
   // "all" → no stock filter
 
@@ -190,6 +207,7 @@ const searchProducts = asyncHandler(async (req, res) => {
     title: 1, slug: 1, price: 1, compareAtPrice: 1,
     stock: 1, images: 1, averageRating: 1, ratingCount: 1,
     store: 1, category: 1, isActive: 1, createdAt: 1,
+    size: 1, variants: 1,
   };
   // Include text score when doing text search (needed for sort + display)
   if (hasQuery) {
@@ -286,7 +304,7 @@ const suggestProducts = asyncHandler(async (req, res) => {
     isActive: true,
     // Match titles starting with the query or containing the word
     title: new RegExp(`(^|\\s)${prefix}`, "i"),
-    stock: { $gt: 0 },
+    $and: [inStockClause()],
   };
 
   const storeId = await resolveStoreId(storeRef);

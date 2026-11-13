@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { Colors, Radius, Spacing, Typography } from '../theme';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolateColor,
+} from 'react-native-reanimated';
+import { Colors, Motion, Radius, Spacing, Typography } from '../theme';
 
+/**
+ * Text input with an animated focus border and glow.
+ * secureTextEntry adds a show/hide toggle.
+ */
 const Input = ({
   label,
   placeholder,
@@ -21,49 +26,61 @@ const Input = ({
   error,
   style,
   inputStyle,
+  onFocus,
+  onBlur,
   ...rest
 }) => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
+  const focus = useSharedValue(0);
 
-  const isPassword = secureTextEntry;
+  const containerStyle = useAnimatedStyle(() => ({
+    borderColor: interpolateColor(focus.value, [0, 1], [Colors.border, Colors.primary]),
+    shadowOpacity: focus.value * 0.18,
+  }));
 
   return (
     <View style={[styles.wrapper, style]}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      <View
-        style={[
-          styles.container,
-          isFocused && styles.containerFocused,
-          error && styles.containerError,
-        ]}
-      >
+      <Animated.View style={[styles.container, containerStyle, error && styles.containerError]}>
         {leftIcon ? <View style={styles.leftIcon}>{leftIcon}</View> : null}
         <TextInput
-          style={[styles.input, leftIcon ? { paddingLeft: Spacing.xs } : null, inputStyle]}
+          style={[styles.input, inputStyle]}
           placeholder={placeholder}
           placeholderTextColor={Colors.muted}
           value={value}
           onChangeText={onChangeText}
-          secureTextEntry={isPassword && !isPasswordVisible}
+          secureTextEntry={secureTextEntry && !isPasswordVisible}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           autoCorrect={autoCorrect}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onFocus={(e) => {
+            focus.value = withSpring(1, Motion.springs.snappy);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            focus.value = withSpring(0, Motion.springs.snappy);
+            onBlur?.(e);
+          }}
           {...rest}
         />
-        {isPassword && (
-          <TouchableOpacity
+        {secureTextEntry && (
+          <Pressable
             style={styles.eyeButton}
             onPress={() => setIsPasswordVisible((v) => !v)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
           >
-            <Text style={styles.eyeIcon}>{isPasswordVisible ? '🙈' : '👁'}</Text>
-          </TouchableOpacity>
+            <Feather name={isPasswordVisible ? 'eye-off' : 'eye'} size={18} color={Colors.textSecondary} />
+          </Pressable>
         )}
-      </View>
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      </Animated.View>
+      {error ? (
+        <View style={styles.errorRow}>
+          <Feather name="alert-circle" size={13} color={Colors.errorText} />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
     </View>
   );
 };
@@ -73,52 +90,52 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.base,
   },
   label: {
+    fontFamily: Typography.family.semibold,
     fontSize: Typography.size.sm,
-    fontWeight: Typography.weight.semibold,
     color: Colors.text,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.xs + 2,
   },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1.5,
     borderColor: Colors.border,
     paddingHorizontal: Spacing.md,
     minHeight: 52,
-  },
-  containerFocused: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.white,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowRadius: 8,
+    shadowOpacity: 0,
   },
   containerError: {
     borderColor: Colors.error,
+    backgroundColor: Colors.errorBg,
   },
   leftIcon: {
     marginRight: Spacing.sm,
   },
   input: {
     flex: 1,
-    fontSize: Typography.size.base,
+    fontFamily: Typography.family.regular,
+    fontSize: Typography.size.md,
     color: Colors.text,
     paddingVertical: Spacing.sm,
   },
   eyeButton: {
     padding: Spacing.xs,
   },
-  eyeIcon: {
-    fontSize: 16,
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: Spacing.xs + 2,
   },
   errorText: {
-    color: Colors.error,
-    fontSize: Typography.size.xs,
-    marginTop: Spacing.xs,
+    fontFamily: Typography.family.medium,
+    color: Colors.errorText,
+    fontSize: Typography.size.xs + 1,
   },
 });
 

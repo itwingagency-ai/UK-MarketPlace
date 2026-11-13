@@ -301,7 +301,7 @@ export default function ReviewsPage() {
           label="Unanswered"
           value={stats?.unansweredCount || 0}
           icon={<MessageSquare size={18} />}
-          color="#e65100"
+          color="var(--color-warning-solid)"
         />
         <StatCard
           label="Hidden"

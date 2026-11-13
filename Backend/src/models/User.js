@@ -74,6 +74,21 @@ const userSchema = new mongoose.Schema(
       type: [addressSchema],
       default: [],
     },
+    // Expo push tokens for this user's devices (see lib/pushService)
+    pushTokens: {
+      type: [
+        new mongoose.Schema(
+          {
+            token: { type: String, required: true, maxlength: 200 },
+            platform: { type: String, default: "", maxlength: 20 },
+            updatedAt: { type: Date, default: Date.now },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+      select: false,
+    },
     favoriteStores: [
       {
         type: mongoose.Schema.Types.ObjectId,

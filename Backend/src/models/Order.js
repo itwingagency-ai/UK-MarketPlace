@@ -164,6 +164,10 @@ const trackingSchema = new mongoose.Schema(
     deliveredAt: { type: Date, default: null },
     cancelledAt: { type: Date, default: null },
     cancellationReason: { type: String, default: "", maxlength: 500 },
+    // Set once when a cancelled order's items go back into inventory
+    stockRestoredAt: { type: Date, default: null },
+    // Shop's estimate, given when accepting the order
+    estimatedReadyAt: { type: Date, default: null },
     estimatedDeliveryEarliest: { type: Date, default: null },
     estimatedDeliveryLatest: { type: Date, default: null },
     events: { type: [shipmentEventSchema], default: [] },

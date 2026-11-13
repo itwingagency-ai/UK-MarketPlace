@@ -30,6 +30,22 @@
           "merchantIdentifier": "merchant.com.ukmarketplace",
           "enableGooglePay": false
         }
+      ],
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow UK Marketplace to use your photos so you can add pictures of your products.",
+          "cameraPermission": "Allow UK Marketplace to use your camera so you can take pictures of your products.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#50178E",
+          "defaultChannel": "orders"
+        }
       ]
     ],
     "extra": {

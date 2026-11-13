@@ -1,44 +1,221 @@
-// Snappy Shopper Design Tokens
+/**
+ * Design tokens for the customer app.
+ * Source: arbaz-design/01-design-system/theme.native.js (Task A design system),
+ * plus legacy keys that existing screens still reference.
+ *
+ * Fonts are loaded in App.js via @expo-google-fonts; Typography.family holds
+ * the loaded font names.
+ */
+
+export const Palette = {
+  brand: {
+    50: '#F6F0FE',
+    100: '#EDE0FD',
+    200: '#DBC2FB',
+    300: '#C194F7',
+    400: '#A35EF0',
+    500: '#8432E3',
+    600: '#6920C2',
+    700: '#50178E',
+    800: '#3E126F',
+    900: '#2D0D52',
+    950: '#1A0633',
+  },
+  accent: {
+    50: '#FEF2F2',
+    100: '#FEE2E2',
+    200: '#FECACA',
+    300: '#FCA5A5',
+    400: '#F87171',
+    500: '#EF4444',
+    600: '#DC2626',
+    700: '#B91C1C',
+    800: '#991B1B',
+    900: '#7F1D1D',
+  },
+  neutral: {
+    0: '#FFFFFF',
+    50: '#F8FAFC',
+    100: '#F1F5F9',
+    150: '#EAEFF6',
+    200: '#E2E8F0',
+    300: '#CBD5E1',
+    400: '#94A3B8',
+    500: '#64748B',
+    600: '#475569',
+    700: '#334155',
+    800: '#1E293B',
+    850: '#151D2A',
+    900: '#0F172A',
+    950: '#090D16',
+    1000: '#000000',
+  },
+};
+
 export const Colors = {
-  primary: '#50178E',      // Brand purple
-  primaryLight: '#7A3FB8',
-  primaryDark: '#3B0764',
-  accent: '#EF4444',       // Action red
-  accentLight: '#F87171',
-  accentDark: '#DC2626',
-  success: '#22C55E',
+  // Legacy / top-level default (light) keys for drop-in compatibility
+  primary: '#50178E',
+  primaryLight: '#EDE0FD',
+  primaryDark: '#3E126F',
+  primarySubtle: '#F6F0FE',
+  accent: '#EF4444',
+  accentLight: '#FEE2E2',
+  success: '#10B981',
+  successBg: '#ECFDF5',
+  successText: '#047857',
   warning: '#F59E0B',
+  warningBg: '#FFFBEB',
+  warningText: '#B45309',
   error: '#EF4444',
-  bg: '#FFFFFF',
-  surface: '#F8FAFC',
+  errorBg: '#FEF2F2',
+  errorText: '#B91C1C',
+  info: '#0EA5E9',
+  infoBg: '#F0F9FF',
+  infoText: '#0369A1',
+  bg: '#F8FAFC',
+  surface: '#FFFFFF',
   surfaceSecondary: '#F1F5F9',
+  surfaceTertiary: '#EAEFF6',
   border: '#E2E8F0',
-  borderLight: '#F1F5F9',
+  borderSubtle: '#F1F5F9',
   text: '#0F172A',
   textSecondary: '#475569',
+  textTertiary: '#64748B',
   muted: '#94A3B8',
   white: '#FFFFFF',
   black: '#000000',
-  overlay: 'rgba(0,0,0,0.5)',
-  cardShadow: 'rgba(15,23,42,0.08)',
+  // Legacy keys still referenced by existing screens
+  background: '#F8FAFC',
+  textLight: '#64748B',
+  accentDark: '#DC2626',
+  borderLight: '#F1F5F9',
+  overlay: 'rgba(15, 23, 42, 0.48)',
+  cardShadow: 'rgba(15, 23, 42, 0.08)',
+  glassSurface: 'rgba(255, 255, 255, 0.86)',
+  glassBorder: 'rgba(255, 255, 255, 0.65)',
+
+  light: {
+    mode: 'light',
+    primary: '#50178E',
+    primaryHover: '#6920C2',
+    primaryLight: '#EDE0FD',
+    primaryDark: '#3E126F',
+    primarySubtle: '#F6F0FE',
+    onPrimary: '#FFFFFF',
+    accent: '#EF4444',
+    accentSubtle: '#FEF2F2',
+    onAccent: '#FFFFFF',
+    success: '#10B981',
+    successBg: '#ECFDF5',
+    successFg: '#047857',
+    successBorder: '#A7F3D0',
+    warning: '#F59E0B',
+    warningBg: '#FFFBEB',
+    warningFg: '#B45309',
+    warningBorder: '#FDE68A',
+    error: '#EF4444',
+    errorBg: '#FEF2F2',
+    errorFg: '#B91C1C',
+    errorBorder: '#FECACA',
+    info: '#0EA5E9',
+    infoBg: '#F0F9FF',
+    infoFg: '#0369A1',
+    infoBorder: '#BAE6FD',
+    bg: '#F8FAFC',
+    surface: '#FFFFFF',
+    surfaceSecondary: '#F1F5F9',
+    surfaceTertiary: '#EAEFF6',
+    surfaceElevated: '#FFFFFF',
+    overlay: 'rgba(15, 23, 42, 0.48)',
+    glassSurface: 'rgba(255, 255, 255, 0.80)',
+    glassBorder: 'rgba(255, 255, 255, 0.65)',
+    border: '#E2E8F0',
+    borderSubtle: '#F1F5F9',
+    borderStrong: '#CBD5E1',
+    text: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    muted: '#94A3B8',
+    textInverse: '#FFFFFF',
+  },
+
+  dark: {
+    mode: 'dark',
+    primary: '#A35EF0',
+    primaryHover: '#C194F7',
+    primaryLight: '#2D0D52',
+    primaryDark: '#50178E',
+    primarySubtle: '#1A0633',
+    onPrimary: '#FFFFFF',
+    accent: '#F87171',
+    accentSubtle: 'rgba(239, 68, 68, 0.15)',
+    onAccent: '#FFFFFF',
+    success: '#10B981',
+    successBg: 'rgba(16, 185, 129, 0.14)',
+    successFg: '#6EE7B7',
+    successBorder: 'rgba(16, 185, 129, 0.35)',
+    warning: '#F59E0B',
+    warningBg: 'rgba(245, 158, 11, 0.14)',
+    warningFg: '#FCD34D',
+    warningBorder: 'rgba(245, 158, 11, 0.35)',
+    error: '#EF4444',
+    errorBg: 'rgba(239, 68, 68, 0.15)',
+    errorFg: '#FCA5A5',
+    errorBorder: 'rgba(239, 68, 68, 0.35)',
+    info: '#0EA5E9',
+    infoBg: 'rgba(14, 165, 233, 0.15)',
+    infoFg: '#7DD3FC',
+    infoBorder: 'rgba(14, 165, 233, 0.35)',
+    bg: '#090D16',
+    surface: '#0F172A',
+    surfaceSecondary: '#151D2A',
+    surfaceTertiary: '#1E293B',
+    surfaceElevated: '#151D2A',
+    overlay: 'rgba(0, 0, 0, 0.72)',
+    glassSurface: 'rgba(15, 23, 42, 0.82)',
+    glassBorder: 'rgba(255, 255, 255, 0.10)',
+    border: '#1E293B',
+    borderSubtle: '#151D2A',
+    borderStrong: '#334155',
+    text: '#F8FAFC',
+    textSecondary: '#CBD5E1',
+    textTertiary: '#94A3B8',
+    muted: '#64748B',
+    textInverse: '#0F172A',
+  },
 };
 
 export const Typography = {
-  fontFamily: {
-    regular: 'System',
-    medium: 'System',
-    bold: 'System',
+  family: {
+    display: 'PlusJakartaSans_700Bold',
+    displayExtrabold: 'PlusJakartaSans_800ExtraBold',
+    regular: 'Inter_400Regular',
+    medium: 'Inter_500Medium',
+    semibold: 'Inter_600SemiBold',
+    bold: 'Inter_700Bold',
+    mono: 'JetBrainsMono_600SemiBold',
   },
   size: {
     xs: 11,
     sm: 13,
-    base: 15,
-    md: 17,
-    lg: 20,
-    xl: 24,
-    '2xl': 28,
+    base: 14,
+    md: 15,
+    lg: 17,
+    xl: 20,
+    '2xl': 24,
+    '3xl': 28,
+    '4xl': 32,
+  },
+  lineHeight: {
+    xs: 14,
+    sm: 18,
+    base: 20,
+    md: 21,
+    lg: 23,
+    xl: 26,
+    '2xl': 30,
     '3xl': 34,
-    '4xl': 40,
+    '4xl': 38,
   },
   weight: {
     regular: '400',
@@ -47,24 +224,40 @@ export const Typography = {
     bold: '700',
     extrabold: '800',
   },
-  lineHeight: {
-    tight: 1.2,
-    normal: 1.5,
-    relaxed: 1.7,
-  },
 };
 
-// Compatibility alias
+// Legacy aliases: existing screens use Typography.fontSize and Typography.fontFamily
 Typography.fontSize = Typography.size;
+Typography.fontFamily = {
+  regular: Typography.family.regular,
+  medium: Typography.family.medium,
+  bold: Typography.family.bold,
+};
+
+// Text style presets (screens spread these: ...Typography.h2)
+Object.assign(Typography, {
+  h2: { fontFamily: Typography.family.displayExtrabold, fontSize: 28, lineHeight: 34, letterSpacing: -0.4 },
+  h3: { fontFamily: Typography.family.display, fontSize: 22, lineHeight: 28, letterSpacing: -0.3 },
+  h4: { fontFamily: Typography.family.display, fontSize: 18, lineHeight: 24 },
+  subtitle: { fontFamily: Typography.family.semibold, fontSize: 16, lineHeight: 22 },
+  subtitle1: { fontFamily: Typography.family.semibold, fontSize: 16, lineHeight: 22 },
+  body: { fontFamily: Typography.family.regular, fontSize: 15, lineHeight: 22 },
+  body1: { fontFamily: Typography.family.regular, fontSize: 15, lineHeight: 22 },
+  body2: { fontFamily: Typography.family.regular, fontSize: 14, lineHeight: 20 },
+  caption: { fontFamily: Typography.family.medium, fontSize: 12, lineHeight: 16 },
+});
 
 export const Spacing = {
+  0: 0,
+  xxs: 2,
   xs: 4,
   sm: 8,
   md: 12,
   base: 16,
-  lg: 20,
-  xl: 24,
-  xxl: 32,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+  // Legacy keys still referenced by existing screens ('3xl' keeps its original 40)
   '2xl': 32,
   '3xl': 40,
   '4xl': 48,
@@ -72,35 +265,153 @@ export const Spacing = {
 };
 
 export const Radius = {
-  sm: 6,
-  md: 10,
-  lg: 14,
+  none: 0,
+  xs: 6,
+  sm: 8,
+  md: 12,
+  lg: 16,
   xl: 20,
-  '2xl': 28,
+  '2xl': 24,
+  '3xl': 32,
   full: 9999,
   round: 9999,
 };
 
-export const Shadow = {
-  sm: {
-    shadowColor: Colors.cardShadow,
+export const Elevation = {
+  0: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+  },
+  1: {
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
+    shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 2,
   },
-  md: {
-    shadowColor: Colors.cardShadow,
+  2: {
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
     elevation: 4,
   },
-  lg: {
-    shadowColor: Colors.cardShadow,
+  3: {
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 1,
-    shadowRadius: 16,
+    shadowOpacity: 0.10,
+    shadowRadius: 18,
     elevation: 8,
   },
+  4: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.14,
+    shadowRadius: 28,
+    elevation: 12,
+  },
+  5: {
+    shadowColor: '#50178E',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.22,
+    shadowRadius: 36,
+    elevation: 16,
+  },
+  object3dDrop: {
+    shadowColor: '#50178E',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.20,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+};
+
+// Backwards-compatible Shadow alias
+export const Shadow = {
+  sm: Elevation[1],
+  md: Elevation[2],
+  lg: Elevation[3],
+  xl: Elevation[4],
+  morphic3d: Elevation.object3dDrop,
+};
+
+export const Motion = {
+  durations: {
+    instant: 0,
+    fast: 120,
+    normal: 220,
+    moderate: 340,
+    slow: 500,
+    celebration: 850,
+  },
+  // Reanimated 4 withSpring() configurations
+  springs: {
+    gentle: {
+      stiffness: 180,
+      damping: 22,
+      mass: 1.0,
+      overshootClamping: false,
+    },
+    snappy: {
+      stiffness: 340,
+      damping: 26,
+      mass: 0.9,
+      overshootClamping: false,
+    },
+    bouncy: {
+      stiffness: 420,
+      damping: 16,
+      mass: 0.8,
+      overshootClamping: false,
+    },
+    drag: {
+      stiffness: 500,
+      damping: 34,
+      mass: 0.7,
+      overshootClamping: false,
+    },
+  },
+  stagger: {
+    tight: 30,
+    list: 45,
+    grid: 55,
+    cards: 70,
+  },
+};
+
+export const HitTarget = {
+  minMobile: 44,
+  comfortableMobile: 48,
+  slop: { top: 8, bottom: 8, left: 8, right: 8 },
+};
+
+export function getTheme(scheme = 'light') {
+  const isDark = scheme === 'dark';
+  return {
+    isDark,
+    colors: isDark ? Colors.dark : Colors.light,
+    typography: Typography,
+    spacing: Spacing,
+    radius: Radius,
+    elevation: Elevation,
+    shadow: Shadow,
+    motion: Motion,
+    hitTarget: HitTarget,
+  };
+}
+
+export default {
+  Palette,
+  Colors,
+  Typography,
+  Spacing,
+  Radius,
+  Elevation,
+  Shadow,
+  Motion,
+  HitTarget,
+  getTheme,
 };

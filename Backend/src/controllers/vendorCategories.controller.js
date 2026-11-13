@@ -5,10 +5,12 @@ const { resolveTargetStoreId } = require("../middleware/storeScope.middleware");
 const Category = require("../models/Category");
 const Product = require("../models/Product");
 const {
+  parseBoolean,
   slugify,
   validateCategoryPayload,
 } = require("../validators/category.validator");
 const { deleteFileFromS3 } = require("../lib/s3Utils");
+const { compareCategories } = require("../lib/categoryTree");
 
 const ensureUniqueSlug = async (storeId, baseSlug, ignoreId = null) => {
   let candidate = baseSlug;
@@ -54,8 +56,24 @@ const listCategories = asyncHandler(async (req, res) => {
     filter.name = new RegExp(escaped, "i");
   }
 
-  const categories = await Category.find(filter).sort({ name: 1 });
-  res.status(200).json({ data: categories });
+  const categories = (await Category.find(filter).lean()).sort(compareCategories);
+
+  // Direct product counts so the dashboard can show what each category holds
+  // and warn before a delete that would be refused.
+  const counts = categories.length
+    ? await Product.aggregate([
+        { $match: { category: { $in: categories.map((c) => c._id) } } },
+        { $group: { _id: "$category", count: { $sum: 1 } } },
+      ])
+    : [];
+  const countMap = new Map(counts.map((c) => [String(c._id), c.count]));
+
+  res.status(200).json({
+    data: categories.map((c) => ({
+      ...c,
+      productCount: countMap.get(String(c._id)) || 0,
+    })),
+  });
 });
 
 const getCategoryById = asyncHandler(async (req, res) => {
@@ -97,7 +115,11 @@ const createCategory = asyncHandler(async (req, res) => {
     description: req.body.description || "",
     image,
     isActive:
-      req.body.isActive !== undefined ? Boolean(req.body.isActive) : true,
+      req.body.isActive !== undefined ? parseBoolean(req.body.isActive) : true,
+    sortOrder:
+      req.body.sortOrder !== undefined && req.body.sortOrder !== ""
+        ? Number(req.body.sortOrder)
+        : 0,
   });
 
   res.status(201).json({ message: "Category created", data: category });
@@ -168,7 +190,10 @@ const updateCategory = asyncHandler(async (req, res) => {
     category.image = req.body.image || "";
   }
   if (req.body.isActive !== undefined) {
-    category.isActive = Boolean(req.body.isActive);
+    category.isActive = parseBoolean(req.body.isActive);
+  }
+  if (req.body.sortOrder !== undefined && req.body.sortOrder !== "") {
+    category.sortOrder = Number(req.body.sortOrder);
   }
 
   await category.save();
@@ -183,7 +208,7 @@ const deleteCategory = asyncHandler(async (req, res) => {
   if (childCount > 0) {
     throw new ApiError(
       409,
-      "Category has subcategories and cannot be deleted; remove or reparent them first"
+      `This category has ${childCount} subcategor${childCount === 1 ? "y" : "ies"}. Move or delete them first.`
     );
   }
 
@@ -193,7 +218,7 @@ const deleteCategory = asyncHandler(async (req, res) => {
   if (productCount > 0) {
     throw new ApiError(
       409,
-      "Category is referenced by products; reassign those products before deleting"
+      `This category still has ${productCount} product${productCount === 1 ? "" : "s"}. Move them to another category first, or hide the category instead.`
     );
   }
 

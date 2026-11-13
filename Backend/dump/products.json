@@ -61,7 +61,7 @@
     "title": "Test Dummy Product",
     "slug": "test-dummy-product",
     "description": "",
-    "price": 99.99,
+    "price": 9999,
     "compareAtPrice": null,
     "stock": 50,
     "category": null,

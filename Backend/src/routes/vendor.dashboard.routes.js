@@ -7,14 +7,17 @@ const {
   replaceOperatingHours,
   updateDay,
   closeDay,
+  setBusy,
 } = require("../controllers/vendorOperatingHours.controller");
 const {
   createProduct,
   deleteProduct,
   getProductById,
+  getStockSummary,
   listProducts,
   restoreProduct,
   updateProduct,
+  updateStock,
 } = require("../controllers/vendorProducts.controller");
 const {
   createCategory,
@@ -83,6 +86,8 @@ const router = express.Router();
 router.get("/overview", getOverview);
 
 router.get("/products", listProducts);
+// Literal path: must stay above /products/:id
+router.get("/products/stock-summary", getStockSummary);
 router.post("/products", upload.array("productImages", 5), createProduct);
 router.get("/products/:id", requireResourceInScope(Product), getProductById);
 router.patch("/products/:id", requireResourceInScope(Product), upload.array("productImages", 5), updateProduct);
@@ -91,6 +96,11 @@ router.patch(
   "/products/:id/restore",
   requireResourceInScope(Product),
   restoreProduct
+);
+router.patch(
+  "/products/:id/stock",
+  requireResourceInScope(Product),
+  updateStock
 );
 
 router.get("/categories", listCategories);
@@ -210,5 +220,6 @@ router.get("/operating-hours", getOperatingHours);
 router.put("/operating-hours", replaceOperatingHours);
 router.patch("/operating-hours/:day", updateDay);
 router.delete("/operating-hours/:day", closeDay);
+router.patch("/busy", setBusy);
 
 module.exports = router;

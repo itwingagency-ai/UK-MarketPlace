@@ -9,3 +9,9 @@ export const getMyOrderById = async (id) => {
   const response = await client.get(`/customer/orders/${id}`);
   return response.data;
 };
+
+// Put a past order's items back in the basket (capped at what's in stock)
+export const reorder = async (id) => {
+  const response = await client.post(`/customer/orders/${id}/reorder`);
+  return response.data;
+};

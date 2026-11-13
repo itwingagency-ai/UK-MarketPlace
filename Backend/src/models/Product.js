@@ -88,6 +88,14 @@ const productSchema = new mongoose.Schema(
       default: "",
       maxlength: 2500,
     },
+    // Free-text size / weight / pack label, e.g. "500 g" or "Box of 6".
+    // Products with variants describe size per variant instead.
+    size: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 60,
+    },
     price: {
       type: Number,
       required: true,
@@ -190,6 +198,27 @@ productSchema.index({ store: 1, isActive: 1, averageRating: -1 });
 
 // Global active-products index for cross-store search
 productSchema.index({ isActive: 1, createdAt: -1 });
+
+// Inventory views filter a store's catalogue by stock level
+productSchema.index({ store: 1, stock: 1 });
+
+// ── Pre-validate: variant products list at their cheapest active variant ─────
+// Listings, sorting and price filters read the top-level price, so keep it in
+// step with the variants instead of trusting whatever the client sent.
+
+productSchema.pre("validate", function syncVariantPricing() {
+  if (!Array.isArray(this.variants) || this.variants.length === 0) return;
+  const active = this.variants.filter((v) => v.isActive !== false);
+  const pool = active.length > 0 ? active : this.variants;
+  const cheapest = pool.reduce((min, v) =>
+    Number(v.price) < Number(min.price) ? v : min
+  );
+  this.price = Number(cheapest.price);
+  this.compareAtPrice =
+    cheapest.compareAtPrice != null && Number(cheapest.compareAtPrice) > Number(cheapest.price)
+      ? Number(cheapest.compareAtPrice)
+      : null;
+});
 
 // ── Pre-save: auto-generate slug from title ──────────────────────────────────
 

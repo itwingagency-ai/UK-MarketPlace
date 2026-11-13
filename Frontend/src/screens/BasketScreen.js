@@ -1,720 +1,408 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  Image,
-  ActivityIndicator,
-  ScrollView,
-} from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Pressable, Image, ScrollView, ActivityIndicator, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
+import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useCart } from '../context/CartContext';
-import { getStoreStatus } from '../api/stores.api';
+import { useAuth } from '../context/AuthContext';
 import { useCustomAlert } from '../context/AlertContext';
+import { getStoreStatus } from '../api/stores.api';
+import Asset3D from '../components/Asset3D';
+import Button from '../components/Button';
+import { formatPence } from '../components/ProductCard';
+import { Colors, Spacing, Typography, Radius, Shadow, Motion } from '../theme';
 
-// Progress Step component
-function ProgressStep({ step, currentStep, label, isLast }) {
-  const isActive = step === currentStep;
-  const isPast = step < currentStep;
-  const color = isActive || isPast ? '#333' : '#D1D5DB';
-  const bgColor = isActive ? '#333' : (isPast ? '#333' : '#FFF');
-  const textColor = isActive || isPast ? '#FFF' : '#6B7280';
+// Entrance/exit/layout animations are built once: new builders per render remount views.
+const GROUP_IN = Array.from({ length: 8 }, (_, i) =>
+  FadeInDown.delay(60 + i * Motion.stagger.cards).springify().damping(Motion.springs.gentle.damping)
+);
+const ITEM_OUT = FadeOut.duration(180);
+const LAYOUT = LinearTransition.springify().damping(Motion.springs.gentle.damping);
+const FADE_IN = FadeIn.duration(250);
 
-  return (
-    <View style={styles.stepWrapper}>
-      <View style={[styles.stepCircle, { backgroundColor: bgColor, borderColor: color }]}>
-        {isPast ? (
-          <Feather name="check" size={14} color="#FFF" />
-        ) : (
-          <Text style={[styles.stepNumber, { color: textColor }]}>{step}</Text>
-        )}
-      </View>
-      <Text style={[styles.stepLabel, { color: isActive ? '#333' : '#6B7280', fontWeight: isActive ? '700' : '500' }]}>{label}</Text>
-    </View>
-  );
+function attributesText(attributes) {
+  if (!attributes) return '';
+  return Object.values(attributes).filter(Boolean).join(' · ');
 }
 
-function CartItem({ item, onUpdate, onRemove, navigation }) {
-  const [updating, setUpdating] = useState(false);
-
-  const handleIncrement = async () => {
-    setUpdating(true);
-    await onUpdate(item._id, item.quantity + 1);
-    setUpdating(false);
+function BasketItem({ item, isLast, onOpen, onChange }) {
+  const [busy, setBusy] = useState(false);
+  const change = async (qty) => {
+    if (busy) return;
+    setBusy(true);
+    await onChange(item, qty);
+    setBusy(false);
   };
-
-  const handleDecrement = async () => {
-    setUpdating(true);
-    if (item.quantity > 1) {
-      await onUpdate(item._id, item.quantity - 1);
-    } else {
-      await onRemove(item._id);
-    }
-    setUpdating(false);
-  };
-
-  const handleRemove = async () => {
-    setUpdating(true);
-    await onRemove(item._id);
-    setUpdating(false);
-  };
-
-  const imageUrl = item.image || item.product?.images?.[0] || 'https://images.unsplash.com/photo-1550508117-a006c00661ff?q=80&w=400&auto=format&fit=crop';
-  const unitPrice = item.unitPrice ?? item.price ?? 0;
-  const price = ((unitPrice * item.quantity) / 100).toFixed(2);
-  const originalPrice = item.compareAtPrice ? ((item.compareAtPrice * item.quantity) / 100).toFixed(2) : null;
+  const onOffer = item.compareAtPrice && item.compareAtPrice > item.unitPrice;
 
   return (
-    <View style={styles.cartItemRow}>
-      <TouchableOpacity onPress={() => navigation.navigate('ProductDetail', { product: { _id: item.product, title: item.title, price: item.unitPrice, images: item.image ? [item.image] : [] } })}>
-        <Image source={{ uri: imageUrl }} style={styles.itemImage} />
-      </TouchableOpacity>
-
-      <View style={styles.itemDetails}>
-        <TouchableOpacity onPress={() => navigation.navigate('ProductDetail', { product: { _id: item.product, title: item.title, price: item.unitPrice, images: item.image ? [item.image] : [] } })}>
-          <Text style={styles.itemName} numberOfLines={2}>{item.title || item.product?.title || 'Product'}</Text>
-        </TouchableOpacity>
-
-        <View style={styles.controlsRow}>
-          <View style={styles.quantityControl}>
-            <TouchableOpacity onPress={handleDecrement} disabled={updating} style={styles.qtyBtn}>
-              {item.quantity === 1 ? (
-                <Feather name="trash-2" size={16} color={Colors.text} />
-              ) : (
-                <Feather name="minus" size={16} color={Colors.text} />
-              )}
-            </TouchableOpacity>
-
-            <Text style={styles.qtyText}>
-              {updating ? <ActivityIndicator size="small" /> : item.quantity}
-            </Text>
-
-            <TouchableOpacity onPress={handleIncrement} disabled={updating} style={styles.qtyBtn}>
-              <Feather name="plus" size={16} color={Colors.text} />
-            </TouchableOpacity>
+    <Animated.View exiting={ITEM_OUT} layout={LAYOUT} style={[styles.item, isLast && styles.itemLast]}>
+      <Pressable onPress={onOpen} style={styles.itemImageWrap}>
+        <Image source={{ uri: item.image || undefined }} style={styles.itemImage} />
+      </Pressable>
+      <View style={{ flex: 1 }}>
+        <Pressable onPress={onOpen}>
+          <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
+        </Pressable>
+        {attributesText(item.attributes) ? (
+          <Text style={styles.itemMeta}>{attributesText(item.attributes)}</Text>
+        ) : null}
+        <View style={styles.itemFooter}>
+          <View>
+            <Text style={styles.itemPrice}>{formatPence(item.unitPrice * item.quantity)}</Text>
+            {onOffer ? (
+              <Text style={styles.itemCompare}>{formatPence(item.compareAtPrice * item.quantity)}</Text>
+            ) : null}
           </View>
-
-          <View style={styles.priceContainer}>
-            <Text style={styles.itemPrice}>£{price}</Text>
-            {originalPrice && (
-              <Text style={styles.itemOriginalPrice}>£{originalPrice}</Text>
+          <View style={styles.stepper}>
+            <Pressable onPress={() => change(item.quantity - 1)} style={styles.stepBtn} hitSlop={6}>
+              <Feather name={item.quantity === 1 ? 'trash-2' : 'minus'} size={15} color={Colors.text} />
+            </Pressable>
+            {busy ? (
+              <ActivityIndicator size="small" color={Colors.primary} style={{ width: 24 }} />
+            ) : (
+              <Text style={styles.qty}>{item.quantity}</Text>
             )}
+            <Pressable onPress={() => change(item.quantity + 1)} style={styles.stepBtn} hitSlop={6}>
+              <Feather name="plus" size={15} color={Colors.text} />
+            </Pressable>
           </View>
         </View>
       </View>
+    </Animated.View>
+  );
+}
+
+function SummaryRow({ label, value, strong, accent }) {
+  return (
+    <View style={styles.summaryRow}>
+      <Text style={[styles.summaryLabel, strong && styles.summaryStrong]}>{label}</Text>
+      <Text style={[styles.summaryValue, strong && styles.summaryStrong, accent && styles.summaryAccent]}>{value}</Text>
     </View>
   );
 }
 
 export default function BasketScreen({ navigation }) {
-  const { items, byStore, total, subtotal, shippingFee, itemCount, storeId, defaultShippingMethod, updateItem, removeItem, isLoading } = useCart();
+  const { items, byStore, total, subtotal, shippingFee, itemCount, storeId, updateItem, removeItem, isLoading } = useCart();
+  const { isAuthenticated } = useAuth();
   const { showAlert } = useCustomAlert();
+  const insets = useSafeAreaInsets();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
-  const insets = useSafeAreaInsets();
-
-  let deliveryTimeText = '10 - 25 min';
-  if (defaultShippingMethod) {
-    if (defaultShippingMethod.minDays === 0 && defaultShippingMethod.maxDays === 0) {
-      deliveryTimeText = 'Today';
-    } else if (defaultShippingMethod.minDays === defaultShippingMethod.maxDays) {
-      deliveryTimeText = `${defaultShippingMethod.minDays} min${defaultShippingMethod.minDays !== 1 ? 's' : ''}`;
-    } else {
-      deliveryTimeText = `${defaultShippingMethod.minDays} - ${defaultShippingMethod.maxDays} mins`;
-    }
-  }
-
-  // Store name or summary of multiple stores
-  const storeName = byStore && byStore.length > 1 
-    ? `${byStore.length} Stores (${itemCount} items)` 
-    : (byStore?.[0]?.storeName || items[0]?.product?.store?.name || 'Snappy Store');
-
-  const totalInPounds = (total / 100).toFixed(2);
-  const subtotalInPounds = (subtotal / 100).toFixed(2);
-  const shippingFeeInPounds = (shippingFee / 100).toFixed(2);
-
-  const originalSubtotal = items.reduce((acc, item) => {
-    const unitPrice = item.unitPrice ?? item.price ?? 0;
-    const comparePrice = item.compareAtPrice && item.compareAtPrice > unitPrice ? item.compareAtPrice : unitPrice;
-    return acc + (comparePrice * item.quantity);
+  const savings = items.reduce((acc, item) => {
+    const compare = item.compareAtPrice && item.compareAtPrice > item.unitPrice ? item.compareAtPrice : item.unitPrice;
+    return acc + (compare - item.unitPrice) * item.quantity;
   }, 0);
-  
-  const hasDiscount = originalSubtotal > subtotal;
-  const originalTotal = hasDiscount ? ((originalSubtotal + shippingFee) / 100).toFixed(2) : null;
+
+  const handleChange = async (item, qty) => {
+    const res = qty <= 0 ? await removeItem(item._id) : await updateItem(item._id, qty);
+    if (!res.success) {
+      showAlert({ title: "Couldn't update basket", message: res.error, icon: 'alert-circle', showCancel: false, confirmText: 'OK' });
+    }
+  };
+
+  const openProduct = (item) =>
+    navigation.navigate('ProductDetail', {
+      product: { _id: item.product, title: item.title, price: item.unitPrice, images: [item.image] },
+    });
 
   const handleCheckout = async () => {
     if (itemCount === 0) return;
     setIsCheckingOut(true);
     try {
-      const storesToCheck = byStore && byStore.length > 0 ? byStore : (storeId ? [{ storeId, storeName }] : []);
+      const storesToCheck = byStore?.length ? byStore : storeId ? [{ storeId }] : [];
       for (const st of storesToCheck) {
         if (!st.storeId) continue;
-        const res = await getStoreStatus(st.storeId);
-        const statusData = res?.data ?? res;
-        if (statusData && statusData.isOpen === false) {
+        const res = await getStoreStatus(st.storeSlug || st.storeId);
+        const status = res?.data ?? res;
+        if (status && status.isOpen === false) {
           showAlert({
-            title: 'Store Closed',
-            message: `Sorry, ${st.storeName || 'one of the stores in your cart'} is currently closed. ${statusData.statusLabel || ''}`,
+            title: 'Store closed',
+            message: `${st.storeName || 'A store in your basket'} is closed right now. ${status.statusLabel || ''}`,
             icon: 'clock',
             showCancel: false,
-            confirmText: 'Okay',
+            confirmText: 'OK',
           });
-          setIsCheckingOut(false);
           return;
         }
       }
-
-      // Proceed with checkout logic
       navigation.navigate('Checkout');
-    } catch (err) {
-      console.log('Error checking store status', err);
+    } catch {
+      showAlert({ title: 'Connection problem', message: 'Please check your connection and try again.', showCancel: false, confirmText: 'OK' });
     } finally {
       setIsCheckingOut(false);
     }
   };
 
-  if (itemCount === 0) {
+  const goShopping = () => navigation.navigate('ShopHomeTab');
+
+  const header = (
+    <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
+      <Text style={styles.title}>Basket</Text>
+      {itemCount > 0 ? (
+        <Text style={styles.subtitle}>
+          {itemCount} {itemCount === 1 ? 'item' : 'items'}
+          {byStore?.length > 1 ? ` from ${byStore.length} stores` : byStore?.[0]?.storeName ? ` from ${byStore[0].storeName}` : ''}
+        </Text>
+      ) : null}
+    </View>
+  );
+
+  if (!isAuthenticated || itemCount === 0) {
     return (
       <View style={styles.root}>
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
-          <View style={styles.header}>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
-              <Feather name="arrow-left" size={24} color={Colors.text} />
-            </TouchableOpacity>
-            <View style={styles.headerTitles}>
-              <Text style={styles.headerTitle}>Cart</Text>
-              <Text style={styles.headerSubtitle}>{storeName}</Text>
-            </View>
-          </View>
-        </SafeAreaView>
-        <View style={styles.emptyContent}>
-          <View style={styles.iconWrapper}>
-            <View style={styles.cartIcon}>
-              <View style={[styles.cartHandle, { borderColor: Colors.muted }]} />
-              <View style={[styles.cartBody, { backgroundColor: Colors.border }]} />
-            </View>
-          </View>
-          <Text style={styles.title}>Your basket is empty</Text>
-          <Text style={styles.subtitle}>Browse stores and add items to get started</Text>
-        </View>
+        <StatusBar barStyle="dark-content" />
+        {header}
+        {isLoading ? (
+          <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing.xxl }} />
+        ) : (
+          <Animated.View entering={FADE_IN} style={styles.empty}>
+            <Asset3D name="illo-empty-basket" size={170} float />
+            <Text style={styles.emptyTitle}>
+              {isAuthenticated ? 'Your basket is empty' : 'Log in to start your basket'}
+            </Text>
+            <Text style={styles.emptyBody}>
+              {isAuthenticated
+                ? 'Fresh groceries from local stores are a few taps away.'
+                : 'Your basket is saved to your account so it follows you everywhere.'}
+            </Text>
+            <Button
+              title={isAuthenticated ? 'Browse stores' : 'Log in'}
+              onPress={isAuthenticated ? goShopping : () => navigation.navigate('AccountTab')}
+              style={{ marginTop: Spacing.lg, minWidth: 200 }}
+            />
+          </Animated.View>
+        )}
       </View>
     );
   }
 
   return (
     <View style={styles.root}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
-            <Feather name="arrow-left" size={24} color={Colors.text} />
-          </TouchableOpacity>
-          <View style={styles.headerTitles}>
-            <Text style={styles.headerTitle}>Cart</Text>
-            <Text style={styles.headerSubtitle}>{storeName}</Text>
-          </View>
-          <View style={styles.placeholder} />
-        </View>
+      <StatusBar barStyle="dark-content" />
+      {header}
 
-        {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressLineBackground} />
-          <View style={[styles.progressLineFill, { width: '50%' }]} />
-          <View style={styles.progressStepsRow}>
-            <ProgressStep step={1} currentStep={2} label="Menu" />
-            <ProgressStep step={2} currentStep={2} label="Cart" />
-            <ProgressStep step={3} currentStep={2} label="Checkout" isLast />
-          </View>
-        </View>
-      </SafeAreaView>
-
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-
-        {/* Delivery Info */}
-        <View style={styles.deliveryInfoRow}>
-          <Text style={styles.deliveryInfoText}>
-            Delivery: <Text style={{ fontWeight: '800' }}>{deliveryTimeText}</Text>
-          </Text>
-        </View>
-
-        {/* Cart Items Grouped By Store Order */}
-        <View style={styles.itemsSection}>
-          {byStore && byStore.length > 0 ? (
-            byStore.map((storeCart, index) => (
-              <View key={storeCart.storeId || index} style={styles.storeCartCard}>
-                <View style={styles.storeCartHeader}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                    <Ionicons name="storefront-outline" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
-                    <Text style={styles.storeCartTitle}>{storeCart.storeName || `Store #${index + 1}`}</Text>
-                  </View>
-                  <View style={styles.storeCartBadge}>
-                    <Text style={styles.storeCartBadgeText}>Order #{index + 1}</Text>
-                  </View>
-                </View>
-
-                {storeCart.items?.map(item => (
-                  <CartItem
-                    key={item._id}
-                    item={item}
-                    onUpdate={updateItem}
-                    onRemove={removeItem}
-                    navigation={navigation}
-                  />
-                ))}
-
-                {byStore.length > 1 && (
-                  <View style={styles.storeCartFooter}>
-                    <View style={styles.storeSummaryRow}>
-                      <Text style={styles.storeSummaryLabel}>Subtotal ({storeCart.itemCount} items):</Text>
-                      <Text style={styles.storeSummaryVal}>£{(storeCart.subtotal / 100).toFixed(2)}</Text>
-                    </View>
-                    <View style={styles.storeSummaryRow}>
-                      <Text style={styles.storeSummaryLabel}>Delivery Fee:</Text>
-                      <Text style={styles.storeSummaryVal}>£{(storeCart.shippingFee / 100).toFixed(2)}</Text>
-                    </View>
-                    <View style={[styles.storeSummaryRow, { marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#F3F4F6' }]}>
-                      <Text style={[styles.storeSummaryLabel, { fontWeight: '700', color: Colors.text }]}>Store Order Total:</Text>
-                      <Text style={[styles.storeSummaryVal, { fontWeight: '800', color: Colors.primary }]}>£{(storeCart.total / 100).toFixed(2)}</Text>
-                    </View>
-                  </View>
-                )}
+      <ScrollView contentContainerStyle={{ padding: Spacing.base, paddingBottom: 220 }} showsVerticalScrollIndicator={false}>
+        {byStore.map((group, index) => (
+          <Animated.View key={String(group.storeId)} entering={GROUP_IN[Math.min(index, 7)]} layout={LAYOUT} style={styles.group}>
+            <View style={styles.groupHeader}>
+              <View style={styles.storeIcon}>
+                <Feather name="shopping-bag" size={16} color={Colors.primary} />
               </View>
-            ))
-          ) : (
-            items.map(item => (
-              <CartItem
-                key={item._id}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.groupTitle} numberOfLines={1}>{group.storeName || `Store ${index + 1}`}</Text>
+                <Text style={styles.groupMeta}>
+                  {group.itemCount} {group.itemCount === 1 ? 'item' : 'items'} · delivery {group.shippingFee > 0 ? formatPence(group.shippingFee) : 'free'}
+                </Text>
+              </View>
+            </View>
+            {group.items.map((item, i) => (
+              <BasketItem
+                key={String(item._id)}
                 item={item}
-                onUpdate={updateItem}
-                onRemove={removeItem}
-                navigation={navigation}
+                isLast={i === group.items.length - 1}
+                onOpen={() => openProduct(item)}
+                onChange={handleChange}
               />
-            ))
-          )}
+            ))}
+            {byStore.length > 1 ? (
+              <View style={styles.groupFooter}>
+                <Text style={styles.groupFooterLabel}>Order {index + 1} total</Text>
+                <Text style={styles.groupFooterValue}>{formatPence(group.total ?? group.subtotal + group.shippingFee)}</Text>
+              </View>
+            ) : null}
+          </Animated.View>
+        ))}
 
-          <TouchableOpacity style={styles.addMoreRow} onPress={() => navigation.goBack()}>
-            <Feather name="plus" size={20} color={Colors.text} />
-            <Text style={styles.addMoreText}>Add more items</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Total Summary */}
-        <View style={styles.summarySection}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summarySubLabel}>Items Subtotal</Text>
-            <Text style={styles.summarySubPrice}>£{subtotalInPounds}</Text>
+        {byStore.length > 1 ? (
+          <View style={styles.note}>
+            <Feather name="info" size={16} color={Colors.primary} />
+            <Text style={styles.noteText}>
+              Items from different stores arrive as separate orders, each with its own delivery.
+            </Text>
           </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summarySubLabel}>Delivery Fee</Text>
-            <Text style={styles.summarySubPrice}>£{shippingFeeInPounds}</Text>
-          </View>
-          <View style={[styles.summaryRow, { marginTop: Spacing.sm, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.border }]}>
-            <View>
-              <Text style={styles.summaryTotalLabel}>Total <Text style={styles.summaryTaxLabel}>(incl. tax)</Text></Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.summaryTotalPrice}>£{totalInPounds}</Text>
-              {originalTotal && <Text style={styles.summaryOriginalPrice}>£{originalTotal}</Text>}
-            </View>
-          </View>
-        </View>
+        ) : null}
 
-        {/* Action Button */}
-        <View style={styles.bottomFooter}>
-          <TouchableOpacity
-            style={styles.confirmBtn}
-            activeOpacity={0.8}
-            onPress={handleCheckout}
-            disabled={isCheckingOut}
-          >
-            {isCheckingOut ? (
-              <ActivityIndicator color={Colors.white} size="small" />
-            ) : (
-              <Text style={styles.confirmBtnText}>Confirm payment and address</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
+        <Animated.View layout={LAYOUT} style={styles.summary}>
+          <SummaryRow label="Subtotal" value={formatPence(subtotal)} />
+          <SummaryRow label="Delivery" value={shippingFee > 0 ? formatPence(shippingFee) : 'Free'} />
+          {savings > 0 ? <SummaryRow label="You're saving" value={`-${formatPence(savings)}`} accent /> : null}
+          <View style={styles.divider} />
+          <SummaryRow label="Total" value={formatPence(total)} strong />
+        </Animated.View>
       </ScrollView>
+
+      <View style={[styles.checkoutBar, { bottom: 96 }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.checkoutLabel}>Total</Text>
+          <Text style={styles.checkoutTotal}>{formatPence(total)}</Text>
+        </View>
+        <Button
+          title="Checkout"
+          onPress={handleCheckout}
+          loading={isCheckingOut}
+          icon={<Feather name="lock" size={16} color={Colors.white} />}
+          style={{ flex: 1.4 }}
+          size="lg"
+        />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F9FAFB' },
-  safeArea: {
-    backgroundColor: Colors.white,
-  },
+  root: { flex: 1, backgroundColor: Colors.bg },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    justifyContent: 'space-between'
+    paddingHorizontal: Spacing.base,
+    paddingBottom: Spacing.sm,
   },
-  closeBtn: {
-    padding: Spacing.xs,
-  },
-  headerTitles: {
-    flex: 1,
-    paddingHorizontal: Spacing.md,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+  title: {
+    fontFamily: Typography.family.displayExtrabold,
+    fontSize: 30,
+    letterSpacing: -0.8,
     color: Colors.text,
   },
-  headerSubtitle: {
-    fontSize: 13,
+  subtitle: {
+    fontFamily: Typography.family.medium,
+    fontSize: 14,
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  placeholder: {
-    width: 32,
-  },
-
-  // Progress Bar
-  progressContainer: {
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.white,
-    position: 'relative',
-    height: 60,
+    paddingBottom: 120,
   },
-  progressLineBackground: {
-    position: 'absolute',
-    top: 25,
-    left: Spacing.xl + 15,
-    right: Spacing.xl + 15,
-    height: 4,
-    backgroundColor: '#E5E7EB',
-    zIndex: 1,
-  },
-  progressLineFill: {
-    position: 'absolute',
-    top: 25,
-    left: Spacing.xl + 15,
-    height: 4,
-    backgroundColor: '#333',
-    zIndex: 2,
-  },
-  progressStepsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    zIndex: 3,
-  },
-  stepWrapper: {
-    alignItems: 'center',
-    width: 60,
-  },
-  stepCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.white,
-    marginBottom: 4,
-  },
-  stepNumber: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  stepLabel: {
-    fontSize: 11,
-  },
-
-  scrollContent: {
-    paddingBottom: Spacing.xl + 40, // add more space so the button doesn't get hidden behind bottom tabs
-  },
-
-  // Toggle Switch
-  toggleContainer: {
-    flexDirection: 'row',
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md,
-    backgroundColor: '#E5E7EB',
-    borderRadius: Radius.full,
-    padding: 4,
-  },
-  toggleBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: Radius.full,
-    gap: 8,
-  },
-  toggleBtnActive: {
-    backgroundColor: Colors.white,
-    ...Shadow.sm,
-  },
-  toggleText: {
-    fontWeight: '600',
-    color: Colors.muted,
-  },
-  toggleTextActive: {
+  emptyTitle: {
+    fontFamily: Typography.family.displayExtrabold,
+    fontSize: 23,
+    letterSpacing: -0.4,
     color: Colors.text,
-    fontWeight: '700',
-  },
-
-  // Delivery Info
-  deliveryInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
-  },
-  deliveryInfoText: {
-    fontSize: 15,
-    color: Colors.text,
-  },
-  changeText: {
-    fontSize: 15,
-    color: Colors.text,
-    textDecorationLine: 'underline',
-  },
-
-  // Items
-  itemsSection: {
-    backgroundColor: Colors.white,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
-  cartItemRow: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-  },
-  itemImage: {
-    width: 60,
-    height: 60,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.surfaceSecondary,
-  },
-  itemDetails: {
-    flex: 1,
-    marginLeft: Spacing.md,
-  },
-  itemName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: Spacing.md,
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  quantityControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: Radius.full,
-  },
-  qtyBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  qtyText: {
-    fontSize: 15,
-    fontWeight: '700',
-    minWidth: 20,
+    marginTop: Spacing.lg,
     textAlign: 'center',
   },
-  priceContainer: {
-    alignItems: 'flex-end',
-  },
-  itemPrice: {
+  emptyBody: {
+    fontFamily: Typography.family.regular,
     fontSize: 15,
-    fontWeight: '800',
-    color: '#D81B60', // Pink matching figma
-  },
-  itemOriginalPrice: {
-    fontSize: 13,
-    color: Colors.muted,
-    textDecorationLine: 'line-through',
-  },
-  addMoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    gap: Spacing.sm,
-  },
-  addMoreText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-
-  // Summary
-  summarySection: {
-    backgroundColor: Colors.white,
-    padding: Spacing.lg,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  summarySubLabel: {
-    fontSize: 15,
-    color: Colors.text,
-  },
-  summarySubPrice: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  summaryTotalLabel: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.text,
-  },
-  summaryTaxLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: Colors.muted,
-  },
-  seeSummaryText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.text,
-    marginTop: 4,
-  },
-  summaryTotalPrice: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#D81B60',
-  },
-  summaryOriginalPrice: {
-    fontSize: 13,
-    color: Colors.muted,
-    textDecorationLine: 'line-through',
-    marginTop: 2,
-  },
-
-  // Footer
-  bottomFooter: {
-    backgroundColor: Colors.white,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.xl,
-  },
-  confirmBtn: {
-    backgroundColor: '#D81B60', // Pink from figma
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-  },
-  confirmBtnText: {
-    color: Colors.white,
-    fontSize: 16, // matches Typography.subtitle1
-    fontWeight: '600',
-  },
-
-  // Empty state
-  emptyContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing['3xl'],
-    paddingBottom: 100,
-  },
-  iconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.xl,
-  },
-  cartIcon: { alignItems: 'center' },
-  cartHandle: {
-    width: 20, height: 12, borderWidth: 3, borderBottomWidth: 0, borderRadius: 10, marginBottom: -2,
-  },
-  cartBody: {
-    width: 28, height: 18, borderRadius: 4, borderTopLeftRadius: 1, borderTopRightRadius: 1,
-  },
-  title: {
-    fontSize: Typography.size.lg, fontWeight: '800', color: Colors.text, marginBottom: Spacing.sm,
-  },
-  subtitle: {
-    fontSize: Typography.size.sm, color: Colors.muted, textAlign: 'center', lineHeight: 20,
-  },
-  storeCartCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xs,
-    marginBottom: Spacing.lg,
-  },
-  storeCartHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    marginBottom: Spacing.sm,
-  },
-  storeCartTitle: {
-    fontSize: Typography.size.base,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  storeCartBadge: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: Radius.full,
-  },
-  storeCartBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  storeCartFooter: {
+    lineHeight: 22,
+    color: Colors.textSecondary,
+    textAlign: 'center',
     marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    backgroundColor: '#F9FAFB',
-    marginHorizontal: -Spacing.md,
-    paddingHorizontal: Spacing.md,
-    borderBottomLeftRadius: Radius.lg,
-    borderBottomRightRadius: Radius.lg,
   },
-  storeSummaryRow: {
+  group: {
+    borderRadius: Radius['2xl'],
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    padding: Spacing.base,
+    marginBottom: Spacing.base,
+    ...Shadow.sm,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderSubtle,
+  },
+  storeIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primarySubtle,
+  },
+  groupTitle: { fontFamily: Typography.family.display, fontSize: 16, color: Colors.text },
+  groupMeta: { fontFamily: Typography.family.regular, fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  item: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderSubtle,
+  },
+  itemLast: { borderBottomWidth: 0, paddingBottom: 0 },
+  itemImageWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    backgroundColor: Colors.surfaceSecondary,
+  },
+  itemImage: { width: '100%', height: '100%' },
+  itemTitle: { fontFamily: Typography.family.semibold, fontSize: 14, lineHeight: 19, color: Colors.text },
+  itemMeta: { fontFamily: Typography.family.regular, fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  itemFooter: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: Spacing.sm,
+  },
+  itemPrice: { fontFamily: Typography.family.displayExtrabold, fontSize: 16, color: Colors.text },
+  itemCompare: {
+    fontFamily: Typography.family.regular,
+    fontSize: 12,
+    color: Colors.muted,
+    textDecorationLine: 'line-through',
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surfaceSecondary,
+    paddingHorizontal: 4,
+  },
+  stepBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  qty: { minWidth: 24, textAlign: 'center', fontFamily: Typography.family.bold, fontSize: 14, color: Colors.text },
+  groupFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingTop: Spacing.md,
+  },
+  groupFooterLabel: { fontFamily: Typography.family.medium, fontSize: 13, color: Colors.textSecondary },
+  groupFooterValue: { fontFamily: Typography.family.bold, fontSize: 14, color: Colors.text },
+  note: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.primarySubtle,
+    marginBottom: Spacing.base,
+  },
+  noteText: { flex: 1, fontFamily: Typography.family.regular, fontSize: 13, lineHeight: 18, color: Colors.primary },
+  summary: {
+    borderRadius: Radius['2xl'],
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    padding: Spacing.base,
+  },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 },
+  summaryLabel: { fontFamily: Typography.family.regular, fontSize: 14, color: Colors.textSecondary },
+  summaryValue: { fontFamily: Typography.family.semibold, fontSize: 14, color: Colors.text },
+  summaryStrong: { fontFamily: Typography.family.displayExtrabold, fontSize: 18, color: Colors.text },
+  summaryAccent: { color: Colors.successText },
+  divider: { height: 1, backgroundColor: Colors.borderSubtle, marginVertical: Spacing.sm },
+  checkoutBar: {
+    position: 'absolute',
+    left: Spacing.base,
+    right: Spacing.base,
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 2,
+    gap: Spacing.base,
+    padding: Spacing.md,
+    paddingLeft: Spacing.base,
+    borderRadius: Radius['2xl'],
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    ...Shadow.lg,
   },
-  storeSummaryLabel: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  storeSummaryVal: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-  },
+  checkoutLabel: { fontFamily: Typography.family.regular, fontSize: 12, color: Colors.textSecondary },
+  checkoutTotal: { fontFamily: Typography.family.displayExtrabold, fontSize: 20, color: Colors.text },
 });

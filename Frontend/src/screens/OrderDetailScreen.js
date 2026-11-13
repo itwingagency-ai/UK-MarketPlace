@@ -16,7 +16,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 import { Feather } from '@expo/vector-icons';
-import { getMyOrderById } from '../api/orders.api';
+import { getMyOrderById, reorder } from '../api/orders.api';
+import { useCart } from '../context/CartContext';
+import { useLiveEvent } from '../context/NotificationsContext';
+import Button from '../components/Button';
 import { getMyReviews, submitReview, updateMyReview } from '../api/reviews.api';
 import { useCustomAlert } from '../context/AlertContext';
 
@@ -36,13 +39,49 @@ export default function OrderDetailScreen({ route, navigation }) {
   const [reviewBody, setReviewBody] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
 
+  const { fetchCart } = useCart();
+  const [reordering, setReordering] = useState(false);
+
   useEffect(() => {
     fetchOrder();
   }, [orderId]);
 
-  const fetchOrder = async () => {
+  // The shop accepting / sending the order updates this screen live
+  useLiveEvent('order:status_changed', (p) => {
+    if (p?.orderId === orderId) fetchOrder({ silent: true });
+  });
+
+  const handleReorder = async () => {
+    setReordering(true);
     try {
-      setLoading(true);
+      const res = await reorder(orderId);
+      await fetchCart();
+      const { added, skipped } = res.data;
+      const skippedText = skipped.length
+        ? `\n\nNot added: ${skipped.map((s) => `${s.title} (${s.reason.toLowerCase()})`).join(', ')}`
+        : '';
+      if (added.length === 0) {
+        showAlert({ title: "Couldn't add these items", message: `None of these items can be ordered right now.${skippedText}`, icon: 'alert-circle', showCancel: false, confirmText: 'OK' });
+        return;
+      }
+      showAlert({
+        title: 'Added to your basket',
+        message: `${added.length} item${added.length === 1 ? '' : 's'} added at today's prices.${skippedText}`,
+        icon: 'shopping-bag',
+        confirmText: 'View basket',
+        cancelText: 'Stay here',
+        onConfirm: () => navigation.navigate('BasketTab'),
+      });
+    } catch (err) {
+      showAlert({ title: "Couldn't reorder", message: err.response?.data?.message || 'Please try again.', icon: 'alert-circle', showCancel: false, confirmText: 'OK' });
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const fetchOrder = async ({ silent = false } = {}) => {
+    try {
+      if (!silent) setLoading(true);
       setError(null);
       const res = await getMyOrderById(orderId);
       setOrder(res.data);
@@ -284,6 +323,14 @@ export default function OrderDetailScreen({ route, navigation }) {
                 </Text>
               </View>
             </View>
+            {order.tracking?.estimatedReadyAt && ['confirmed', 'packed'].includes(statusStr) ? (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Ready by</Text>
+                <Text style={[styles.summaryValue, { color: Colors.primary }]}>
+                  {new Date(order.tracking.estimatedReadyAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+            ) : null}
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Store</Text>
               <Text style={styles.summaryValue}>{order.store?.name || 'Store'}</Text>
@@ -308,6 +355,17 @@ export default function OrderDetailScreen({ route, navigation }) {
             </View>
           </View>
         )}
+        ListFooterComponent={
+          <Button
+            title="Order again"
+            variant="outline"
+            size="full"
+            loading={reordering}
+            onPress={handleReorder}
+            icon={<Feather name="rotate-ccw" size={16} color={Colors.primary} />}
+            style={{ marginTop: Spacing.base, marginBottom: 120 }}
+          />
+        }
       />
 
       <Modal

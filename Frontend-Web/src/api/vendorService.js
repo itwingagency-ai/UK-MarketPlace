@@ -103,12 +103,23 @@ export const vendorService = {
     const { data } = await client.patch(`/vendor/dashboard/products/${id}`, payload);
     return data;
   },
-  deleteProduct: async (id) => {
-    const { data } = await client.delete(`/vendor/dashboard/products/${id}`);
+  deleteProduct: async (id, { hard = false } = {}) => {
+    const { data } = await client.delete(`/vendor/dashboard/products/${id}`, {
+      params: hard ? { hard: 'true' } : undefined,
+    });
     return data;
   },
   restoreProduct: async (id) => {
     const { data } = await client.patch(`/vendor/dashboard/products/${id}/restore`);
+    return data;
+  },
+  // payload: { stock } to set the total, or { adjust } to add/remove; plus variantId for variant products
+  updateProductStock: async (id, payload) => {
+    const { data } = await client.patch(`/vendor/dashboard/products/${id}/stock`, payload);
+    return data;
+  },
+  getStockSummary: async () => {
+    const { data } = await client.get('/vendor/dashboard/products/stock-summary');
     return data;
   },
 
@@ -183,6 +194,10 @@ export const vendorService = {
   },
   getCategoryBreakdown: async (params) => {
     const { data } = await client.get('/vendor/dashboard/analytics/category-breakdown', { params });
+    return data;
+  },
+  getTopProducts: async (params) => {
+    const { data } = await client.get('/vendor/dashboard/analytics/top-products', { params });
     return data;
   },
 

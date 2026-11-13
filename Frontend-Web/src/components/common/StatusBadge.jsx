@@ -11,27 +11,43 @@
 const STATUS_MAP = {
   // Order statuses
   pending:    'warning',
+  confirmed:  'info',
   accepted:   'info',
   preparing:  'info',
   packed:     'info',
-  dispatched: 'info',
+  shipped:    'primary',
+  dispatched: 'primary',
   delivered:  'success',
   cancelled:  'danger',
-  refunded:   'danger',
+
+  // Payment statuses
+  paid:       'success',
+  failed:     'danger',
+  refunded:   'neutral',
+
+  // Shipment events
+  created:            'neutral',
+  picked_up:          'info',
+  in_transit:         'primary',
+  out_for_delivery:   'primary',
+  delivery_attempted: 'warning',
+  exception:          'danger',
 
   // Vendor application statuses
   approved:   'success',
   rejected:   'danger',
 
-  // Generic
+  // Users / stores / generic
   active:     'success',
   suspended:  'danger',
+  unverified: 'warning',
   inactive:   'neutral',
   draft:      'neutral',
   published:  'success',
 };
 
 const VARIANT_CLASSES = {
+  primary: 'badge-primary',
   success: 'badge-success',
   danger:  'badge-danger',
   warning: 'badge-warning',
@@ -42,7 +58,7 @@ const VARIANT_CLASSES = {
 export default function StatusBadge({ status, label, size = 'md', dot = true }) {
   const variant = STATUS_MAP[status?.toLowerCase()] || 'neutral';
   const className = `badge ${VARIANT_CLASSES[variant]}${size === 'sm' ? ' badge-sm' : ''}`;
-  const displayText = label || status || 'Unknown';
+  const displayText = (label || status || 'Unknown').replace(/_/g, ' ');
 
   return (
     <span className={className}>

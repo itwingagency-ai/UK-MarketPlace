@@ -63,9 +63,25 @@ const validateCategoryPayload = (payload, isPatch = false) => {
       throw new ApiError(400, "image URL is too long");
     }
   }
+
+  if (
+    payload.sortOrder !== undefined &&
+    payload.sortOrder !== null &&
+    payload.sortOrder !== ""
+  ) {
+    const n = Number(payload.sortOrder);
+    if (!Number.isInteger(n) || n < 0 || n > 9999) {
+      throw new ApiError(400, "sortOrder must be a whole number from 0 to 9999");
+    }
+  }
 };
+
+// Multipart forms send booleans as strings; Boolean("false") would be true.
+const parseBoolean = (value) =>
+  value === true || value === "true" || value === "1" || value === 1 || value === "on";
 
 module.exports = {
   validateCategoryPayload,
   slugify,
+  parseBoolean,
 };

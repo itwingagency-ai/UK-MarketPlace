@@ -12,7 +12,13 @@ const {
   getMyOrderById,
   getMyOrderHistory,
   listMyOrders,
+  reorder,
 } = require("../controllers/customerOrders.controller");
+const {
+  createStockAlert,
+  deleteStockAlert,
+  listStockAlerts,
+} = require("../controllers/stockAlerts.controller");
 const {
   checkEligibility,
   deleteMyReview,
@@ -37,6 +43,11 @@ router.delete("/me/addresses/:id", deleteAddress);
 router.get("/orders", listMyOrders);
 router.get("/orders/:id", getMyOrderById);
 router.get("/orders/:id/history", getMyOrderHistory);
+router.post("/orders/:id/reorder", reorder);
+
+router.get("/stock-alerts", listStockAlerts);
+router.post("/stock-alerts", createStockAlert);
+router.delete("/stock-alerts", deleteStockAlert);
 
 router.get("/reviews", listMyReviews);
 router.get("/products/:productId/reviews/eligibility", checkEligibility);

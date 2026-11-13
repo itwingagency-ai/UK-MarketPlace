@@ -3,46 +3,28 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   TextInput,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
+  Pressable,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather, Ionicons, FontAwesome } from '@expo/vector-icons';
+import Animated, { FadeInDown, useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useStripe } from '@stripe/stripe-react-native';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
+import { Colors, Spacing, Typography, Radius, Shadow, Motion } from '../theme';
+import { formatPence } from '../components/ProductCard';
+
+// Entrance animations are built once: a new builder per render remounts views.
+const SECTION_IN = Array.from({ length: 4 }, (_, i) =>
+  FadeInDown.delay(60 + i * Motion.stagger.cards).springify().damping(Motion.springs.gentle.damping)
+);
 import { previewCheckout, placeOrder, cancelTransaction, confirmTransaction } from '../api/checkout.api';
 import { getMyAddresses, addMyAddress } from '../api/profile.api';
 import { useCart } from '../context/CartContext';
 import { useCustomAlert } from '../context/AlertContext';
 import { useAuth } from '../context/AuthContext';
 
-// Progress Step component
-function ProgressStep({ step, currentStep, label, isLast }) {
-  const isActive = step === currentStep;
-  const isPast = step < currentStep;
-  const color = isActive || isPast ? '#333' : '#D1D5DB';
-  const bgColor = isActive ? '#333' : (isPast ? '#333' : '#FFF');
-  const textColor = isActive || isPast ? '#FFF' : '#6B7280';
-
-  return (
-    <View style={styles.stepWrapper}>
-      <View style={[styles.stepCircle, { backgroundColor: bgColor, borderColor: color }]}>
-        {isPast ? (
-          <Feather name="check" size={14} color="#FFF" />
-        ) : (
-          <Text style={[styles.stepNumber, { color: textColor }]}>{step}</Text>
-        )}
-      </View>
-      <Text style={[styles.stepLabel, { color: isActive ? '#333' : '#6B7280', fontWeight: isActive ? '700' : '500' }]}>{label}</Text>
-    </View>
-  );
-}
-
-// UK Distance Helper (Haversine Formula in km)
 const calculateHaversineKm = (lat1, lng1, lat2, lng2) => {
   if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
   const toRad = (deg) => (deg * Math.PI) / 180;
@@ -161,6 +143,12 @@ export default function CheckoutScreen({ navigation }) {
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
   const storeName = items && items[0]?.product?.store?.name ? items[0].product.store.name : 'Snappy Store';
+  const insets = useSafeAreaInsets();
+
+  // Android is edge-to-edge, so the window doesn't shrink for the keyboard.
+  // An animated spacer (UI thread, no re-render) lets the form scroll above it.
+  const keyboard = useAnimatedKeyboard();
+  const keyboardSpacer = useAnimatedStyle(() => ({ height: keyboard.height.value }));
 
   // Form State
   const [paymentMethod, setPaymentMethod] = useState('cod'); // 'online' or 'cod'
@@ -481,729 +469,532 @@ export default function CheckoutScreen({ navigation }) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Preparing your checkout…</Text>
       </SafeAreaView>
     );
   }
 
+  const orders = previewData?.byStore ?? [];
+  const grandTotal = previewData?.grandTotal ?? 0;
+  const canPlace = !isPlacingOrder && previewData?.canCheckout;
+
+  const field = (props) => (
+    <TextInput placeholderTextColor={Colors.muted} {...props} style={[styles.input, props.style]} />
+  );
+
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
-          <Feather name="arrow-left" size={24} color={Colors.text} />
-        </TouchableOpacity>
-        <View style={styles.headerTitles}>
+        <Pressable style={styles.circleBtn} onPress={() => navigation.goBack()} accessibilityLabel="Back">
+          <Feather name="arrow-left" size={20} color={Colors.text} />
+        </Pressable>
+        <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Checkout</Text>
-          <Text style={styles.headerSubtitle}>{storeName}</Text>
+          <Text style={styles.headerSubtitle}>
+            {orders.length > 1 ? `${orders.length} stores · ${orders.length} orders` : orders[0]?.storeName || storeName}
+          </Text>
         </View>
-        <View style={styles.placeholder} />
-      </View>
-
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressLineBackground} />
-        <View style={[styles.progressLineFill, { right: Spacing.xl + 15, backgroundColor: '#333' }]} />
-        <View style={styles.progressStepsRow}>
-          <ProgressStep step={1} currentStep={3} label="Menu" />
-          <ProgressStep step={2} currentStep={3} label="Cart" />
-          <ProgressStep step={3} currentStep={3} label="Checkout" isLast />
+        <View style={styles.secureBadge}>
+          <Feather name="lock" size={12} color={Colors.successText} />
+          <Text style={styles.secureText}>Secure</Text>
         </View>
       </View>
 
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          
-          {/* Shipping Address Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Shipping Address</Text>
-              <View style={styles.ukBadge}>
-                <Text style={styles.ukBadgeText}>🇬🇧 UK Only</Text>
-              </View>
-            </View>
-            <View style={styles.card}>
-              {savedAddresses.length > 0 && (
-                <View style={styles.savedAddressContainer}>
-                  <Text style={styles.savedAddressHeader}>Select from Saved Addresses</Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.savedAddressScroll}
-                  >
-                    {savedAddresses.map((item) => {
-                      const isSelected = selectedSavedAddressId === item._id;
-                      return (
-                        <TouchableOpacity
-                          key={item._id}
-                          style={[styles.savedAddressCard, isSelected && styles.savedAddressCardSelected]}
-                          onPress={() => handleSelectSavedAddress(item)}
-                          activeOpacity={0.8}
-                        >
-                          <View style={styles.savedAddressRowHeader}>
-                            <Text style={[styles.savedAddressLabel, isSelected && styles.savedAddressLabelSelected]}>
-                              {item.label || 'Home'}
-                            </Text>
-                            {item.isDefault && (
-                              <View style={styles.savedDefaultBadge}>
-                                <Text style={styles.savedDefaultText}>Default</Text>
-                              </View>
-                            )}
-                          </View>
-                          <Text style={styles.savedAddressText} numberOfLines={1}>
-                            {item.line1}
-                          </Text>
-                          <Text style={styles.savedAddressSub} numberOfLines={1}>
-                            {item.city}, {item.postalCode}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                  <View style={styles.divider} />
-                </View>
-              )}
+        {/* Delivery address */}
+        <Animated.View entering={SECTION_IN[0]} style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.stepDot}><Text style={styles.stepDotText}>1</Text></View>
+            <Text style={styles.sectionTitle}>Delivery address</Text>
+            <View style={styles.ukBadge}><Text style={styles.ukBadgeText}>UK only</Text></View>
+          </View>
 
-              <TextInput
-                style={styles.input}
-                placeholder="Full Name"
-                value={address.fullName}
-                onChangeText={(text) => {
-                  setAddress({ ...address, fullName: text });
-                  setSelectedSavedAddressId(null);
-                }}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Phone Number *"
-                keyboardType="phone-pad"
-                value={address.phone}
-                onChangeText={(text) => {
-                  setAddress({ ...address, phone: text });
-                  setSelectedSavedAddressId(null);
-                }}
-              />
-              
-              <View style={styles.addressInputContainer}>
-                <TextInput
-                  style={[styles.input, { marginBottom: 0, paddingRight: 40 }]}
-                  placeholder="Street Address (Start typing for UK suggestions...)"
-                  value={address.line1}
-                  onChangeText={handleLine1Change}
-                />
-                <View style={styles.inputIconRight}>
-                  {isLoadingSuggestions ? (
-                    <ActivityIndicator size="small" color={Colors.primary} />
-                  ) : (
-                    <Ionicons name="location-outline" size={20} color={Colors.primary} />
-                  )}
-                </View>
-              </View>
-
-              {showSuggestions && (
-                <View style={styles.suggestionsBox}>
-                  <View style={styles.suggestionsHeaderRow}>
-                    <Text style={styles.suggestionsHeader}>🇬🇧 UK Address Suggestions</Text>
-                    <TouchableOpacity onPress={() => setShowSuggestions(false)}>
-                      <Feather name="x" size={16} color={Colors.muted} />
-                    </TouchableOpacity>
-                  </View>
-                  {isLoadingSuggestions ? (
-                    <View style={styles.suggestionsLoadingRow}>
-                      <ActivityIndicator size="small" color={Colors.primary} />
-                      <Text style={styles.suggestionsLoadingText}>Searching UK addresses...</Text>
-                    </View>
-                  ) : suggestions.length > 0 ? (
-                    suggestions.map((item, index) => (
-                      <TouchableOpacity
-                        key={item.id || index}
-                        style={[
-                          styles.suggestionItem,
-                          index === suggestions.length - 1 && styles.suggestionItemLast
-                        ]}
-                        onPress={() => handleSelectSuggestion(item)}
-                        activeOpacity={0.7}
+          <View style={styles.card}>
+            {savedAddresses.length > 0 && (
+              <View style={styles.savedAddressContainer}>
+                <Text style={styles.fieldLabel}>Saved addresses</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.savedAddressScroll}>
+                  {savedAddresses.map((item) => {
+                    const isSelected = selectedSavedAddressId === item._id;
+                    return (
+                      <Pressable
+                        key={item._id}
+                        style={[styles.savedAddressCard, isSelected && styles.savedAddressCardSelected]}
+                        onPress={() => handleSelectSavedAddress(item)}
                       >
-                        <Ionicons name="location-sharp" size={18} color={Colors.primary} style={styles.suggestionIcon} />
-                        <View style={styles.suggestionTextContainer}>
-                          <Text style={styles.suggestionTitle} numberOfLines={1}>
-                            {item.line1 || item.displayName.split(',')[0]}
+                        <View style={styles.savedAddressRowHeader}>
+                          <Feather name={isSelected ? 'check-circle' : 'home'} size={14} color={isSelected ? Colors.primary : Colors.textSecondary} />
+                          <Text style={[styles.savedAddressLabel, isSelected && styles.savedAddressLabelSelected]}>
+                            {item.label || 'Home'}
                           </Text>
-                          <Text style={styles.suggestionSubtitle} numberOfLines={2}>
-                            {item.displayName}
-                          </Text>
+                          {item.isDefault && (
+                            <View style={styles.savedDefaultBadge}><Text style={styles.savedDefaultText}>Default</Text></View>
+                          )}
                         </View>
-                        <Feather name="arrow-down-left" size={16} color={Colors.primary} />
-                      </TouchableOpacity>
-                    ))
-                  ) : (
-                    <View style={styles.noSuggestionsRow}>
-                      <Text style={styles.noSuggestionsText}>No matching UK addresses found. You can enter manually below.</Text>
-                    </View>
-                  )}
+                        <Text style={styles.savedAddressText} numberOfLines={1}>{item.line1}</Text>
+                        <Text style={styles.savedAddressSub} numberOfLines={1}>{item.city}, {item.postalCode}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+                <View style={styles.orRow}>
+                  <View style={styles.orLine} />
+                  <Text style={styles.orText}>or enter a new address</Text>
+                  <View style={styles.orLine} />
                 </View>
-              )}
-
-              <TextInput
-                style={[styles.input, { marginTop: Spacing.sm }]}
-                placeholder="Apartment, suite, etc. (Optional)"
-                value={address.line2}
-                onChangeText={(text) => {
-                  setAddress({ ...address, line2: text });
-                  setSelectedSavedAddressId(null);
-                }}
-              />
-
-              <View style={[styles.rowInputs, { marginTop: Spacing.md }]}>
-                <TextInput
-                  style={[styles.input, styles.halfInput]}
-                  placeholder="City / Town"
-                  value={address.city}
-                  onChangeText={(text) => setAddress({ ...address, city: text })}
-                />
-                <TextInput
-                  style={[styles.input, styles.halfInput]}
-                  placeholder="Postcode (e.g. SW1)"
-                  autoCapitalize="characters"
-                  value={address.postalCode}
-                  onChangeText={(text) => setAddress({ ...address, postalCode: text })}
-                />
               </View>
+            )}
 
-              {/* Delivery Range Verification Banner */}
-              {deliveryRangeStatus.checked && (
-                <View
-                  style={[
-                    styles.rangeBanner,
-                    deliveryRangeStatus.inRange ? styles.rangeBannerSuccess : styles.rangeBannerError,
-                  ]}
-                >
-                  <Ionicons
-                    name={deliveryRangeStatus.inRange ? 'checkmark-circle' : 'alert-circle'}
-                    size={20}
-                    color={deliveryRangeStatus.inRange ? '#15803D' : '#DC2626'}
-                  />
-                  <Text
-                    style={[
-                      styles.rangeBannerText,
-                      deliveryRangeStatus.inRange ? styles.rangeTextSuccess : styles.rangeTextError,
-                    ]}
-                  >
-                    {deliveryRangeStatus.message}
-                  </Text>
-                </View>
-              )}
+            {field({
+              placeholder: 'Full name',
+              value: address.fullName,
+              onChangeText: (text) => { setAddress({ ...address, fullName: text }); setSelectedSavedAddressId(null); },
+            })}
+            {field({
+              placeholder: 'Phone number *',
+              keyboardType: 'phone-pad',
+              value: address.phone,
+              onChangeText: (text) => { setAddress({ ...address, phone: text }); setSelectedSavedAddressId(null); },
+            })}
+
+            <View style={styles.addressInputContainer}>
+              {field({
+                placeholder: 'Start typing your street address',
+                value: address.line1,
+                onChangeText: handleLine1Change,
+                style: { marginBottom: 0, paddingRight: 44 },
+              })}
+              <View style={styles.inputIconRight}>
+                {isLoadingSuggestions ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : (
+                  <Feather name="map-pin" size={18} color={Colors.primary} />
+                )}
+              </View>
             </View>
-          </View>
 
-          {/* Payment Method Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Payment Method</Text>
-            <View style={styles.card}>
-              <TouchableOpacity
-                style={[styles.paymentOption, paymentMethod === 'online' && styles.paymentOptionActive]}
-                onPress={() => setPaymentMethod('online')}
-              >
-                <View style={styles.paymentOptionLeft}>
-                  <Ionicons 
-                    name={paymentMethod === 'online' ? "radio-button-on" : "radio-button-off"} 
-                    size={24} 
-                    color={paymentMethod === 'online' ? Colors.primary : Colors.border} 
-                  />
-                  <Text style={styles.paymentOptionText}>Credit/Debit Card</Text>
+            {showSuggestions && (
+              <View style={styles.suggestionsBox}>
+                <View style={styles.suggestionsHeaderRow}>
+                  <Text style={styles.suggestionsHeader}>Suggested UK addresses</Text>
+                  <Pressable onPress={() => setShowSuggestions(false)} hitSlop={8}>
+                    <Feather name="x" size={16} color={Colors.muted} />
+                  </Pressable>
                 </View>
-                <Feather name="credit-card" size={20} color={Colors.textLight} />
-              </TouchableOpacity>
-
-              <View style={styles.divider} />
-
-              <TouchableOpacity
-                style={[styles.paymentOption, paymentMethod === 'cod' && styles.paymentOptionActive]}
-                onPress={() => setPaymentMethod('cod')}
-              >
-                <View style={styles.paymentOptionLeft}>
-                  <Ionicons 
-                    name={paymentMethod === 'cod' ? "radio-button-on" : "radio-button-off"} 
-                    size={24} 
-                    color={paymentMethod === 'cod' ? Colors.primary : Colors.border} 
-                  />
-                  <Text style={styles.paymentOptionText}>Cash on Delivery</Text>
-                </View>
-                <FontAwesome name="gbp" size={20} color={Colors.textLight} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Order Summary */}
-          {previewData && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                Order Summary ({previewData.byStore?.length || 1} {previewData.byStore?.length === 1 ? 'Order' : 'Orders'})
-              </Text>
-              
-              {previewData.byStore && previewData.byStore.length > 0 ? (
-                previewData.byStore.map((storeOrder, idx) => (
-                  <View key={storeOrder.storeId || idx} style={[styles.card, { marginBottom: Spacing.md }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: Spacing.xs }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Ionicons name="storefront-outline" size={18} color={Colors.primary} style={{ marginRight: 6 }} />
-                        <Text style={{ fontWeight: '700', fontSize: Typography.size.base, color: Colors.text }}>{storeOrder.storeName || `Store #${idx + 1}`}</Text>
+                {isLoadingSuggestions ? (
+                  <View style={styles.suggestionsLoadingRow}>
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                    <Text style={styles.suggestionsLoadingText}>Searching addresses…</Text>
+                  </View>
+                ) : suggestions.length > 0 ? (
+                  suggestions.map((item, index) => (
+                    <Pressable
+                      key={item.id || index}
+                      style={[styles.suggestionItem, index === suggestions.length - 1 && styles.suggestionItemLast]}
+                      onPress={() => handleSelectSuggestion(item)}
+                    >
+                      <View style={styles.suggestionIcon}><Feather name="map-pin" size={14} color={Colors.primary} /></View>
+                      <View style={styles.suggestionTextContainer}>
+                        <Text style={styles.suggestionTitle} numberOfLines={1}>
+                          {item.line1 || item.displayName.split(',')[0]}
+                        </Text>
+                        <Text style={styles.suggestionSubtitle} numberOfLines={2}>{item.displayName}</Text>
                       </View>
-                      <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.full }}>
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.primary }}>Order #{idx + 1}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Subtotal ({storeOrder.itemCount} items)</Text>
-                      <Text style={styles.summaryValue}>£{(storeOrder.subtotal / 100).toFixed(2)}</Text>
-                    </View>
-                    <View style={styles.summaryRow}>
-                      <Text style={styles.summaryLabel}>Shipping</Text>
-                      <Text style={styles.summaryValue}>£{(storeOrder.shippingFee / 100).toFixed(2)}</Text>
-                    </View>
-                    <View style={[styles.summaryRow, { borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: Spacing.xs, marginTop: 4 }]}>
-                      <Text style={{ fontWeight: '700', color: Colors.text }}>Store Order Total</Text>
-                      <Text style={{ fontWeight: '800', color: Colors.primary }}>£{(storeOrder.total / 100).toFixed(2)}</Text>
-                    </View>
-                  </View>
-                ))
-              ) : (
-                <View style={styles.card}>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Subtotal</Text>
-                    <Text style={styles.summaryValue}>£{(previewData.subtotal / 100).toFixed(2)}</Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Shipping</Text>
-                    <Text style={styles.summaryValue}>£{(previewData.shippingFee / 100).toFixed(2)}</Text>
-                  </View>
-                  <View style={[styles.summaryRow, styles.summaryTotalRow]}>
-                    <Text style={styles.summaryTotalLabel}>Total</Text>
-                    <Text style={styles.summaryTotalValue}>£{(previewData.grandTotal / 100).toFixed(2)}</Text>
-                  </View>
-                </View>
-              )}
+                    </Pressable>
+                  ))
+                ) : (
+                  <Text style={styles.noSuggestionsText}>No matches — you can enter the address manually.</Text>
+                )}
+              </View>
+            )}
 
-              {previewData.byStore?.length > 1 && (
-                <View style={[styles.card, { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: Colors.primary, marginTop: Spacing.xs }]}>
-                  <View style={[styles.summaryRow, styles.summaryTotalRow, { borderTopWidth: 0, marginTop: 0, paddingTop: 0 }]}>
-                    <Text style={styles.summaryTotalLabel}>Grand Total (All Orders)</Text>
-                    <Text style={styles.summaryTotalValue}>£{(previewData.grandTotal / 100).toFixed(2)}</Text>
-                  </View>
-                </View>
-              )}
+            {field({
+              placeholder: 'Flat, suite, etc. (optional)',
+              value: address.line2,
+              onChangeText: (text) => { setAddress({ ...address, line2: text }); setSelectedSavedAddressId(null); },
+              style: { marginTop: Spacing.md },
+            })}
+
+            <View style={styles.rowInputs}>
+              {field({
+                placeholder: 'Town / city',
+                value: address.city,
+                onChangeText: (text) => setAddress({ ...address, city: text }),
+                style: styles.halfInput,
+              })}
+              {field({
+                placeholder: 'Postcode',
+                autoCapitalize: 'characters',
+                value: address.postalCode,
+                onChangeText: (text) => setAddress({ ...address, postalCode: text }),
+                style: styles.halfInput,
+              })}
             </View>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={styles.placeOrderBtn}
+            {deliveryRangeStatus.checked && (
+              <View style={[styles.rangeBanner, deliveryRangeStatus.inRange ? styles.rangeBannerSuccess : styles.rangeBannerError]}>
+                <Feather
+                  name={deliveryRangeStatus.inRange ? 'check-circle' : 'alert-circle'}
+                  size={18}
+                  color={deliveryRangeStatus.inRange ? Colors.successText : Colors.errorText}
+                />
+                <Text style={[styles.rangeBannerText, deliveryRangeStatus.inRange ? styles.rangeTextSuccess : styles.rangeTextError]}>
+                  {deliveryRangeStatus.message.replace(/^[✅❌]\s*/u, '')}
+                </Text>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* Payment */}
+        <Animated.View entering={SECTION_IN[1]} style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.stepDot}><Text style={styles.stepDotText}>2</Text></View>
+            <Text style={styles.sectionTitle}>Payment</Text>
+          </View>
+          {[
+            ['online', 'Card', 'Pay securely with Stripe', 'credit-card'],
+            ['cod', 'Cash on delivery', 'Pay the rider when it arrives', 'dollar-sign'],
+          ].map(([key, label, hint, icon]) => {
+            const active = paymentMethod === key;
+            return (
+              <Pressable
+                key={key}
+                onPress={() => setPaymentMethod(key)}
+                style={[styles.paymentOption, active && styles.paymentOptionActive]}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: active }}
+              >
+                <View style={[styles.paymentIcon, active && styles.paymentIconActive]}>
+                  <Feather name={icon} size={18} color={active ? Colors.white : Colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.paymentOptionText}>{label}</Text>
+                  <Text style={styles.paymentHint}>{hint}</Text>
+                </View>
+                <View style={[styles.radio, active && styles.radioActive]}>
+                  {active ? <View style={styles.radioDot} /> : null}
+                </View>
+              </Pressable>
+            );
+          })}
+        </Animated.View>
+
+        {/* Summary */}
+        {previewData && (
+          <Animated.View entering={SECTION_IN[2]} style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.stepDot}><Text style={styles.stepDotText}>3</Text></View>
+              <Text style={styles.sectionTitle}>Review</Text>
+            </View>
+
+            {orders.length > 0 ? (
+              orders.map((storeOrder, idx) => (
+                <View key={storeOrder.storeId || idx} style={[styles.card, { marginBottom: Spacing.md }]}>
+                  <View style={styles.orderHeader}>
+                    <View style={styles.storeIcon}><Feather name="shopping-bag" size={14} color={Colors.primary} /></View>
+                    <Text style={styles.orderStore} numberOfLines={1}>{storeOrder.storeName || `Store ${idx + 1}`}</Text>
+                    {orders.length > 1 ? (
+                      <View style={styles.orderTag}><Text style={styles.orderTagText}>Order {idx + 1}</Text></View>
+                    ) : null}
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Items ({storeOrder.itemCount})</Text>
+                    <Text style={styles.summaryValue}>{formatPence(storeOrder.subtotal)}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Delivery</Text>
+                    <Text style={styles.summaryValue}>{storeOrder.shippingFee > 0 ? formatPence(storeOrder.shippingFee) : 'Free'}</Text>
+                  </View>
+                  {orders.length > 1 ? (
+                    <View style={[styles.summaryRow, styles.summaryTotalRow]}>
+                      <Text style={styles.summaryStoreTotalLabel}>Order total</Text>
+                      <Text style={styles.summaryStoreTotalValue}>{formatPence(storeOrder.total)}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              ))
+            ) : (
+              <View style={styles.card}>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Subtotal</Text>
+                  <Text style={styles.summaryValue}>{formatPence(previewData.subtotal)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Delivery</Text>
+                  <Text style={styles.summaryValue}>{formatPence(previewData.shippingFee)}</Text>
+                </View>
+              </View>
+            )}
+          </Animated.View>
+        )}
+
+        <Animated.View style={keyboardSpacer} />
+      </ScrollView>
+
+      <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.footerLabel}>{orders.length > 1 ? 'Grand total' : 'Total'}</Text>
+          <Text style={styles.footerTotal}>{formatPence(grandTotal)}</Text>
+        </View>
+        <Pressable
+          style={[styles.placeOrderBtn, !canPlace && styles.placeOrderBtnDisabled]}
           onPress={handlePlaceOrder}
-          disabled={isPlacingOrder || !previewData?.canCheckout}
+          disabled={!canPlace}
         >
           {isPlacingOrder ? (
             <ActivityIndicator color={Colors.white} size="small" />
           ) : (
-            <Text style={styles.placeOrderBtnText}>Place Order</Text>
+            <>
+              <Text style={styles.placeOrderBtnText}>{paymentMethod === 'online' ? 'Pay now' : 'Place order'}</Text>
+              <Feather name="arrow-right" size={18} color={Colors.white} />
+            </>
           )}
-        </TouchableOpacity>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-  },
+  root: { flex: 1, backgroundColor: Colors.bg },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg, gap: Spacing.md },
+  loadingText: { fontFamily: Typography.family.medium, fontSize: 14, color: Colors.textSecondary },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.white,
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.base,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
   },
-  closeBtn: {
-    width: 40,
-    height: 40,
+  circleBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerTitles: {
-    flex: 1,
-    paddingHorizontal: Spacing.md,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Colors.text,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  placeholder: {
-    width: 32,
-  },
-  scrollContent: {
-    padding: Spacing.lg,
-    paddingBottom: Spacing.xxl,
-  },
-  section: {
-    marginBottom: Spacing.xl,
-  },
-  sectionTitle: {
-    ...Typography.subtitle1,
-    color: Colors.text,
-    fontWeight: '700',
-    marginBottom: Spacing.sm,
-  },
-  card: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    ...Shadow.sm,
-  },
-  input: {
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    marginBottom: Spacing.sm,
-    ...Typography.body1,
   },
-  paymentOption: {
+  headerTitle: { fontFamily: Typography.family.displayExtrabold, fontSize: 24, letterSpacing: -0.6, color: Colors.text },
+  headerSubtitle: { fontFamily: Typography.family.medium, fontSize: 13, color: Colors.textSecondary },
+  secureBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.sm,
-  },
-  paymentOptionActive: {
-    // Optional active style
-  },
-  paymentOptionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  paymentOptionText: {
-    ...Typography.body1,
-    color: Colors.text,
-    marginLeft: Spacing.sm,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: Spacing.sm,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
-  },
-  summaryLabel: {
-    ...Typography.body2,
-    color: Colors.textLight,
-  },
-  summaryValue: {
-    ...Typography.body2,
-    color: Colors.text,
-    fontWeight: '500',
-  },
-  summaryTotalRow: {
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  summaryTotalLabel: {
-    ...Typography.subtitle1,
-    color: Colors.text,
-    fontWeight: '700',
-  },
-  summaryTotalValue: {
-    ...Typography.subtitle1,
-    color: '#D81B60', // Pink/Red color
-    fontWeight: '800',
-    fontSize: 18,
-  },
-  footer: {
-    backgroundColor: Colors.white,
-    padding: Spacing.lg,
-    ...Shadow.md,
-  },
-  placeOrderBtn: {
-    backgroundColor: '#D81B60', // Pink color
-    paddingVertical: Spacing.md,
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 5,
     borderRadius: Radius.full,
-    alignItems: 'center',
+    backgroundColor: Colors.successBg,
   },
-  placeOrderBtnText: {
-    ...Typography.subtitle1,
-    color: Colors.white,
-    fontWeight: '600',
-  },
-  // Progress Bar
-  progressContainer: {
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.white,
-    position: 'relative',
-    height: 60,
-  },
-  progressLineBackground: {
-    position: 'absolute',
-    top: 25,
-    left: Spacing.xl + 15,
-    right: Spacing.xl + 15,
-    height: 4,
-    backgroundColor: '#E5E7EB',
-    zIndex: 1,
-  },
-  progressLineFill: {
-    position: 'absolute',
-    top: 25,
-    left: Spacing.xl + 15,
-    height: 4,
-    backgroundColor: '#333',
-    zIndex: 2,
-  },
-  progressStepsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    zIndex: 3,
-  },
-  stepWrapper: {
-    alignItems: 'center',
-    width: 60,
-  },
-  stepCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
+  secureText: { fontFamily: Typography.family.bold, fontSize: 11, color: Colors.successText },
+  scrollContent: { paddingHorizontal: Spacing.base, paddingBottom: 140 },
+  section: { marginTop: Spacing.base },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md },
+  stepDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.white,
-    marginBottom: 4,
+    backgroundColor: Colors.primary,
   },
-  stepNumber: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  stepLabel: {
-    fontSize: 11,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
-  },
-  ukBadge: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
+  stepDotText: { fontFamily: Typography.family.bold, fontSize: 12, color: Colors.white },
+  sectionTitle: { flex: 1, fontFamily: Typography.family.display, fontSize: 18, letterSpacing: -0.3, color: Colors.text },
+  ukBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full, backgroundColor: Colors.primarySubtle },
+  ukBadgeText: { fontFamily: Typography.family.bold, fontSize: 11, color: Colors.primary },
+  card: {
+    padding: Spacing.base,
+    borderRadius: Radius['2xl'],
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  ukBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#1E40AF',
-  },
-  addressInputContainer: {
-    position: 'relative',
-    marginBottom: Spacing.sm,
-  },
-  inputIconRight: {
-    position: 'absolute',
-    right: 12,
-    top: 14,
-  },
-  suggestionsBox: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: Radius.md,
-    marginBottom: Spacing.sm,
-    overflow: 'hidden',
+    borderColor: Colors.borderSubtle,
     ...Shadow.sm,
+  },
+  fieldLabel: { fontFamily: Typography.family.semibold, fontSize: 13, color: Colors.text, marginBottom: Spacing.sm },
+  savedAddressContainer: { marginBottom: Spacing.sm },
+  savedAddressScroll: { gap: Spacing.sm },
+  savedAddressCard: {
+    width: 190,
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  savedAddressCardSelected: { borderColor: Colors.primary, backgroundColor: Colors.primarySubtle },
+  savedAddressRowHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  savedAddressLabel: { fontFamily: Typography.family.bold, fontSize: 14, color: Colors.text },
+  savedAddressLabelSelected: { color: Colors.primary },
+  savedDefaultBadge: { marginLeft: 'auto', paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full, backgroundColor: Colors.surfaceSecondary },
+  savedDefaultText: { fontFamily: Typography.family.semibold, fontSize: 10, color: Colors.textSecondary },
+  savedAddressText: { fontFamily: Typography.family.medium, fontSize: 13, color: Colors.text },
+  savedAddressSub: { fontFamily: Typography.family.regular, fontSize: 12, color: Colors.textSecondary },
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginVertical: Spacing.md },
+  orLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  orText: { fontFamily: Typography.family.medium, fontSize: 12, color: Colors.muted },
+  input: {
+    height: 50,
+    paddingHorizontal: Spacing.base,
+    marginBottom: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    fontFamily: Typography.family.regular,
+    fontSize: 15,
+    color: Colors.text,
+  },
+  addressInputContainer: { position: 'relative' },
+  inputIconRight: { position: 'absolute', right: Spacing.base, top: 0, bottom: 0, justifyContent: 'center' },
+  suggestionsBox: {
+    marginTop: Spacing.sm,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    overflow: 'hidden',
   },
   suggestionsHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#DBEAFE',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.surfaceSecondary,
   },
-  suggestionsHeader: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#1E40AF',
-  },
-  suggestionsLoadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-    justifyContent: 'center',
-  },
-  suggestionsLoadingText: {
-    fontSize: 12,
-    color: Colors.muted,
-    marginLeft: 8,
-  },
+  suggestionsHeader: { fontFamily: Typography.family.semibold, fontSize: 12, color: Colors.textSecondary },
+  suggestionsLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md },
+  suggestionsLoadingText: { fontFamily: Typography.family.regular, fontSize: 13, color: Colors.textSecondary },
   suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    backgroundColor: Colors.white,
-  },
-  suggestionItemLast: {
-    borderBottomWidth: 0,
-  },
-  suggestionIcon: {
-    marginRight: 8,
-  },
-  suggestionTextContainer: {
-    flex: 1,
-    marginRight: 8,
-  },
-  suggestionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  suggestionSubtitle: {
-    fontSize: 11,
-    color: Colors.muted,
-    marginTop: 1,
-  },
-  noSuggestionsRow: {
+    gap: Spacing.md,
     padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderSubtle,
+  },
+  suggestionItemLast: { borderBottomWidth: 0 },
+  suggestionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primarySubtle,
   },
-  noSuggestionsText: {
-    fontSize: 12,
-    color: Colors.muted,
-    textAlign: 'center',
-  },
-  rowInputs: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
-  },
-  halfInput: {
-    flex: 0.48,
-    marginBottom: 0,
-  },
+  suggestionTextContainer: { flex: 1 },
+  suggestionTitle: { fontFamily: Typography.family.semibold, fontSize: 14, color: Colors.text },
+  suggestionSubtitle: { fontFamily: Typography.family.regular, fontSize: 12, color: Colors.textSecondary },
+  noSuggestionsText: { fontFamily: Typography.family.regular, fontSize: 13, color: Colors.textSecondary, padding: Spacing.md },
+  rowInputs: { flexDirection: 'row', gap: Spacing.md },
+  halfInput: { flex: 1 },
   rangeBanner: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.sm,
     padding: Spacing.md,
-    borderRadius: Radius.md,
-    marginTop: Spacing.sm,
-    borderWidth: 1,
+    borderRadius: Radius.lg,
   },
-  rangeBannerSuccess: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#BBF7D0',
-  },
-  rangeBannerError: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
-  },
-  rangeBannerText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 8,
-    lineHeight: 16,
-  },
-  rangeTextSuccess: {
-    color: '#15803D',
-  },
-  rangeTextError: {
-    color: '#DC2626',
-  },
-  savedAddressContainer: {
-    marginBottom: Spacing.md,
-  },
-  savedAddressHeader: {
-    fontSize: Typography.size.sm,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: Spacing.sm,
-  },
-  savedAddressScroll: {
-    paddingBottom: 4,
-  },
-  savedAddressCard: {
-    width: 200,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
-    marginRight: Spacing.sm,
-  },
-  savedAddressCardSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: '#EEF2FF',
-  },
-  savedAddressRowHeader: {
+  rangeBannerSuccess: { backgroundColor: Colors.successBg },
+  rangeBannerError: { backgroundColor: Colors.errorBg },
+  rangeBannerText: { flex: 1, fontFamily: Typography.family.medium, fontSize: 13, lineHeight: 18 },
+  rangeTextSuccess: { color: Colors.successText },
+  rangeTextError: { color: Colors.errorText },
+  paymentOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
+    gap: Spacing.md,
+    padding: Spacing.base,
+    marginBottom: Spacing.sm,
+    borderRadius: Radius.xl,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
   },
-  savedAddressLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#4B5563',
+  paymentOptionActive: { borderColor: Colors.primary, backgroundColor: Colors.primarySubtle },
+  paymentIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primarySubtle,
   },
-  savedAddressLabelSelected: {
-    color: Colors.primary,
+  paymentIconActive: { backgroundColor: Colors.primary },
+  paymentOptionText: { fontFamily: Typography.family.bold, fontSize: 15, color: Colors.text },
+  paymentHint: { fontFamily: Typography.family.regular, fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  savedDefaultBadge: {
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: Radius.full,
+  radioActive: { borderColor: Colors.primary },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary },
+  orderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingBottom: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderSubtle,
   },
-  savedDefaultText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#065F46',
+  storeIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primarySubtle,
   },
-  savedAddressText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 2,
+  orderStore: { flex: 1, fontFamily: Typography.family.display, fontSize: 15, color: Colors.text },
+  orderTag: { paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full, backgroundColor: Colors.primarySubtle },
+  orderTagText: { fontFamily: Typography.family.bold, fontSize: 11, color: Colors.primary },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  summaryLabel: { fontFamily: Typography.family.regular, fontSize: 14, color: Colors.textSecondary },
+  summaryValue: { fontFamily: Typography.family.semibold, fontSize: 14, color: Colors.text },
+  summaryTotalRow: { borderTopWidth: 1, borderTopColor: Colors.borderSubtle, marginTop: Spacing.sm, paddingTop: Spacing.sm },
+  summaryStoreTotalLabel: { fontFamily: Typography.family.bold, fontSize: 14, color: Colors.text },
+  summaryStoreTotalValue: { fontFamily: Typography.family.bold, fontSize: 14, color: Colors.primary },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.base,
+    paddingTop: Spacing.md,
+    paddingHorizontal: Spacing.base,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius['2xl'],
+    borderTopRightRadius: Radius['2xl'],
+    ...Shadow.xl,
   },
-  savedAddressSub: {
-    fontSize: 11,
-    color: Colors.muted,
+  footerLabel: { fontFamily: Typography.family.regular, fontSize: 12, color: Colors.textSecondary },
+  footerTotal: { fontFamily: Typography.family.displayExtrabold, fontSize: 22, color: Colors.text },
+  placeOrderBtn: {
+    flex: 1.3,
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.primary,
+    ...Shadow.morphic3d,
   },
+  placeOrderBtnDisabled: { backgroundColor: Colors.muted },
+  placeOrderBtnText: { fontFamily: Typography.family.bold, fontSize: 16, color: Colors.white },
 });
