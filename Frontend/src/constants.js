@@ -1,6 +1,7 @@
-// API base URL — change to your machine's LAN IP when testing on a physical device
-// e.g. 'http://192.168.1.x:5001/api/v1'
-export const API_BASE_URL = 'http://localhost:5001/api/v1';
+// API base URL. Builds set EXPO_PUBLIC_API_URL (e.g. the live server,
+// https://ukmarketplace.itwing.cloud/api/v1). For a physical device on the
+// local backend use your machine's LAN IP, e.g. 'http://192.168.1.x:5001/api/v1'.
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
 
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'ukm_access_token',

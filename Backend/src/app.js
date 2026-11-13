@@ -27,13 +27,17 @@ const { USE_LOCAL_UPLOADS, LOCAL_UPLOAD_DIR } = require("./middleware/upload.mid
 
 const app = express();
 
+// Behind nginx in production: trust its X-Forwarded-* headers so req.protocol
+// is "https" and uploaded-image URLs aren't built as http:// (mixed content).
+if (env.nodeEnv === "production") app.set("trust proxy", 1);
+
 app.use(
   cors({
     origin: env.clientOrigin === "*" ? true : env.clientOrigin,
     credentials: true,
   })
 );
-app.use(morgan("dev"));
+app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 
 // IMPORTANT: Stripe webhook needs the raw body for signature verification.
 // Mount it BEFORE express.json() and use express.raw() for this path only.

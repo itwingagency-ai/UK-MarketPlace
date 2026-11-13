@@ -1,0 +1,31 @@
+# UK Marketplace on personalVps. Run from /home/tayyab/ukmarketplace via deploy.sh.
+name: ukmarketplace
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    command: ["--bind_ip_all", "--wiredTigerCacheSizeGB", "0.5"]
+    volumes:
+      - mongo-data:/data/db
+    # Not published: only the api container reaches it
+
+  api:
+    build: ../../Backend
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    env_file:
+      - /home/tayyab/envs/ukmarketplace.backend.env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/multistore
+      PORT: "5001"
+    ports:
+      - "127.0.0.1:8050:5001"
+    volumes:
+      # Product/store images while S3 isn't configured
+      - uploads:/app/uploads
+
+volumes:
+  mongo-data:
+  uploads:
