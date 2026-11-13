@@ -83,7 +83,7 @@ export default function RegisterScreen({ navigation }) {
           <View style={styles.headerBlock}>
             <Text style={styles.welcomeLabel}>Get started</Text>
             <Text style={styles.title}>Create your account</Text>
-            <Text style={styles.tagline}>Sign up for Snappy Shopper today.</Text>
+            <Text style={styles.tagline}>Sign up for UK Marketplace today.</Text>
           </View>
 
           {/* Full Name Input */}

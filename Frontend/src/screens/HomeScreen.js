@@ -259,7 +259,7 @@ export default function HomeScreen({ navigation }) {
                 <View style={styles.brandMark}>
                   <Feather name="shopping-bag" size={16} color={Colors.white} />
                 </View>
-                <Text style={styles.brandText}>snappy shopper</Text>
+                <Text style={styles.brandText}>UK Marketplace</Text>
               </View>
               {isAuthenticated ? (
                 <Pressable onPress={handleLogout} style={styles.userChip} hitSlop={8}>

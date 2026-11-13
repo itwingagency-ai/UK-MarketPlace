@@ -142,7 +142,7 @@ export default function CheckoutScreen({ navigation }) {
   const [previewData, setPreviewData] = useState(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
-  const storeName = items && items[0]?.product?.store?.name ? items[0].product.store.name : 'Snappy Store';
+  const storeName = items && items[0]?.product?.store?.name ? items[0].product.store.name : 'Your store';
   const insets = useSafeAreaInsets();
 
   // Android is edge-to-edge, so the window doesn't shrink for the keyboard.

@@ -3,7 +3,7 @@
 export const API_BASE_URL = 'http://localhost:5001/api/v1';
 
 export const STORAGE_KEYS = {
-  ACCESS_TOKEN: 'snappy_access_token',
-  REFRESH_TOKEN: 'snappy_refresh_token',
-  USER: 'snappy_user',
+  ACCESS_TOKEN: 'ukm_access_token',
+  REFRESH_TOKEN: 'ukm_refresh_token',
+  USER: 'ukm_user',
 };

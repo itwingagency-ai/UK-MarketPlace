@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import client from './client';
 
-export const PUSH_TOKEN_KEY = 'snappy_push_token';
+export const PUSH_TOKEN_KEY = 'ukm_push_token';
 
 export const registerPushToken = async (token, platform) => {
   await client.post('/me/push-tokens', { token, platform });
