@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { getOrder, updateOrderStatus } from '../../api/vendor.api';
 import { useCustomAlert } from '../../context/AlertContext';
 import { formatPence } from '../../components/ProductCard';
+import PriceLines from '../../components/PriceLines';
 import Button from '../../components/Button';
 import { ScreenHeader, Card, SectionTitle, Pill, EmptyState, Loading, ActionSheet, sharedStyles } from '../../components/vendor/VendorUI';
 import { useLiveEvent } from '../../context/NotificationsContext';
@@ -76,7 +77,9 @@ export default function VendorOrderDetailScreen({ navigation, route }) {
   const address = order.shippingAddress || {};
   const customer = order.customerSnapshot || {};
   const placedNote = (order.statusHistory || [])[0]?.note || '';
-  const customerNote = placedNote.includes('Note:') ? placedNote.split('Note:')[1].trim() : '';
+  // Orders from before Wave 1 kept the note only in the first history entry
+  const customerNote =
+    order.customerNote || (placedNote.includes('Note:') ? placedNote.split('Note:')[1].trim() : '');
 
   return (
     <View style={sharedStyles.screen}>
@@ -120,8 +123,28 @@ export default function VendorOrderDetailScreen({ navigation, route }) {
           <View style={styles.totals}>
             <View style={styles.totalRow}><Text style={styles.totalLabel}>Subtotal</Text><Text style={styles.totalLabel}>{formatPence(order.subtotal)}</Text></View>
             <View style={styles.totalRow}><Text style={styles.totalLabel}>Delivery{order.shippingMethod?.name ? ` (${order.shippingMethod.name})` : ''}</Text><Text style={styles.totalLabel}>{formatPence(order.shippingFee)}</Text></View>
-            <View style={styles.totalRow}><Text style={styles.grand}>Total</Text><Text style={styles.grand}>{formatPence(order.total)}</Text></View>
+            <PriceLines lines={order.priceLines} showInfo={false} />
+            <View style={styles.totalRow}><Text style={styles.grand}>Customer pays</Text><Text style={styles.grand}>{formatPence(order.total)}</Text></View>
           </View>
+        </Card>
+
+        <SectionTitle>Picking</SectionTitle>
+        <Card style={{ gap: Spacing.sm }}>
+          <View style={styles.pickRow}>
+            <Feather name="repeat" size={16} color={Colors.textSecondary} />
+            <Text style={[styles.body, { flex: 1 }]}>Substitutions</Text>
+            <Pill
+              label={order.allowSubstitutions === false ? 'Not allowed' : 'Allowed'}
+              tone={order.allowSubstitutions === false ? 'warning' : 'success'}
+            />
+          </View>
+          {order.tipAmount > 0 ? (
+            <View style={styles.pickRow}>
+              <Feather name="heart" size={16} color={Colors.textSecondary} />
+              <Text style={[styles.body, { flex: 1 }]}>Tip for your team</Text>
+              <Text style={styles.itemTotal}>{formatPence(order.tipAmount)}</Text>
+            </View>
+          ) : null}
         </Card>
 
         {customerNote ? (
@@ -211,6 +234,7 @@ const styles = StyleSheet.create({
   thumbImg: { width: '100%', height: '100%' },
   itemTitle: { fontFamily: Typography.family.semibold, fontSize: 15, color: Colors.text },
   itemTotal: { fontFamily: Typography.family.bold, fontSize: 15, color: Colors.text },
+  pickRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   totals: { borderTopWidth: 1, borderTopColor: Colors.border, marginTop: Spacing.sm, paddingTop: Spacing.sm, gap: 6 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between' },
   totalLabel: { fontFamily: Typography.family.regular, fontSize: 14, color: Colors.textSecondary },

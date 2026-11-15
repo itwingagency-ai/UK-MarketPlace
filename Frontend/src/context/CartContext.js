@@ -6,6 +6,13 @@ import * as CartAPI from '../api/cart.api';
 const initialState = {
   items: [],
   byStore: [],
+  coupons: [],
+  nearMisses: [],
+  blockingIssues: [],
+  discountTotal: 0,
+  feeTotal: 0,
+  tipTotal: 0,
+  options: { allowSubstitutions: true, tips: {}, notes: {} },
   total: 0,
   itemCount: 0,
   storeId: null,
@@ -36,6 +43,14 @@ function cartReducer(state, action) {
         total,
         subtotal,
         shippingFee,
+        // Everything below is computed by the server; the app only displays it
+        coupons: cart.coupons || [],
+        nearMisses: cart.nearMisses || [],
+        blockingIssues: cart.blockingIssues || [],
+        discountTotal: cart.discountTotal ?? 0,
+        feeTotal: cart.feeTotal ?? 0,
+        tipTotal: cart.tipTotal ?? 0,
+        options: cart.options || initialState.options,
         itemCount,
         storeId: cart.byStore?.[0]?.storeId ?? cart.store ?? null,
         defaultShippingMethod: cart.byStore?.[0]?.defaultShippingMethod ?? null,
@@ -111,6 +126,35 @@ export const CartProvider = ({ children }) => {
     }
   }, [isAuthenticated]);
 
+  // Coupon / tip / options: send the customer's choice, show what comes back
+  const runCartAction = useCallback(async (call, fallback) => {
+    if (!isAuthenticated) return { success: false, error: 'Please log in first' };
+    try {
+      const res = await call();
+      dispatch({ type: CART_ACTIONS.SET_CART, payload: res.data });
+      return { success: true, message: res.message };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.message ?? fallback };
+    }
+  }, [isAuthenticated]);
+
+  const applyCoupon = useCallback(
+    (code) => runCartAction(() => CartAPI.applyCoupon(code), "Couldn't apply that code"),
+    [runCartAction]
+  );
+  const removeCoupon = useCallback(
+    (code) => runCartAction(() => CartAPI.removeCoupon(code), "Couldn't remove that code"),
+    [runCartAction]
+  );
+  const setTip = useCallback(
+    (storeId, amount) => runCartAction(() => CartAPI.setTip(storeId, amount), "Couldn't update the tip"),
+    [runCartAction]
+  );
+  const setCartOptions = useCallback(
+    (options) => runCartAction(() => CartAPI.setCartOptions(options), "Couldn't save that"),
+    [runCartAction]
+  );
+
   const clearCart = useCallback(async () => {
     if (!isAuthenticated) return { success: false, error: 'Please login to clear cart' };
     try {
@@ -130,6 +174,17 @@ export const CartProvider = ({ children }) => {
         total: state.total,
         subtotal: state.subtotal,
         shippingFee: state.shippingFee,
+        coupons: state.coupons,
+        nearMisses: state.nearMisses,
+        blockingIssues: state.blockingIssues,
+        discountTotal: state.discountTotal,
+        feeTotal: state.feeTotal,
+        tipTotal: state.tipTotal,
+        options: state.options,
+        applyCoupon,
+        removeCoupon,
+        setTip,
+        setCartOptions,
         itemCount: state.itemCount,
         storeId: state.storeId,
         defaultShippingMethod: state.defaultShippingMethod,

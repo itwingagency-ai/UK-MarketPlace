@@ -43,3 +43,36 @@ export const clearCart = async () => {
   const { data } = await client.delete('/cart');
   return data.data ?? data;
 };
+
+/**
+ * POST /api/v1/cart/coupon — the server decides what the code is worth.
+ */
+export const applyCoupon = async (code) => {
+  const { data } = await client.post('/cart/coupon', { code });
+  return data;
+};
+
+/**
+ * DELETE /api/v1/cart/coupon/:code
+ */
+export const removeCoupon = async (code) => {
+  const { data } = await client.delete(`/cart/coupon/${encodeURIComponent(code)}`);
+  return data;
+};
+
+/**
+ * PUT /api/v1/cart/tip — amount in pence, 0 removes the tip.
+ */
+export const setTip = async (storeId, amount) => {
+  const { data } = await client.put('/cart/tip', { storeId, amount });
+  return data;
+};
+
+/**
+ * PUT /api/v1/cart/options
+ * { allowSubstitutions?, stores?: [{ storeId, note?, bags? }] }
+ */
+export const setCartOptions = async (options) => {
+  const { data } = await client.put('/cart/options', options);
+  return data;
+};

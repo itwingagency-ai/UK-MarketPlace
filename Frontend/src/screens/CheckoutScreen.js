@@ -7,6 +7,7 @@ import {
   TextInput,
   ActivityIndicator,
   Pressable,
+  Switch,
 } from 'react-native';
 import Animated, { FadeInDown, useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useStripe } from '@stripe/stripe-react-native';
 import { Colors, Spacing, Typography, Radius, Shadow, Motion } from '../theme';
 import { formatPence } from '../components/ProductCard';
+import PriceLines from '../components/PriceLines';
 
 // Entrance animations are built once: a new builder per render remounts views.
 const SECTION_IN = Array.from({ length: 4 }, (_, i) =>
@@ -133,7 +135,7 @@ const fetchUKAddressSuggestions = async (query) => {
 };
 
 export default function CheckoutScreen({ navigation }) {
-  const { clearCart, fetchCart, items } = useCart();
+  const { clearCart, fetchCart, items, setCartOptions } = useCart();
   const { showAlert } = useCustomAlert();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
@@ -346,10 +348,31 @@ export default function CheckoutScreen({ navigation }) {
     loadPreview();
   }, []);
 
+  // Order options: saved to the cart as the customer edits them
+  const [allowSubs, setAllowSubs] = useState(true);
+  const [storeNotes, setStoreNotes] = useState({});
+
+  const saveOption = async (options) => {
+    const res = await setCartOptions(options);
+    if (!res.success) {
+      showAlert({ title: "Couldn't save that", message: res.error, icon: 'alert-circle', showCancel: false, confirmText: 'OK' });
+    }
+    return res.success;
+  };
+
+  const toggleSubs = async (value) => {
+    setAllowSubs(value);
+    if (!(await saveOption({ allowSubstitutions: value }))) setAllowSubs(!value);
+  };
+
+  const saveNote = (storeId) => saveOption({ stores: [{ storeId, note: storeNotes[storeId] || '' }] });
+
   const loadPreview = async () => {
     try {
       const res = await previewCheckout();
       setPreviewData(res.data);
+      setAllowSubs(res.data?.options?.allowSubstitutions !== false);
+      setStoreNotes(Object.fromEntries((res.data?.byStore || []).map((g) => [String(g.storeId), g.note || ''])));
     } catch (err) {
       showAlert({
         title: 'Error',
@@ -701,13 +724,59 @@ export default function CheckoutScreen({ navigation }) {
           })}
         </Animated.View>
 
-        {/* Summary */}
-        {previewData && (
+        {/* Order options */}
+        {orders.length > 0 && (
           <Animated.View entering={SECTION_IN[2]} style={styles.section}>
             <View style={styles.sectionHeaderRow}>
               <View style={styles.stepDot}><Text style={styles.stepDotText}>3</Text></View>
+              <Text style={styles.sectionTitle}>Order options</Text>
+            </View>
+            <View style={styles.card}>
+              <View style={styles.optionRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.paymentOptionText}>Allow substitutions</Text>
+                  <Text style={styles.paymentHint}>If something is out of stock, the store may swap it for a close match</Text>
+                </View>
+                <Switch value={allowSubs} onValueChange={toggleSubs} trackColor={{ true: Colors.primary }} accessibilityLabel="Allow substitutions" />
+              </View>
+              {orders.map((storeOrder, idx) => {
+                const sid = String(storeOrder.storeId);
+                return (
+                  <View key={sid} style={{ marginTop: Spacing.md }}>
+                    <Text style={styles.fieldLabel}>
+                      Note for {storeOrder.storeName || `store ${idx + 1}`} (optional)
+                    </Text>
+                    {field({
+                      placeholder: 'e.g. Leave with the neighbour at no. 12',
+                      value: storeNotes[sid] || '',
+                      onChangeText: (text) => setStoreNotes((prev) => ({ ...prev, [sid]: text.slice(0, 500) })),
+                      onEndEditing: () => saveNote(sid),
+                      multiline: true,
+                      style: styles.noteInput,
+                    })}
+                  </View>
+                );
+              })}
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Summary */}
+        {previewData && (
+          <Animated.View entering={SECTION_IN[3]} style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.stepDot}><Text style={styles.stepDotText}>4</Text></View>
               <Text style={styles.sectionTitle}>Review</Text>
             </View>
+
+            {!previewData.canCheckout && (previewData.issues || []).length > 0 ? (
+              <View style={[styles.rangeBanner, styles.rangeBannerError, { marginBottom: Spacing.md }]}>
+                <Feather name="alert-circle" size={18} color={Colors.errorText} />
+                <Text style={[styles.rangeBannerText, styles.rangeTextError]}>
+                  {previewData.issues.map((i) => i.reason).join('\n')}
+                </Text>
+              </View>
+            ) : null}
 
             {orders.length > 0 ? (
               orders.map((storeOrder, idx) => (
@@ -727,6 +796,7 @@ export default function CheckoutScreen({ navigation }) {
                     <Text style={styles.summaryLabel}>Delivery</Text>
                     <Text style={styles.summaryValue}>{storeOrder.shippingFee > 0 ? formatPence(storeOrder.shippingFee) : 'Free'}</Text>
                   </View>
+                  <PriceLines lines={storeOrder.lines} />
                   {orders.length > 1 ? (
                     <View style={[styles.summaryRow, styles.summaryTotalRow]}>
                       <Text style={styles.summaryStoreTotalLabel}>Order total</Text>
@@ -979,6 +1049,8 @@ const styles = StyleSheet.create({
   orderTag: { paddingHorizontal: Spacing.sm, paddingVertical: 3, borderRadius: Radius.full, backgroundColor: Colors.primarySubtle },
   orderTagText: { fontFamily: Typography.family.bold, fontSize: 11, color: Colors.primary },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  optionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  noteInput: { height: 72, paddingTop: Spacing.md, textAlignVertical: 'top', marginBottom: 0 },
   summaryLabel: { fontFamily: Typography.family.regular, fontSize: 14, color: Colors.textSecondary },
   summaryValue: { fontFamily: Typography.family.semibold, fontSize: 14, color: Colors.text },
   summaryTotalRow: { borderTopWidth: 1, borderTopColor: Colors.borderSubtle, marginTop: Spacing.sm, paddingTop: Spacing.sm },

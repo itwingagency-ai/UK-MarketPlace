@@ -20,6 +20,7 @@ import { getMyOrderById, reorder, cancelMyOrder } from '../api/orders.api';
 import { useCart } from '../context/CartContext';
 import { useLiveEvent } from '../context/NotificationsContext';
 import Button from '../components/Button';
+import PriceLines from '../components/PriceLines';
 import { getMyReviews, submitReview, updateMyReview } from '../api/reviews.api';
 import { useCustomAlert } from '../context/AlertContext';
 
@@ -375,6 +376,13 @@ export default function OrderDetailScreen({ route, navigation }) {
               <Text style={styles.summaryLabel}>Shipping</Text>
               <Text style={styles.summaryValue}>£{(order.shippingFee / 100).toFixed(2)}</Text>
             </View>
+            <PriceLines lines={order.priceLines} />
+            {order.customerNote ? (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Your note</Text>
+                <Text style={[styles.summaryValue, { flex: 1, textAlign: 'right', marginLeft: Spacing.md }]}>{order.customerNote}</Text>
+              </View>
+            ) : null}
             <View style={[styles.summaryRow, styles.totalRow]}>
               <Text style={styles.totalLabel}>Total</Text>
               <Text style={styles.totalValue}>£{(order.total / 100).toFixed(2)}</Text>
