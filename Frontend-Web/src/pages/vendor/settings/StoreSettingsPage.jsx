@@ -45,6 +45,7 @@ export default function StoreSettingsPage() {
     bannerFile: null,
     contactEmail: '',
     contactPhone: '',
+    minimumOrderPounds: '',
   });
 
   useEffect(() => {
@@ -64,6 +65,8 @@ export default function StoreSettingsPage() {
         bannerUrl: data.bannerUrl || '',
         contactEmail: data.contactEmail || '',
         contactPhone: data.contactPhone || '',
+        // Stored in pence; edited in pounds
+        minimumOrderPounds: data.minimumOrder ? (data.minimumOrder / 100).toFixed(2) : '',
       };
       setFormData(normalized);
       initialData.current = JSON.stringify(normalized);
@@ -106,7 +109,9 @@ export default function StoreSettingsPage() {
       setSaving(true);
       const payload = new FormData();
       Object.keys(formData).forEach(key => {
-        if (key === 'bannerFile') {
+        if (key === 'minimumOrderPounds') {
+          payload.append('minimumOrder', String(Math.round(Number(formData.minimumOrderPounds || 0) * 100)));
+        } else if (key === 'bannerFile') {
           if (formData.bannerFile) payload.append('bannerImage', formData.bannerFile);
         } else if (key === 'logoFile') {
           if (formData.logoFile) payload.append('logoImage', formData.logoFile);
@@ -301,6 +306,33 @@ export default function StoreSettingsPage() {
                 placeholder="+44 7XXX XXXXXX"
                 id="contact-phone-input"
               />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Ordering ── */}
+        <div className="card" style={{ marginBottom: 'var(--space-5)' }}>
+          <div className="card-header">
+            <h3>Ordering</h3>
+          </div>
+          <div className="card-body space-y-4">
+            <div className="form-group">
+              <label className="form-label">Minimum order (£)</label>
+              <input
+                type="number"
+                min="0"
+                max="1000"
+                step="0.01"
+                className="form-input"
+                name="minimumOrderPounds"
+                value={formData.minimumOrderPounds}
+                onChange={handleChange}
+                placeholder="0.00"
+                id="minimum-order-input"
+              />
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 'var(--space-1)' }}>
+                Customers can't check out below this (goods only, before discounts). Leave empty for no minimum.
+              </p>
             </div>
           </div>
         </div>

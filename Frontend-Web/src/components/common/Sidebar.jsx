@@ -18,6 +18,7 @@ import {
   Tag,
   Boxes,
   DollarSign,
+  Ticket,
   MapPin,
   Clock,
   FolderTree,
@@ -54,6 +55,7 @@ const adminNav = [
     items: [
       { to: '/admin/settings', icon: Settings, text: 'Platform Settings' },
       { to: '/admin/commission', icon: DollarSign, text: 'Commission' },
+      { to: '/admin/offers', icon: Ticket, text: 'Coupons & Offers' },
       { to: '/admin/analytics', icon: BarChart3, text: 'Analytics' },
     ],
   },
@@ -78,6 +80,7 @@ const vendorNav = [
     label: 'Sales',
     items: [
       { to: '/vendor/orders', icon: ShoppingCart, text: 'Orders' },
+      { to: '/vendor/offers', icon: Ticket, text: 'Coupons & Offers' },
       { to: '/vendor/reviews', icon: Star, text: 'Reviews' },
       { to: '/vendor/reports', icon: FileText, text: 'Reports' },
       { to: '/vendor/analytics', icon: BarChart3, text: 'Analytics' },

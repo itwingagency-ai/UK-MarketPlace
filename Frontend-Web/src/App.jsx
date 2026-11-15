@@ -26,6 +26,7 @@ import PlatformSettingsPage from './pages/admin/PlatformSettingsPage';
 import CommissionPage from './pages/admin/CommissionPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
 import CategoryStudioPage from './pages/admin/CategoryStudioPage';
+import AdminOffersPage from './pages/admin/OffersPage';
 
 /* ── Vendor Pages ── */
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -41,6 +42,7 @@ import OrdersPage from './pages/vendor/OrdersPage';
 import ReviewsPage from './pages/vendor/ReviewsPage';
 import ReportsPage from './pages/vendor/ReportsPage';
 import CommissionPageVendor from './pages/vendor/CommissionPage';
+import VendorOffersPage from './pages/vendor/OffersPage';
 /* ── Shared ── */
 import PlaceholderPage from './components/common/PlaceholderPage';
 
@@ -76,6 +78,7 @@ export default function App() {
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="settings" element={<PlatformSettingsPage />} />
             <Route path="commission" element={<CommissionPage />} />
+            <Route path="offers" element={<AdminOffersPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
           </Route>
 
@@ -102,6 +105,7 @@ export default function App() {
             {/* Phase 6 */}
             <Route path="orders" element={<OrdersPage />} />
             <Route path="reviews" element={<ReviewsPage />} />
+            <Route path="offers" element={<VendorOffersPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="analytics" element={<VendorAnalyticsPage />} />
             <Route path="commission" element={<CommissionPageVendor />} />

@@ -166,4 +166,42 @@ export const adminService = {
     const { data } = await client.delete(`/admin/reviews/${id}`);
     return data;
   },
+
+  /* ── Coupons, automatic offers, redemptions (money in pence) ── */
+  getCoupons: async (params) => {
+    const { data } = await client.get('/admin/coupons', { params });
+    return data;
+  },
+  createCoupon: async (payload) => {
+    const { data } = await client.post('/admin/coupons', payload);
+    return data;
+  },
+  updateCoupon: async (id, payload) => {
+    const { data } = await client.patch(`/admin/coupons/${id}`, payload);
+    return data;
+  },
+  deleteCoupon: async (id) => {
+    const { data } = await client.delete(`/admin/coupons/${id}`);
+    return data;
+  },
+  getCouponRedemptions: async (params) => {
+    const { data } = await client.get('/admin/coupons/redemptions', { params });
+    return data;
+  },
+  getPromotions: async (params) => {
+    const { data } = await client.get('/admin/promotions', { params });
+    return data;
+  },
+  createPromotion: async (payload) => {
+    const { data } = await client.post('/admin/promotions', payload);
+    return data;
+  },
+  updatePromotion: async (id, payload) => {
+    const { data } = await client.patch(`/admin/promotions/${id}`, payload);
+    return data;
+  },
+  deletePromotion: async (id) => {
+    const { data } = await client.delete(`/admin/promotions/${id}`);
+    return data;
+  },
 };

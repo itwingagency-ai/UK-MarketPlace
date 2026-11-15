@@ -224,4 +224,42 @@ export const vendorService = {
     });
     return response.data;
   },
+
+  /* ── Coupons, automatic offers, redemptions (money in pence) ── */
+  getCoupons: async (params) => {
+    const { data } = await client.get('/vendor/dashboard/coupons', { params });
+    return data;
+  },
+  createCoupon: async (payload) => {
+    const { data } = await client.post('/vendor/dashboard/coupons', payload);
+    return data;
+  },
+  updateCoupon: async (id, payload) => {
+    const { data } = await client.patch(`/vendor/dashboard/coupons/${id}`, payload);
+    return data;
+  },
+  deleteCoupon: async (id) => {
+    const { data } = await client.delete(`/vendor/dashboard/coupons/${id}`);
+    return data;
+  },
+  getCouponRedemptions: async (params) => {
+    const { data } = await client.get('/vendor/dashboard/coupons/redemptions', { params });
+    return data;
+  },
+  getPromotions: async (params) => {
+    const { data } = await client.get('/vendor/dashboard/promotions', { params });
+    return data;
+  },
+  createPromotion: async (payload) => {
+    const { data } = await client.post('/vendor/dashboard/promotions', payload);
+    return data;
+  },
+  updatePromotion: async (id, payload) => {
+    const { data } = await client.patch(`/vendor/dashboard/promotions/${id}`, payload);
+    return data;
+  },
+  deletePromotion: async (id) => {
+    const { data } = await client.delete(`/vendor/dashboard/promotions/${id}`);
+    return data;
+  },
 };

@@ -181,6 +181,43 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
                     <span style={{ textTransform: 'uppercase' }}>{order.paymentMethod || '—'}</span>
                   </div>
                 </div>
+
+                {/* Discounts, fees and tip, as the server priced them (signed pence) */}
+                {(order.priceLines || []).length > 0 ? (
+                  <div style={{ marginTop: 'var(--space-3)', borderTop: '1px solid var(--border-color)', paddingTop: 'var(--space-2)' }}>
+                    {order.priceLines.map((line, i) => (
+                      <div key={`${line.kind}-${i}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', padding: '2px 0' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>
+                          {line.label || line.code}
+                          {line.kind !== 'tip' ? ` · paid by ${line.fundedBy === 'platform' ? 'platform' : 'you'}` : ''}
+                        </span>
+                        <span style={{ color: line.amount < 0 ? '#059669' : 'var(--text-primary)', fontWeight: 600 }}>
+                          {line.amount < 0 ? `-${formatCurrency(-line.amount)}` : formatCurrency(line.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* ── Picking instructions ── */}
+              <div className="order-section">
+                <div className="order-section-title">Picking</div>
+                <div className="order-info-grid">
+                  <div className="order-info-item">
+                    <label>Substitutions</label>
+                    <span>{order.allowSubstitutions === false ? 'Not allowed' : 'Allowed'}</span>
+                  </div>
+                  <div className="order-info-item">
+                    <label>Tip</label>
+                    <span>{order.tipAmount ? formatCurrency(order.tipAmount) : '—'}</span>
+                  </div>
+                </div>
+                {order.customerNote ? (
+                  <div style={{ marginTop: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--surface-50)', fontSize: 'var(--text-sm)' }}>
+                    <strong>Customer note:</strong> {order.customerNote}
+                  </div>
+                ) : null}
               </div>
 
               {/* ── Customer Info ── */}

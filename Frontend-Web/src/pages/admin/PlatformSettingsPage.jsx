@@ -3,6 +3,7 @@ import { adminService } from '../../api/adminService';
 import { PageHeader } from '../../components/common';
 import { Save, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
+import FeesSettings from './FeesSettings';
 
 export default function PlatformSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -188,6 +189,8 @@ export default function PlatformSettingsPage() {
           </form>
         </div>
       </div>
+
+      <FeesSettings />
     </div>
   );
 }
