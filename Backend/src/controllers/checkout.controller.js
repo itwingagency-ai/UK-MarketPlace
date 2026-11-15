@@ -425,7 +425,8 @@ const placeOrdersWithTransaction = async ({
       })
     );
 
-    const orders = await Order.create(orderDocs, { session });
+    // Mongoose refuses multi-document create() inside a session unless ordered
+    const orders = await Order.create(orderDocs, { session, ordered: true });
 
     await Cart.updateOne(
       { _id: cart._id },
