@@ -1,6 +1,10 @@
 const express = require("express");
 const {
   addItem,
+  applyCoupon,
+  removeCoupon,
+  setCartOptions,
+  setTip,
   clearCart,
   getCart,
   removeItem,
@@ -14,5 +18,9 @@ router.post("/items", addItem);
 router.patch("/items/:itemId", updateItemQuantity);
 router.delete("/items/:itemId", removeItem);
 router.delete("/", clearCart);
+router.post("/coupon", applyCoupon);
+router.delete("/coupon/:code", removeCoupon);
+router.put("/tip", setTip);
+router.put("/options", setCartOptions);
 
 module.exports = router;

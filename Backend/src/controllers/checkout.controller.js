@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const mongoose = require("mongoose");
 const ApiError = require("../lib/ApiError");
 const asyncHandler = require("../lib/asyncHandler");
@@ -5,12 +6,15 @@ const env = require("../config/env");
 const {
   buildLiveSnapshotForItem,
   getOrCreateCart,
+  mapToObject,
 } = require("../lib/cartUtils");
 const {
   buildMethodSnapshot,
   findActiveShippingMethodsByStores,
 } = require("../lib/shippingUtils");
-const { orderPricingFields, priceStoreGroup } = require("../lib/pricing");
+const { orderPricingFields } = require("../lib/pricing");
+const { priceCartWithOffers } = require("../lib/offers");
+const { claimCouponRedemptions } = require("../lib/couponRedemptions");
 const { getPlatformCurrency } = require("../lib/currency");
 const { getStripeClient, isStripeConfigured } = require("../lib/stripeClient");
 const { appendPaymentEvent } = require("../lib/paymentService");
@@ -150,31 +154,55 @@ const resolveShippingForGroups = async ({ groups, selections, strict }) => {
   }
 };
 
-// Price every store group at live prices (lib/pricing owns the arithmetic).
-// Call after resolveShippingForGroups.
-const priceGroups = (groups) => {
-  for (const group of groups.values()) {
-    const priced = priceStoreGroup({
-      items: group.items.map(({ item, status }) => ({
-        unitPrice: Number(status.live.unitPrice),
-        quantity: Number(item.quantity),
-      })),
-      settings: group.shippingSettings,
-      shippingMethod: group.shippingMethod,
-    });
+// Price every store group at live prices with the cart's coupons, tips and
+// fee choices (lib/offers -> lib/pricing own the arithmetic).
+// Call after resolveShippingForGroups. Returns the offers result
+// (coupon statuses, near misses, blocking issues).
+const priceGroups = async (groups, { cart, userId }) => {
+  const list = Array.from(groups.values());
+  const stores = list.length
+    ? await Store.find({ _id: { $in: list.map((g) => g.storeId) } }).select(
+      "name slug location locationSet deliveryRadiusKm minimumOrder"
+    )
+    : [];
+  const storesById = new Map(stores.map((st) => [String(st._id), st]));
+
+  const result = await priceCartWithOffers({
+    cart,
+    userId,
+    groups: list.map((group) => {
+      group.store = storesById.get(String(group.storeId)) || null;
+      return {
+        storeId: group.storeId,
+        store: group.store,
+        settings: group.shippingSettings,
+        shippingMethod: group.shippingMethod,
+        items: group.items.map(({ item, status }) => ({
+          product: item.product,
+          unitPrice: Number(status.live.unitPrice),
+          quantity: Number(item.quantity),
+        })),
+      };
+    }),
+  });
+
+  list.forEach((group, i) => {
+    const priced = result.groups[i].priced;
     group.priced = priced;
+    group.offers = result.groups[i];
     group.subtotal = priced.subtotal;
     group.shippingFee = priced.shippingFee;
     group.total = priced.total;
-  }
+  });
+  return result;
 };
 
-const computeStoreTotals = async (groups, selections = null) => {
+const computeStoreTotals = async (groups, selections, ctx) => {
   await resolveShippingForGroups({ groups, selections, strict: false });
-  priceGroups(groups);
+  return priceGroups(groups, ctx);
 };
 
-const buildPreviewResponse = async (evaluatedItems, selections = null) => {
+const buildPreviewResponse = async (evaluatedItems, selections, { cart, userId }) => {
   const items = evaluatedItems.map(({ item, status }) => ({
     _id: item._id,
     product: item.product,
@@ -192,22 +220,18 @@ const buildPreviewResponse = async (evaluatedItems, selections = null) => {
   }));
 
   const groups = groupByStore(evaluatedItems);
-  await computeStoreTotals(groups, selections);
-
-  const storeIds = Array.from(groups.keys()).map(
-    (k) => new mongoose.Types.ObjectId(k)
-  );
-  const stores = storeIds.length
-    ? await Store.find({ _id: { $in: storeIds } }).select("name slug location locationSet deliveryRadiusKm")
-    : [];
-  const storesById = new Map(stores.map((s) => [String(s._id), s]));
+  const offers = await computeStoreTotals(groups, selections, { cart, userId });
+  const notes = mapToObject(cart.notes);
 
   let subtotal = 0;
   let shippingFee = 0;
   let grandTotal = 0;
+  let discountTotal = 0;
+  let feeTotal = 0;
+  let tipTotal = 0;
   const byStore = [];
   for (const group of groups.values()) {
-    const store = storesById.get(String(group.storeId));
+    const { store } = group;
     byStore.push({
       storeId: group.storeId,
       storeName: store?.name || "",
@@ -223,6 +247,11 @@ const buildPreviewResponse = async (evaluatedItems, selections = null) => {
       feeTotal: group.priced.feeTotal,
       tipAmount: group.priced.tipAmount,
       total: group.total,
+      promotion: group.offers.promotion,
+      optionalFees: group.offers.optionalFees,
+      nearMisses: group.offers.nearMisses,
+      minimumOrder: store?.minimumOrder || 0,
+      note: notes[String(group.storeId)] || "",
       availableShippingMethods: (group.availableShippingMethods || []).map(
         buildMethodSnapshot
       ),
@@ -231,22 +260,41 @@ const buildPreviewResponse = async (evaluatedItems, selections = null) => {
     subtotal += group.subtotal;
     shippingFee += group.shippingFee;
     grandTotal += group.total;
+    discountTotal += group.priced.discountTotal;
+    feeTotal += group.priced.feeTotal;
+    tipTotal += group.priced.tipAmount;
   }
 
   const blockingIssues = items.filter((x) => !x.available);
+  const invalidCoupons = offers.coupons.filter((c) => c.status === "invalid");
 
   return {
     items,
     byStore,
     subtotal,
     shippingFee,
+    discountTotal,
+    feeTotal,
+    tipTotal,
     grandTotal,
-    canCheckout: blockingIssues.length === 0 && byStore.length > 0,
-    issues: blockingIssues.map((x) => ({
-      itemId: x._id,
-      title: x.title,
-      reason: x.reason,
-    })),
+    coupons: offers.coupons,
+    nearMisses: offers.nearMisses,
+    blockingIssues: offers.blockingIssues,
+    options: { allowSubstitutions: cart.allowSubstitutions !== false },
+    canCheckout:
+      blockingIssues.length === 0 &&
+      offers.blockingIssues.length === 0 &&
+      invalidCoupons.length === 0 &&
+      byStore.length > 0,
+    issues: [
+      ...blockingIssues.map((x) => ({
+        itemId: x._id,
+        title: x.title,
+        reason: x.reason,
+      })),
+      ...offers.blockingIssues.map((b) => ({ storeId: b.storeId, reason: b.message })),
+      ...invalidCoupons.map((c) => ({ code: c.code, reason: `${c.code}: ${c.message}. Remove it to continue` })),
+    ],
   };
 };
 
@@ -279,7 +327,10 @@ const previewCheckout = asyncHandler(async (req, res) => {
 
   const evaluatedItems = await evaluateCart(cart);
   const selections = parseSelectionsFromQuery(req.query);
-  const preview = await buildPreviewResponse(evaluatedItems, selections);
+  const preview = await buildPreviewResponse(evaluatedItems, selections, {
+    cart,
+    userId: req.user.id,
+  });
   res.status(200).json({ data: preview });
 });
 
@@ -381,6 +432,8 @@ const buildOrderDoc = ({
   shippingAddress,
   paymentMethod,
   notePrefix,
+  customerNote = "",
+  allowSubstitutions = true,
 }) => ({
   store: storeGroup.storeId,
   customer: user._id,
@@ -392,6 +445,8 @@ const buildOrderDoc = ({
   shippingAddress,
   items: buildOrderItems(storeGroup.items),
   ...orderPricingFields(storeGroup.priced),
+  customerNote,
+  allowSubstitutions,
   paymentMethod,
   paymentStatus: "pending",
   orderStatus: "pending",
@@ -407,6 +462,28 @@ const buildOrderDoc = ({
   shippingMethod: buildShippingMethodSnapshot(storeGroup.shippingMethod),
 });
 
+// What the order keeps from the cart besides items: the note for that store
+// (falling back to the checkout-wide note) and the substitution choice.
+const orderDocsFor = ({ cart, storeGroups, user, shippingAddress, paymentMethod, notes }) => {
+  const cartNotes = mapToObject(cart.notes);
+  return Array.from(storeGroups.values()).map((group) => {
+    const customerNote = (cartNotes[String(group.storeId)] || notes || "").toString().trim().slice(0, 500);
+    return buildOrderDoc({
+      storeGroup: group,
+      user,
+      shippingAddress,
+      paymentMethod,
+      notePrefix: customerNote ? `Order placed. Note: ${customerNote}` : "Order placed",
+      customerNote,
+      allowSubstitutions: cart.allowSubstitutions !== false,
+    });
+  });
+};
+
+// After placement the cart is empty and its one-off choices are spent.
+// allowSubstitutions is a standing preference, so it stays.
+const CLEARED_CART = { items: [], couponCodes: [], tips: {}, notes: {}, declinedFees: {} };
+
 const placeOrdersWithTransaction = async ({
   cart,
   storeGroups,
@@ -414,6 +491,7 @@ const placeOrdersWithTransaction = async ({
   shippingAddress,
   paymentMethod,
   notes,
+  checkoutId,
 }) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -425,22 +503,16 @@ const placeOrdersWithTransaction = async ({
       }
     }
 
-    const orderDocs = Array.from(storeGroups.values()).map((group) =>
-      buildOrderDoc({
-        storeGroup: group,
-        user,
-        shippingAddress,
-        paymentMethod,
-        notePrefix: notes ? `Order placed. Note: ${notes}` : "Order placed",
-      })
-    );
+    const orderDocs = orderDocsFor({ cart, storeGroups, user, shippingAddress, paymentMethod, notes });
 
     // Mongoose refuses multi-document create() inside a session unless ordered
     const orders = await Order.create(orderDocs, { session, ordered: true });
 
+    await claimCouponRedemptions({ orders, userId: user._id, checkoutId, session });
+
     await Cart.updateOne(
       { _id: cart._id },
-      { $set: { items: [] } },
+      { $set: CLEARED_CART },
       { session }
     );
 
@@ -465,9 +537,11 @@ const placeOrdersWithCompensation = async ({
   shippingAddress,
   paymentMethod,
   notes,
+  checkoutId,
 }) => {
   const decrementedItems = [];
   const createdOrderIds = [];
+  let couponClaim = null;
 
   try {
     for (const group of storeGroups.values()) {
@@ -479,24 +553,21 @@ const placeOrdersWithCompensation = async ({
     }
 
     const orders = [];
-    for (const group of storeGroups.values()) {
-      const doc = buildOrderDoc({
-        storeGroup: group,
-        user,
-        shippingAddress,
-        paymentMethod,
-        notePrefix: notes ? `Order placed. Note: ${notes}` : "Order placed",
-      });
+    for (const doc of orderDocsFor({ cart, storeGroups, user, shippingAddress, paymentMethod, notes })) {
       // eslint-disable-next-line no-await-in-loop
       const order = await Order.create(doc);
       createdOrderIds.push(order._id);
       orders.push(order);
     }
 
-    await Cart.updateOne({ _id: cart._id }, { $set: { items: [] } });
+    // Undoes its own partial claims if it throws
+    couponClaim = await claimCouponRedemptions({ orders, userId: user._id, checkoutId });
+
+    await Cart.updateOne({ _id: cart._id }, { $set: CLEARED_CART });
 
     return orders;
   } catch (err) {
+    if (couponClaim) await couponClaim.undo().catch(() => { });
     for (const item of decrementedItems) {
       // eslint-disable-next-line no-await-in-loop
       await incrementStockForItem(item, null).catch(() => { });
@@ -648,7 +719,16 @@ const placeOrder = asyncHandler(async (req, res) => {
   });
 
   // Price each store with the resolved methods (same function as the preview).
-  priceGroups(storeGroups);
+  const offers = await priceGroups(storeGroups, { cart, userId: user._id });
+
+  const invalidCoupon = offers.coupons.find((c) => c.status === "invalid");
+  if (invalidCoupon) {
+    throw new ApiError(409, `${invalidCoupon.code}: ${invalidCoupon.message}. Remove it to continue`);
+  }
+  if (offers.blockingIssues.length > 0) {
+    throw new ApiError(409, offers.blockingIssues[0].message);
+  }
+  const checkoutId = crypto.randomUUID();
 
   let orders;
   try {
@@ -659,6 +739,7 @@ const placeOrder = asyncHandler(async (req, res) => {
       shippingAddress,
       paymentMethod: req.body.paymentMethod,
       notes: req.body.notes,
+      checkoutId,
     });
   } catch (err) {
     if (isReplicaSetTransactionError(err)) {
@@ -669,6 +750,7 @@ const placeOrder = asyncHandler(async (req, res) => {
         shippingAddress,
         paymentMethod: req.body.paymentMethod,
         notes: req.body.notes,
+        checkoutId,
       });
     } else {
       throw err;

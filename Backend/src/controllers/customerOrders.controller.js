@@ -11,7 +11,7 @@ const {
 const { ALLOWED_STATUSES } = require("../validators/order.validator");
 const {
   refundOrderIfPaid,
-  restoreStockForOrderOnce,
+  releaseCancelledOrder,
 } = require("../lib/paymentService");
 const { notifyOrderStatus } = require("../lib/appNotifications");
 const { emitOrderStatusChanged } = require("../lib/orderEvents");
@@ -268,7 +268,7 @@ const cancelMyOrder = asyncHandler(async (req, res) => {
     throw new ApiError(409, "This order can no longer be cancelled — the store has already accepted it");
   }
 
-  await restoreStockForOrderOnce(order);
+  await releaseCancelledOrder(order, { reason });
   const refund = await refundOrderIfPaid(order, {
     by: req.user.id,
     byRole: "customer",

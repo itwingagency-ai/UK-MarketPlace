@@ -33,6 +33,8 @@ const getSettings = asyncHandler(async (req, res) => {
     policies: settings?.policies || { returnPolicy: "", shippingPolicy: "" },
     notifications: settings?.notifications || { emailEnabled: true, smsEnabled: false, whatsappEnabled: false },
     shipping: settings?.shipping || { flatFee: 0, freeShippingThreshold: 0 },
+    // Pence. Baskets below this (goods, before discounts) can't be checked out.
+    minimumOrder: store.minimumOrder || 0,
   };
 
   return res.status(200).json({ data: result });
@@ -42,12 +44,14 @@ const updateSettings = asyncHandler(async (req, res) => {
   validateSettingsPayload(req.body);
   const storeId = resolveTargetStoreId(req);
 
-  const { storeName, description, logoUrl, contactEmail, contactPhone, ...otherSettings } = req.body;
+  const { storeName, description, logoUrl, contactEmail, contactPhone, minimumOrder, ...otherSettings } = req.body;
 
   // 1. Update the Store document for root fields
   const storeUpdates = {};
   if (storeName !== undefined) storeUpdates.name = storeName;
   if (description !== undefined) storeUpdates.description = description;
+  // Multipart forms send numbers as strings
+  if (minimumOrder !== undefined) storeUpdates.minimumOrder = Number(minimumOrder);
   if (contactEmail !== undefined || contactPhone !== undefined) {
     const store = await Store.findById(storeId).select("contact");
     storeUpdates.contact = {

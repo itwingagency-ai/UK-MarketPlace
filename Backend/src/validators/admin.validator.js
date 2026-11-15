@@ -1,4 +1,5 @@
 const ApiError = require("../lib/ApiError");
+const { validateFeesPayload } = require("./offers.validator");
 
 const isPlainObject = (value) =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -204,6 +205,8 @@ const validatePlatformSettingsUpdate = (payload) => {
       }
     }
   }
+
+  if (payload.fees !== undefined) validateFeesPayload(payload.fees);
 
   if (payload.policies !== undefined && !isPlainObject(payload.policies)) {
     throw new ApiError(400, "policies must be an object");

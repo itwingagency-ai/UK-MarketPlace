@@ -1,6 +1,5 @@
 const {
-  buildCommissionSnapshot,
-  commissionBaseForOrder,
+  buildOrderCommissionSnapshot,
   resolveCommissionConfig,
 } = require("./commissionUtils");
 const {
@@ -19,6 +18,7 @@ const PaymentTransaction = require("../models/PaymentTransaction");
 const Store = require("../models/Store");
 const User = require("../models/User");
 const { getStripeClient, isStripeConfigured } = require("./stripeClient");
+const { releaseCouponRedemptions } = require("./couponRedemptions");
 
 const restoreStockForOrder = async (order) => {
   for (const item of order.items || []) {
@@ -54,6 +54,15 @@ const restoreStockForOrderOnce = async (order) => {
   if (order.tracking) order.tracking.stockRestoredAt = claimedAt;
   await restoreStockForOrder(order);
   return true;
+};
+
+/**
+ * Everything a cancelled order hands back: its stock (exactly once) and the
+ * coupon uses it held. Every cancellation path calls this.
+ */
+const releaseCancelledOrder = async (order, { reason = "Order cancelled" } = {}) => {
+  await restoreStockForOrderOnce(order);
+  await releaseCouponRedemptions(order, { reason });
 };
 
 /**
@@ -159,7 +168,7 @@ const applyCommissionSnapshot = async (order) => {
   ]);
 
   const config = resolveCommissionConfig(store, platform);
-  order.commission = buildCommissionSnapshot(config, commissionBaseForOrder(order));
+  order.commission = buildOrderCommissionSnapshot(config, order);
 };
 
 const markOrdersPaid = async ({
@@ -221,7 +230,7 @@ const cancelOrdersAndRestoreStock = async ({
 
     const previousStatus = order.orderStatus;
     // eslint-disable-next-line no-await-in-loop
-    await restoreStockForOrderOnce(order);
+    await releaseCancelledOrder(order, { reason: reason || "Payment failed" });
 
     order.orderStatus = "cancelled";
     order.paymentStatus = "failed";
@@ -287,6 +296,7 @@ const finalizeTransaction = async (
 module.exports = {
   restoreStockForOrder,
   restoreStockForOrderOnce,
+  releaseCancelledOrder,
   refundOrderIfPaid,
   appendPaymentEvent,
   appendStatusHistory,

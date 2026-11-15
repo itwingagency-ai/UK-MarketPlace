@@ -2,6 +2,8 @@ const ApiError = require("../lib/ApiError");
 const asyncHandler = require("../lib/asyncHandler");
 const {
   buildCommissionSnapshot,
+  vendorNetForOrder,
+  VENDOR_NET_EXPR,
   resolveCommissionConfig,
 } = require("../lib/commissionUtils");
 const Order = require("../models/Order");
@@ -45,6 +47,7 @@ const getCommissionSummary = asyncHandler(async (req, res) => {
           _id: null,
           revenue: { $sum: "$total" },
           commission: { $sum: "$commission.amount" },
+          payout: { $sum: VENDOR_NET_EXPR },
           orders: { $sum: 1 },
         },
       },
@@ -58,6 +61,7 @@ const getCommissionSummary = asyncHandler(async (req, res) => {
           },
           revenue: { $sum: "$total" },
           commission: { $sum: "$commission.amount" },
+          payout: { $sum: VENDOR_NET_EXPR },
           orders: { $sum: 1 },
         },
       },
@@ -69,7 +73,7 @@ const getCommissionSummary = asyncHandler(async (req, res) => {
     PlatformSettings.getOrInit(),
   ]);
 
-  const totals = agg[0] || { revenue: 0, commission: 0, orders: 0 };
+  const totals = agg[0] || { revenue: 0, commission: 0, payout: 0, orders: 0 };
   const config = resolveCommissionConfig(store, platform);
 
   res.status(200).json({
@@ -93,14 +97,14 @@ const getCommissionSummary = asyncHandler(async (req, res) => {
       totals: {
         revenue: totals.revenue,
         commission: totals.commission,
-        netPayout: totals.revenue - totals.commission,
+        netPayout: totals.payout || 0,
         orders: totals.orders,
       },
       dailySeries: dailyAgg.map((point) => ({
         date: point._id,
         revenue: point.revenue,
         commission: point.commission,
-        netPayout: point.revenue - point.commission,
+        netPayout: point.payout || 0,
         orders: point.orders,
       })),
     },
@@ -137,12 +141,13 @@ const getCommissionLedger = asyncHandler(async (req, res) => {
           _id: null,
           revenue: { $sum: "$total" },
           commission: { $sum: "$commission.amount" },
+          payout: { $sum: VENDOR_NET_EXPR },
         },
       },
     ]),
   ]);
 
-  const totals = totalsAgg[0] || { revenue: 0, commission: 0 };
+  const totals = totalsAgg[0] || { revenue: 0, commission: 0, payout: 0 };
 
   res.status(200).json({
     page,
@@ -151,7 +156,7 @@ const getCommissionLedger = asyncHandler(async (req, res) => {
     totals: {
       revenue: totals.revenue,
       commission: totals.commission,
-      netPayout: totals.revenue - totals.commission,
+      netPayout: totals.payout || 0,
     },
     data: orders.map((o) => ({
       id: o._id,
@@ -172,7 +177,7 @@ const getCommissionLedger = asyncHandler(async (req, res) => {
         sourceRate: o.commission?.sourceRate || null,
         calculatedAt: o.commission?.calculatedAt || null,
       },
-      netPayout: Number(o.total) - Number(o.commission?.amount || 0),
+      netPayout: vendorNetForOrder(o),
     })),
   });
 });

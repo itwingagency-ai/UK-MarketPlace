@@ -8,7 +8,7 @@ const {
   computeShippingFeeForStore,
   findActiveShippingMethodsByStores,
 } = require("./shippingUtils");
-const { priceStoreGroup } = require("./pricing");
+const { priceCartWithOffers } = require("./offers");
 
 const getOrCreateCart = async (userId) => {
   const cart = await Cart.findOneAndUpdate(
@@ -153,6 +153,12 @@ const buildLiveSnapshotForItem = async (item) => {
 const computeStoreShippingFee = (settings, subtotal, method = null) =>
   computeShippingFeeForStore({ method, settings, subtotal });
 
+const mapToObject = (m) => {
+  if (!m) return {};
+  if (m instanceof Map) return Object.fromEntries(m);
+  return { ...m };
+};
+
 const buildCartSummary = async (cart) => {
   const byStoreMap = new Map();
 
@@ -193,7 +199,7 @@ const buildCartSummary = async (cart) => {
       : Promise.resolve([]),
     findActiveShippingMethodsByStores(storeIds),
     storeIds.length
-      ? Store.find({ _id: { $in: storeIds } }).select("name slug location locationSet deliveryRadiusKm")
+      ? Store.find({ _id: { $in: storeIds } }).select("name slug location locationSet deliveryRadiusKm minimumOrder")
       : Promise.resolve([]),
   ]);
   const settingsByStore = new Map(
@@ -203,31 +209,43 @@ const buildCartSummary = async (cart) => {
     storesList.map((s) => [String(s._id), s])
   );
 
-  let grandSubtotal = 0;
-  let grandShipping = 0;
-  let grandTotal = 0;
-  let totalItems = 0;
-
-  for (const group of byStoreMap.values()) {
+  const groups = Array.from(byStoreMap.values());
+  const pricingInputs = groups.map((group) => {
     const storeKey = String(group.storeId);
-    const settings = settingsByStore.get(storeKey);
     const methods = methodsByStore.get(storeKey) || [];
-    const defaultMethod = methods[0] || null;
     const storeObj = storesById.get(storeKey);
-
     group.storeName = storeObj?.name || "";
     group.storeSlug = storeObj?.slug || "";
     group.location = storeObj?.location || null;
     group.locationSet = storeObj?.locationSet || false;
     group.deliveryRadiusKm = storeObj?.deliveryRadiusKm || 5;
-
+    group.minimumOrder = storeObj?.minimumOrder || 0;
+    group.availableShippingMethods = methods.map(buildMethodSnapshot);
+    group.defaultShippingMethod = buildMethodSnapshot(methods[0] || null);
     // The cart prices from its snapshot unit prices; checkout re-prices live.
-    const priced = priceStoreGroup({
-      items: group.items,
+    return {
+      storeId: group.storeId,
       store: storeObj,
-      settings,
-      shippingMethod: defaultMethod,
-    });
+      settings: settingsByStore.get(storeKey),
+      shippingMethod: methods[0] || null,
+      items: group.items.map((i) => ({ product: i.product, unitPrice: i.unitPrice, quantity: i.quantity })),
+    };
+  });
+
+  const result = await priceCartWithOffers({ cart, userId: cart.user, groups: pricingInputs });
+  const tips = mapToObject(cart.tips);
+  const notes = mapToObject(cart.notes);
+
+  let grandSubtotal = 0;
+  let grandShipping = 0;
+  let grandTotal = 0;
+  let discountTotal = 0;
+  let feeTotal = 0;
+  let tipTotal = 0;
+  let totalItems = 0;
+
+  groups.forEach((group, i) => {
+    const priced = result.groups[i].priced;
     group.subtotal = priced.subtotal;
     group.shippingFee = priced.shippingFee;
     group.lines = priced.lines;
@@ -235,22 +253,38 @@ const buildCartSummary = async (cart) => {
     group.feeTotal = priced.feeTotal;
     group.tipAmount = priced.tipAmount;
     group.total = priced.total;
-    group.availableShippingMethods = methods.map(buildMethodSnapshot);
-    group.defaultShippingMethod = buildMethodSnapshot(defaultMethod);
+    group.promotion = result.groups[i].promotion;
+    group.optionalFees = result.groups[i].optionalFees;
+    group.nearMisses = result.groups[i].nearMisses;
+    group.note = notes[String(group.storeId)] || "";
 
     grandSubtotal += group.subtotal;
     grandShipping += group.shippingFee;
     grandTotal += group.total;
+    discountTotal += group.discountTotal;
+    feeTotal += group.feeTotal;
+    tipTotal += group.tipAmount;
     totalItems += group.itemCount;
-  }
+  });
 
   return {
     cartId: cart._id,
     totalItems,
-    byStore: Array.from(byStoreMap.values()),
+    byStore: groups,
     subtotal: grandSubtotal,
     shippingFee: grandShipping,
+    discountTotal,
+    feeTotal,
+    tipTotal,
     grandTotal,
+    coupons: result.coupons,
+    nearMisses: result.nearMisses,
+    blockingIssues: result.blockingIssues,
+    options: {
+      allowSubstitutions: cart.allowSubstitutions !== false,
+      tips,
+      notes,
+    },
     updatedAt: cart.updatedAt,
   };
 };
@@ -264,4 +298,5 @@ module.exports = {
   computeStoreShippingFee,
   buildCartSummary,
   variantAttributesToObject,
+  mapToObject,
 };

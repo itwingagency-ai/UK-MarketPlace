@@ -56,6 +56,8 @@ const {
   updateGlobalCategory,
 } = require("../controllers/globalCategories.controller");
 
+const offers = require("../controllers/offersManagement.controller");
+
 const router = express.Router();
 
 router.get("/overview", overview);
@@ -89,6 +91,17 @@ router.get("/settings", getSettings);
 router.patch("/settings", updateSettings);
 
 router.get("/commission/summary", commissionSummary);
+
+// Coupons and automatic offers (redemptions must stay above /coupons/:id)
+router.get("/coupons/redemptions", offers.listRedemptions);
+router.get("/coupons", offers.listCoupons);
+router.post("/coupons", offers.createCoupon);
+router.patch("/coupons/:id", offers.updateCoupon);
+router.delete("/coupons/:id", offers.deleteCoupon);
+router.get("/promotions", offers.listPromotions);
+router.post("/promotions", offers.createPromotion);
+router.patch("/promotions/:id", offers.updatePromotion);
+router.delete("/promotions/:id", offers.deletePromotion);
 
 router.get("/notifications/templates", listTemplates);
 router.get("/notifications/templates/:eventType/:channel", getTemplate);

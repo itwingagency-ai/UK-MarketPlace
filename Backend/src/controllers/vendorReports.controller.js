@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const ApiError = require("../lib/ApiError");
 const asyncHandler = require("../lib/asyncHandler");
 const { buildCsv, resolveDateRange } = require("../lib/analyticsUtils");
+const { vendorNetForOrder, VENDOR_NET_EXPR } = require("../lib/commissionUtils");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const { ALLOWED_STATUSES } = require("../validators/order.validator");
@@ -93,7 +94,7 @@ const salesReport = asyncHandler(async (req, res) => {
         .map((i) => `${i.title} x${i.quantity}`)
         .join("; ");
       const commission = Number(o.commission?.amount || 0);
-      const netPayout = Number((Number(o.total) - commission).toFixed(2));
+      const netPayout = Number(vendorNetForOrder(o).toFixed(2));
       return [
         o.orderNumber,
         o.createdAt ? new Date(o.createdAt).toISOString() : "",
@@ -147,6 +148,9 @@ const salesReport = asyncHandler(async (req, res) => {
             },
           },
           totalCommission: { $sum: "$commission.amount" },
+          paidPayout: {
+            $sum: { $cond: [{ $eq: ["$paymentStatus", "paid"] }, VENDOR_NET_EXPR, 0] },
+          },
           orderCount: { $sum: 1 },
           paidOrders: {
             $sum: {
@@ -183,11 +187,7 @@ const salesReport = asyncHandler(async (req, res) => {
       totalRevenue: Number((summary.totalRevenue || 0).toFixed(2)),
       paidRevenue: Number((summary.paidRevenue || 0).toFixed(2)),
       totalCommission: Number((summary.totalCommission || 0).toFixed(2)),
-      netPayout: Number(
-        (
-          (summary.paidRevenue || 0) - (summary.totalCommission || 0)
-        ).toFixed(2)
-      ),
+      netPayout: Number((summary.paidPayout || 0).toFixed(2)),
     },
     data: orders,
   });

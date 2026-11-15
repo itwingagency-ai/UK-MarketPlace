@@ -8,6 +8,7 @@ const {
   resolveDateRange,
   validateGranularity,
 } = require("../lib/analyticsUtils");
+const { VENDOR_NET_EXPR } = require("../lib/commissionUtils");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 
@@ -27,6 +28,7 @@ const aggregatePeriod = async (storeFilter, dateRange) => {
           _id: null,
           revenue: { $sum: "$total" },
           commission: { $sum: "$commission.amount" },
+          payout: { $sum: VENDOR_NET_EXPR },
           paidOrders: { $sum: 1 },
           itemsSold: { $sum: { $sum: "$items.quantity" } },
         },
@@ -49,7 +51,7 @@ const aggregatePeriod = async (storeFilter, dateRange) => {
     paidOrders: paid.paidOrders,
     revenue: Number((paid.revenue || 0).toFixed(2)),
     commission: Number((paid.commission || 0).toFixed(2)),
-    netPayout: Number(((paid.revenue || 0) - (paid.commission || 0)).toFixed(2)),
+    netPayout: Number((paid.payout || 0).toFixed(2)),
     averageOrderValue: Number(aov.toFixed(2)),
     itemsSold: paid.itemsSold || 0,
     uniqueCustomers,
@@ -117,6 +119,7 @@ const salesTrend = asyncHandler(async (req, res) => {
         _id: { $dateToString: { format, date: "$createdAt" } },
         revenue: { $sum: "$total" },
         commission: { $sum: "$commission.amount" },
+        payout: { $sum: VENDOR_NET_EXPR },
         orders: { $sum: 1 },
         items: { $sum: { $sum: "$items.quantity" } },
       },
@@ -132,9 +135,7 @@ const salesTrend = asyncHandler(async (req, res) => {
         bucket: point._id,
         revenue: Number((point.revenue || 0).toFixed(2)),
         commission: Number((point.commission || 0).toFixed(2)),
-        netPayout: Number(
-          ((point.revenue || 0) - (point.commission || 0)).toFixed(2)
-        ),
+        netPayout: Number((point.payout || 0).toFixed(2)),
         orders: point.orders,
         items: point.items,
       })),

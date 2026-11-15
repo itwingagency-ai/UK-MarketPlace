@@ -4,7 +4,7 @@ const {
   appendPaymentEvent,
   applyCommissionSnapshot,
   refundOrderIfPaid,
-  restoreStockForOrderOnce,
+  releaseCancelledOrder,
 } = require("../lib/paymentService");
 const { computeEstimatedDelivery } = require("../lib/shippingUtils");
 const {
@@ -242,7 +242,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   // Cancelled items go back on the shelf, and card payments are refunded
   let refund = null;
   if (nextStatus === "cancelled") {
-    await restoreStockForOrderOnce(order);
+    await releaseCancelledOrder(order, { reason: "Cancelled by the store" });
     refund = await refundOrderIfPaid(order, {
       by: req.user.id,
       byRole: req.user.role,

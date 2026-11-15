@@ -84,7 +84,34 @@ const buildCommissionSnapshot = (config, base) => ({
   sourceRate: config.source,
 });
 
+/**
+ * Commission snapshot for a stored order, including what the store is owed:
+ *   vendorNet = commission base + tip - commission
+ * (customer total = vendorNet + commission + platform fees - platform discounts)
+ */
+const buildOrderCommissionSnapshot = (config, order) => {
+  const base = commissionBaseForOrder(order);
+  const snap = buildCommissionSnapshot(config, base);
+  snap.vendorNet = Number((base + Number(order.tipAmount || 0) - snap.amount).toFixed(2));
+  return snap;
+};
+
+/** What the store is owed for an order (pence); legacy orders: total - commission. */
+const vendorNetForOrder = (o) =>
+  o.commission?.vendorNet ?? Number(o.total || 0) - Number(o.commission?.amount || 0);
+
+/** Same as vendorNetForOrder, as an aggregation expression. */
+const VENDOR_NET_EXPR = {
+  $ifNull: [
+    "$commission.vendorNet",
+    { $subtract: ["$total", { $ifNull: ["$commission.amount", 0] }] },
+  ],
+};
+
 module.exports = {
+  buildOrderCommissionSnapshot,
+  vendorNetForOrder,
+  VENDOR_NET_EXPR,
   resolveCommissionConfig,
   computeCommissionAmount,
   computeCommissionBase,

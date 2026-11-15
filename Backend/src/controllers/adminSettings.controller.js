@@ -33,6 +33,18 @@ const updateSettings = asyncHandler(async (req, res) => {
     settings.currency = req.body.currency.toLowerCase().trim();
   }
 
+  if (req.body.fees && typeof req.body.fees === "object") {
+    for (const section of ["service", "smallOrder", "bag"]) {
+      const patch = req.body.fees[section];
+      if (!patch) continue;
+      for (const [key, value] of Object.entries(patch)) {
+        if (["enabled", "percent", "min", "max", "threshold", "amount", "label", "info"].includes(key)) {
+          settings.set(`fees.${section}.${key}`, typeof value === "string" ? value.trim() : value);
+        }
+      }
+    }
+  }
+
   if (req.body.commission && typeof req.body.commission === "object") {
     if (req.body.commission.type !== undefined) {
       settings.commission.type = req.body.commission.type;
