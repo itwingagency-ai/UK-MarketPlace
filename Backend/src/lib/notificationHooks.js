@@ -4,6 +4,7 @@ const User = require("../models/User");
 const { notifyAsync } = require("./notificationDispatcher");
 const { notifyNewOrder } = require("./appNotifications");
 const { emitOrderCreated } = require("./orderEvents");
+const { getPlatformCurrencySafe } = require("./currency");
 
 const formatMoney = (value, currency) => {
   const n = Number(value || 0) / 100;
@@ -71,7 +72,7 @@ const onOrderPlacedToCustomer = async (order, user) => {
       orderNumber: order.orderNumber || "",
       storeName,
       total: formatMoney(order.total),
-      currency: (order.currency || env.platformCurrency || "").toUpperCase(),
+      currency: (await getPlatformCurrencySafe()).toUpperCase(),
       paymentMethod: order.paymentMethod || "",
       trackUrl: trackUrlFor(order.orderNumber, user.email),
     },
@@ -96,7 +97,7 @@ const onOrderPlacedToVendor = async (order, customer) => {
         orderNumber: order.orderNumber || "",
         customerName: customer?.name || "",
         total: formatMoney(order.total),
-        currency: (order.currency || env.platformCurrency || "").toUpperCase(),
+        currency: (await getPlatformCurrencySafe()).toUpperCase(),
         dashboardUrl: dashboardUrl(),
       },
       related: { order: order._id, store: store._id },
@@ -118,7 +119,7 @@ const onOrderPaymentSucceeded = async (order) => {
         name: user.name || "",
         orderNumber: order.orderNumber || "",
         total: formatMoney(order.total),
-        currency: (env.platformCurrency || "").toUpperCase(),
+        currency: (await getPlatformCurrencySafe()).toUpperCase(),
         trackUrl: trackUrlFor(order.orderNumber, user.email),
       },
       related: { order: order._id, store: order.store },

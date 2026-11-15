@@ -35,7 +35,9 @@ const env = {
     cancelUrl:
       process.env.STRIPE_CANCEL_URL || "http://localhost:3000/checkout/cancel",
   },
-  platformCurrency: (process.env.PLATFORM_CURRENCY || "usd").toLowerCase(),
+  // Legacy: the charging currency now lives in PlatformSettings.currency.
+  // When set, this only seeds that setting once (see PlatformSettings.getOrInit).
+  legacyPlatformCurrency: (process.env.PLATFORM_CURRENCY || "").toLowerCase().trim(),
   appName: process.env.APP_NAME || "Marketplace",
   appUrl: process.env.APP_URL || "http://localhost:3000",
   notifications: {

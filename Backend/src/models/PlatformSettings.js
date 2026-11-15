@@ -27,9 +27,10 @@ const platformSettingsSchema = new mongoose.Schema(
       trim: true,
       maxlength: 30,
     },
+    // The one charging currency (ISO 4217, lowercase). Read via lib/currency.
     currency: {
       type: String,
-      default: "usd",
+      default: "gbp",
       lowercase: true,
       trim: true,
       maxlength: 5,
@@ -63,6 +64,10 @@ const platformSettingsSchema = new mongoose.Schema(
       codEnabled: { type: Boolean, default: true },
       reviewsEnabled: { type: Boolean, default: true },
     },
+    // One-off data fixes already applied to this document
+    migrations: {
+      currencyFromEnvAt: { type: Date, default: null },
+    },
     reviews: {
       autoApprove: { type: Boolean, default: true },
       requireVerifiedPurchase: { type: Boolean, default: true },
@@ -78,6 +83,16 @@ platformSettingsSchema.statics.getOrInit = async function getOrInit() {
     { $setOnInsert: { key: "platform" } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
+  // Before Wave 0 the schema defaulted to "usd" while Stripe charged in
+  // PLATFORM_CURRENCY. Copy that env value over the stale default once, so
+  // switching Stripe to read this setting cannot change the charging currency.
+  if (!doc.migrations?.currencyFromEnvAt) {
+    // eslint-disable-next-line global-require
+    const legacy = require("../config/env").legacyPlatformCurrency;
+    if (legacy && doc.currency === "usd" && legacy !== "usd") doc.currency = legacy;
+    doc.set("migrations.currencyFromEnvAt", new Date());
+    await doc.save();
+  }
   if (!doc.supportEmail || !doc.supportPhone) {
     const User = mongoose.model("User");
     const admin = await User.findOne({ role: "admin" }).sort({ createdAt: 1 });

@@ -11,6 +11,7 @@ const {
   findActiveShippingMethodsByStores,
 } = require("../lib/shippingUtils");
 const { orderPricingFields, priceStoreGroup } = require("../lib/pricing");
+const { getPlatformCurrency } = require("../lib/currency");
 const { getStripeClient, isStripeConfigured } = require("../lib/stripeClient");
 const { appendPaymentEvent } = require("../lib/paymentService");
 const {
@@ -557,9 +558,8 @@ const buildStripeLineItems = (orders, currency) => {
   return lineItems;
 };
 
-const createStripeSessionForOrders = async ({ orders, user, transactionId }) => {
+const createStripeSessionForOrders = async ({ orders, user, transactionId, currency }) => {
   const stripe = getStripeClient();
-  const currency = env.platformCurrency;
   const orderNumbers = orders.map((o) => o.orderNumber).join(",");
 
   const session = await stripe.checkout.sessions.create({
@@ -579,9 +579,8 @@ const createStripeSessionForOrders = async ({ orders, user, transactionId }) => 
   return session;
 };
 
-const createStripePaymentIntentForOrders = async ({ orders, user, transactionId }) => {
+const createStripePaymentIntentForOrders = async ({ orders, user, transactionId, currency }) => {
   const stripe = getStripeClient();
-  const currency = env.platformCurrency;
   const orderNumbers = orders.map((o) => o.orderNumber).join(",");
   const totalAmount = orders.reduce((acc, o) => acc + Number(o.total), 0);
 
@@ -705,6 +704,7 @@ const placeOrder = asyncHandler(async (req, res) => {
 
   if (req.body.paymentMethod === "online") {
     const totalAmount = orders.reduce((acc, o) => acc + Number(o.total), 0);
+    const currency = await getPlatformCurrency();
 
     const transaction = await PaymentTransaction.create({
       user: user._id,
@@ -712,7 +712,7 @@ const placeOrder = asyncHandler(async (req, res) => {
       provider: "stripe",
       status: "pending",
       amount: totalAmount,
-      currency: env.platformCurrency,
+      currency,
     });
 
     try {
@@ -721,6 +721,7 @@ const placeOrder = asyncHandler(async (req, res) => {
           orders,
           user,
           transactionId: transaction._id,
+          currency,
         });
 
         transaction.providerIntentId = paymentIntent.id;
@@ -742,13 +743,14 @@ const placeOrder = asyncHandler(async (req, res) => {
           transactionId: transaction._id,
           clientSecret: paymentIntent.client_secret,
           amount: totalAmount,
-          currency: env.platformCurrency,
+          currency,
         };
       } else {
         const session = await createStripeSessionForOrders({
           orders,
           user,
           transactionId: transaction._id,
+          currency,
         });
 
         transaction.providerSessionId = session.id;
@@ -772,7 +774,7 @@ const placeOrder = asyncHandler(async (req, res) => {
           sessionId: session.id,
           url: session.url,
           amount: totalAmount,
-          currency: env.platformCurrency,
+          currency,
           expiresAt: session.expires_at
             ? new Date(session.expires_at * 1000)
             : null,
