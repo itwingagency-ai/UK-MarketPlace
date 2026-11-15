@@ -8,9 +8,9 @@ const {
 } = require("../lib/cartUtils");
 const {
   buildMethodSnapshot,
-  computeShippingFeeForStore,
   findActiveShippingMethodsByStores,
 } = require("../lib/shippingUtils");
+const { orderPricingFields, priceStoreGroup } = require("../lib/pricing");
 const { getStripeClient, isStripeConfigured } = require("../lib/stripeClient");
 const { appendPaymentEvent } = require("../lib/paymentService");
 const {
@@ -149,23 +149,28 @@ const resolveShippingForGroups = async ({ groups, selections, strict }) => {
   }
 };
 
+// Price every store group at live prices (lib/pricing owns the arithmetic).
+// Call after resolveShippingForGroups.
+const priceGroups = (groups) => {
+  for (const group of groups.values()) {
+    const priced = priceStoreGroup({
+      items: group.items.map(({ item, status }) => ({
+        unitPrice: Number(status.live.unitPrice),
+        quantity: Number(item.quantity),
+      })),
+      settings: group.shippingSettings,
+      shippingMethod: group.shippingMethod,
+    });
+    group.priced = priced;
+    group.subtotal = priced.subtotal;
+    group.shippingFee = priced.shippingFee;
+    group.total = priced.total;
+  }
+};
+
 const computeStoreTotals = async (groups, selections = null) => {
   await resolveShippingForGroups({ groups, selections, strict: false });
-
-  for (const group of groups.values()) {
-    let subtotal = 0;
-    for (const { item, status } of group.items) {
-      const livePrice = Number(status.live.unitPrice);
-      subtotal += livePrice * Number(item.quantity);
-    }
-    group.subtotal = subtotal;
-    group.shippingFee = computeShippingFeeForStore({
-      method: group.shippingMethod,
-      settings: group.shippingSettings,
-      subtotal,
-    });
-    group.total = subtotal + group.shippingFee;
-  }
+  priceGroups(groups);
 };
 
 const buildPreviewResponse = async (evaluatedItems, selections = null) => {
@@ -198,6 +203,7 @@ const buildPreviewResponse = async (evaluatedItems, selections = null) => {
 
   let subtotal = 0;
   let shippingFee = 0;
+  let grandTotal = 0;
   const byStore = [];
   for (const group of groups.values()) {
     const store = storesById.get(String(group.storeId));
@@ -211,6 +217,10 @@ const buildPreviewResponse = async (evaluatedItems, selections = null) => {
       itemCount: group.items.reduce((acc, x) => acc + x.item.quantity, 0),
       subtotal: group.subtotal,
       shippingFee: group.shippingFee,
+      lines: group.priced.lines,
+      discountTotal: group.priced.discountTotal,
+      feeTotal: group.priced.feeTotal,
+      tipAmount: group.priced.tipAmount,
       total: group.total,
       availableShippingMethods: (group.availableShippingMethods || []).map(
         buildMethodSnapshot
@@ -219,6 +229,7 @@ const buildPreviewResponse = async (evaluatedItems, selections = null) => {
     });
     subtotal += group.subtotal;
     shippingFee += group.shippingFee;
+    grandTotal += group.total;
   }
 
   const blockingIssues = items.filter((x) => !x.available);
@@ -228,7 +239,7 @@ const buildPreviewResponse = async (evaluatedItems, selections = null) => {
     byStore,
     subtotal,
     shippingFee,
-    grandTotal: subtotal + shippingFee,
+    grandTotal,
     canCheckout: blockingIssues.length === 0 && byStore.length > 0,
     issues: blockingIssues.map((x) => ({
       itemId: x._id,
@@ -379,9 +390,7 @@ const buildOrderDoc = ({
   },
   shippingAddress,
   items: buildOrderItems(storeGroup.items),
-  subtotal: storeGroup.subtotal,
-  shippingFee: storeGroup.shippingFee,
-  total: storeGroup.total,
+  ...orderPricingFields(storeGroup.priced),
   paymentMethod,
   paymentStatus: "pending",
   orderStatus: "pending",
@@ -501,6 +510,19 @@ const placeOrdersWithCompensation = async ({
 const buildStripeLineItems = (orders, currency) => {
   const lineItems = [];
   for (const order of orders) {
+    // Checkout Sessions reject negative line items, so an order carrying any
+    // price lines (discounts, fees, tips) is charged as one line for its total.
+    if (Array.isArray(order.priceLines) && order.priceLines.length > 0) {
+      lineItems.push({
+        quantity: 1,
+        price_data: {
+          currency,
+          unit_amount: Math.round(Number(order.total)),
+          product_data: { name: `Order ${order.orderNumber}` },
+        },
+      });
+      continue;
+    }
     for (const item of order.items) {
       lineItems.push({
         quantity: Number(item.quantity),
@@ -626,20 +648,8 @@ const placeOrder = asyncHandler(async (req, res) => {
     strict: true,
   });
 
-  // Recompute subtotals + shipping using the resolved methods.
-  for (const group of storeGroups.values()) {
-    let subtotal = 0;
-    for (const { item, status } of group.items) {
-      subtotal += Number(status.live.unitPrice) * Number(item.quantity);
-    }
-    group.subtotal = subtotal;
-    group.shippingFee = computeShippingFeeForStore({
-      method: group.shippingMethod,
-      settings: group.shippingSettings,
-      subtotal,
-    });
-    group.total = subtotal + group.shippingFee;
-  }
+  // Price each store with the resolved methods (same function as the preview).
+  priceGroups(storeGroups);
 
   let orders;
   try {

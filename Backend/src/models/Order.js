@@ -175,6 +175,28 @@ const trackingSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// One adjustment to a store's bill (see lib/pricing.js). amount is signed
+// integer pence: negative for discount/coupon/loyalty, positive for fee/tip.
+const priceLineSchema = new mongoose.Schema(
+  {
+    kind: {
+      type: String,
+      enum: ["discount", "coupon", "loyalty", "fee", "tip"],
+      required: true,
+    },
+    code: { type: String, default: "", trim: true, maxlength: 60 },
+    label: { type: String, default: "", trim: true, maxlength: 120 },
+    amount: { type: Number, required: true },
+    fundedBy: {
+      type: String,
+      enum: ["platform", "vendor"],
+      required: true,
+    },
+    removable: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
 const orderShippingMethodSchema = new mongoose.Schema(
   {
     id: {
@@ -238,6 +260,15 @@ const orderSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    // Pricing breakdown from lib/pricing.js. All integer pence.
+    // total = subtotal + shippingFee - discountTotal + feeTotal + tipAmount
+    priceLines: {
+      type: [priceLineSchema],
+      default: [],
+    },
+    discountTotal: { type: Number, default: 0, min: 0 },
+    feeTotal: { type: Number, default: 0, min: 0 },
+    tipAmount: { type: Number, default: 0, min: 0 },
     total: {
       type: Number,
       required: true,
@@ -282,6 +313,8 @@ const orderSchema = new mongoose.Schema(
       },
       rate: { type: Number, default: 0, min: 0, max: 1 },
       fixed: { type: Number, default: 0, min: 0 },
+      // What the rate was applied to (lib/commissionUtils computeCommissionBase)
+      base: { type: Number, default: null, min: 0 },
       amount: { type: Number, default: 0, min: 0 },
       calculatedAt: { type: Date, default: null },
       sourceRate: {
@@ -315,10 +348,6 @@ const formatYmd = (date) => {
 
 const generateOrderNumber = () =>
   `ORD-${formatYmd(new Date())}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
-
-orderSchema.pre("save", function preSave() {
-  this.totalAmount = this.subtotal + this.shippingFee;
-});
 
 orderSchema.pre("validate", function preValidateOrder() {
   if (!this.orderNumber) {

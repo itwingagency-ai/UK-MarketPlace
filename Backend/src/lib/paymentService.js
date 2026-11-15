@@ -1,5 +1,6 @@
 const {
   buildCommissionSnapshot,
+  commissionBaseForOrder,
   resolveCommissionConfig,
 } = require("./commissionUtils");
 const {
@@ -158,7 +159,7 @@ const applyCommissionSnapshot = async (order) => {
   ]);
 
   const config = resolveCommissionConfig(store, platform);
-  order.commission = buildCommissionSnapshot(config, order.total);
+  order.commission = buildCommissionSnapshot(config, commissionBaseForOrder(order));
 };
 
 const markOrdersPaid = async ({

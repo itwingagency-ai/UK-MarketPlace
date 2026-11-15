@@ -8,6 +8,7 @@ const {
   computeShippingFeeForStore,
   findActiveShippingMethodsByStores,
 } = require("./shippingUtils");
+const { priceStoreGroup } = require("./pricing");
 
 const getOrCreateCart = async (userId) => {
   const cart = await Cart.findOneAndUpdate(
@@ -183,7 +184,6 @@ const buildCartSummary = async (cart) => {
       lineTotal,
     });
     group.itemCount += Number(item.quantity);
-    group.subtotal += lineTotal;
   }
 
   const storeIds = Array.from(byStoreMap.keys());
@@ -205,6 +205,7 @@ const buildCartSummary = async (cart) => {
 
   let grandSubtotal = 0;
   let grandShipping = 0;
+  let grandTotal = 0;
   let totalItems = 0;
 
   for (const group of byStoreMap.values()) {
@@ -220,17 +221,26 @@ const buildCartSummary = async (cart) => {
     group.locationSet = storeObj?.locationSet || false;
     group.deliveryRadiusKm = storeObj?.deliveryRadiusKm || 5;
 
-    group.shippingFee = computeShippingFeeForStore({
-      method: defaultMethod,
+    // The cart prices from its snapshot unit prices; checkout re-prices live.
+    const priced = priceStoreGroup({
+      items: group.items,
+      store: storeObj,
       settings,
-      subtotal: group.subtotal,
+      shippingMethod: defaultMethod,
     });
-    group.total = group.subtotal + group.shippingFee;
+    group.subtotal = priced.subtotal;
+    group.shippingFee = priced.shippingFee;
+    group.lines = priced.lines;
+    group.discountTotal = priced.discountTotal;
+    group.feeTotal = priced.feeTotal;
+    group.tipAmount = priced.tipAmount;
+    group.total = priced.total;
     group.availableShippingMethods = methods.map(buildMethodSnapshot);
     group.defaultShippingMethod = buildMethodSnapshot(defaultMethod);
 
     grandSubtotal += group.subtotal;
     grandShipping += group.shippingFee;
+    grandTotal += group.total;
     totalItems += group.itemCount;
   }
 
@@ -240,7 +250,7 @@ const buildCartSummary = async (cart) => {
     byStore: Array.from(byStoreMap.values()),
     subtotal: grandSubtotal,
     shippingFee: grandShipping,
-    grandTotal: grandSubtotal + grandShipping,
+    grandTotal,
     updatedAt: cart.updatedAt,
   };
 };
