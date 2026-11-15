@@ -185,7 +185,10 @@ const priceLineSchema = new mongoose.Schema(
       required: true,
     },
     code: { type: String, default: "", trim: true, maxlength: 60 },
+    // Id of the Coupon / Promotion behind the line, if any
+    ref: { type: String, default: "", maxlength: 40 },
     label: { type: String, default: "", trim: true, maxlength: 120 },
+    info: { type: String, default: "", trim: true, maxlength: 200 },
     amount: { type: Number, required: true },
     fundedBy: {
       type: String,
@@ -267,6 +270,9 @@ const orderSchema = new mongoose.Schema(
       default: [],
     },
     discountTotal: { type: Number, default: 0, min: 0 },
+    // Customer's instructions for this store
+    customerNote: { type: String, default: "", trim: true, maxlength: 500 },
+    allowSubstitutions: { type: Boolean, default: true },
     feeTotal: { type: Number, default: 0, min: 0 },
     tipAmount: { type: Number, default: 0, min: 0 },
     total: {
@@ -316,6 +322,10 @@ const orderSchema = new mongoose.Schema(
       // What the rate was applied to (lib/commissionUtils computeCommissionBase)
       base: { type: Number, default: null, min: 0 },
       amount: { type: Number, default: 0, min: 0 },
+      // What the store is owed for this order: base + tip - commission (pence).
+      // Differs from total - commission once platform-funded discounts or
+      // platform fees are on the order.
+      vendorNet: { type: Number, default: null },
       calculatedAt: { type: Date, default: null },
       sourceRate: {
         type: String,

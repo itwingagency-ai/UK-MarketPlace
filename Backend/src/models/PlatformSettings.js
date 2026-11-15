@@ -64,6 +64,32 @@ const platformSettingsSchema = new mongoose.Schema(
       codEnabled: { type: Boolean, default: true },
       reviewsEnabled: { type: Boolean, default: true },
     },
+    // Customer-facing fees, all amounts integer pence, computed per store order
+    // on goods before discounts. service + smallOrder are platform revenue;
+    // bag is the store's (UK carrier-bag charge) and the customer may remove it.
+    fees: {
+      service: {
+        enabled: { type: Boolean, default: false },
+        percent: { type: Number, default: 0, min: 0, max: 20 },
+        min: { type: Number, default: 0, min: 0 },
+        max: { type: Number, default: 0, min: 0 }, // 0 = no cap
+        label: { type: String, default: "Service fee", trim: true, maxlength: 60 },
+        info: { type: String, default: "Helps us run the marketplace", trim: true, maxlength: 200 },
+      },
+      smallOrder: {
+        enabled: { type: Boolean, default: false },
+        threshold: { type: Number, default: 0, min: 0 },
+        amount: { type: Number, default: 0, min: 0 },
+        label: { type: String, default: "Small order fee", trim: true, maxlength: 60 },
+        info: { type: String, default: "Applies to orders under the minimum", trim: true, maxlength: 200 },
+      },
+      bag: {
+        enabled: { type: Boolean, default: false },
+        amount: { type: Number, default: 0, min: 0 },
+        label: { type: String, default: "Carrier bags", trim: true, maxlength: 60 },
+        info: { type: String, default: "Paid to the store. Remove it if you don't need bags", trim: true, maxlength: 200 },
+      },
+    },
     // One-off data fixes already applied to this document
     migrations: {
       currencyFromEnvAt: { type: Date, default: null },

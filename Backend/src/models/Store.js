@@ -105,6 +105,12 @@ const storeSchema = new mongoose.Schema(
         },
       },
     },
+    // Smallest basket (goods, before discounts) this store accepts, pence. 0 = none.
+    minimumOrder: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     // Maximum km from store the store will deliver to
     deliveryRadiusKm: {
       type: Number,

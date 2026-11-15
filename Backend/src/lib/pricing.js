@@ -76,7 +76,8 @@ const sumItems = (items) => {
  * @param {object}  [p.store]           Store doc (reserved: minimum order, opt-ins)
  * @param {object}  [p.settings]        StoreSettings doc (shipping config, pounds)
  * @param {object}  [p.shippingMethod]  ShippingMethod doc or null
- * @param {Array}   [p.adjustments]     [{ kind, code, label, amount, fundedBy, removable }]
+ * @param {Array}   [p.adjustments]     [{ kind, code, ref, label, info, amount, fundedBy, removable }]
+ *                                      ref: id of the Coupon / Promotion behind the line
  * @returns {{ subtotal, shippingFee, lines, discountTotal, feeTotal, tipAmount, total, commissionBase }}
  */
 // eslint-disable-next-line no-unused-vars
@@ -98,7 +99,9 @@ const priceStoreGroup = ({ items, store = null, settings = null, shippingMethod 
     lines.push({
       kind: adj.kind,
       code: adj.code || "",
+      ref: adj.ref ? String(adj.ref) : "",
       label: adj.label || "",
+      info: adj.info || "",
       amount,
       fundedBy,
       removable: Boolean(adj.removable),

@@ -73,6 +73,18 @@ const cartSchema = new mongoose.Schema(
       type: [cartItemSchema],
       default: [],
     },
+    // Customer intent only: codes and choices. Every amount these lead to is
+    // computed server-side by lib/offers + lib/pricing.
+    // At most one platform coupon plus one per store (enforced by the cart controller)
+    couponCodes: { type: [String], default: [] },
+    // storeId -> tip in integer pence
+    tips: { type: Map, of: Number, default: () => new Map() },
+    // storeId -> note for that store's order
+    notes: { type: Map, of: String, default: () => new Map() },
+    // storeId -> codes of removable fees the customer switched off (e.g. "bag")
+    declinedFees: { type: Map, of: [String], default: () => new Map() },
+    // May the store swap an unavailable item for a close match?
+    allowSubstitutions: { type: Boolean, default: true },
   },
   {
     timestamps: true,
