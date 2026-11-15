@@ -1,12 +1,14 @@
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const express = require("express");
+const helmet = require("helmet");
 const morgan = require("morgan");
 const env = require("./config/env");
 const { errorHandler, notFoundHandler } = require("./middleware/error.middleware");
 const { authenticate } = require("./middleware/auth.middleware");
 const { authorize } = require("./middleware/rbac.middleware");
 const { resolveStoreScope } = require("./middleware/storeScope.middleware");
+const { authLimiter } = require("./middleware/rateLimit.middleware");
 const authRoutes = require("./routes/auth.routes");
 const protectedRoutes = require("./routes/protected.routes");
 const vendorApplicationsApplicantRoutes = require("./routes/vendorApplications.applicant.routes");
@@ -31,13 +33,23 @@ const app = express();
 // is "https" and uploaded-image URLs aren't built as http:// (mixed content).
 if (env.nodeEnv === "production") app.set("trust proxy", 1);
 
+// Security headers. The API only serves JSON, CSV and uploaded images; the
+// images are loaded by the portal and the app from other origins, so the
+// resource policy must allow cross-origin reads.
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 app.use(
   cors({
     origin: env.clientOrigin === "*" ? true : env.clientOrigin,
     credentials: true,
   })
 );
-app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
+if (env.nodeEnv !== "test") {
+  app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
+}
 
 // IMPORTANT: Stripe webhook needs the raw body for signature verification.
 // Mount it BEFORE express.json() and use express.raw() for this path only.
@@ -66,7 +78,7 @@ app.get(["/api/v1/platform/settings", "/api/v1/settings"], async (req, res) => {
   }
 });
 
-app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/auth", authLimiter, authRoutes);
 app.use("/api/v1/protected", protectedRoutes);
 app.use("/api/v1/track", orderTrackingRoutes);
 app.use("/api/v1/products", productSearchRoutes);  // search + suggest + detail
