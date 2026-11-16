@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useReducer } from 'react';
 import { useAuth } from './AuthContext';
 import * as CartAPI from '../api/cart.api';
+import * as RewardsAPI from '../api/rewards.api';
 
 // ─── State & Reducer ──────────────────────────────────────────────────────
 const initialState = {
@@ -51,6 +52,7 @@ function cartReducer(state, action) {
         feeTotal: cart.feeTotal ?? 0,
         tipTotal: cart.tipTotal ?? 0,
         options: cart.options || initialState.options,
+        loyalty: cart.loyalty || null,
         itemCount,
         storeId: cart.byStore?.[0]?.storeId ?? cart.store ?? null,
         defaultShippingMethod: cart.byStore?.[0]?.defaultShippingMethod ?? null,
@@ -161,6 +163,11 @@ export const CartProvider = ({ children }) => {
     [runCartAction]
   );
 
+  const setLoyaltyPoints = useCallback(
+    (points) => runCartAction(() => RewardsAPI.setLoyaltyPoints(points), "Couldn't update your points"),
+    [runCartAction]
+  );
+
   const clearCart = useCallback(async () => {
     if (!isAuthenticated) return { success: false, error: 'Please login to clear cart' };
     try {
@@ -192,6 +199,8 @@ export const CartProvider = ({ children }) => {
         setTip,
         setCartOptions,
         setFulfilment,
+        setLoyaltyPoints,
+        loyalty: state.loyalty,
         itemCount: state.itemCount,
         storeId: state.storeId,
         defaultShippingMethod: state.defaultShippingMethod,

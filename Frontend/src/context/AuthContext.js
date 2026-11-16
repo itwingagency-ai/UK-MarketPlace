@@ -138,10 +138,10 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const register = useCallback(async (name, email, password) => {
+  const register = useCallback(async (name, email, password, referralCode = '') => {
     try {
       dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
-      const data = await apiRegister(name, email, password);
+      const data = await apiRegister(name, email, password, referralCode);
       // Wait for OTP verification before persisting tokens
       return { success: true, requiresOtp: data.requiresOtp };
     } catch (err) {

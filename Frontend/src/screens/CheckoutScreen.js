@@ -135,7 +135,8 @@ const fetchUKAddressSuggestions = async (query) => {
 };
 
 export default function CheckoutScreen({ navigation }) {
-  const { clearCart, fetchCart, items, setCartOptions } = useCart();
+  const { clearCart, fetchCart, items, setCartOptions, setLoyaltyPoints } = useCart();
+  const [pointsBusy, setPointsBusy] = useState(null);
   const { showAlert } = useCustomAlert();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
@@ -369,6 +370,15 @@ export default function CheckoutScreen({ navigation }) {
   const toggleSubs = async (value) => {
     setAllowSubs(value);
     if (!(await saveOption({ allowSubstitutions: value }))) setAllowSubs(!value);
+  };
+
+  // Ask the server to use this many points, then show its re-priced preview
+  const choosePoints = async (points) => {
+    setPointsBusy(points);
+    const res = await setLoyaltyPoints(points);
+    if (res.success) await loadPreview();
+    else showAlert({ title: "Couldn't use points", message: res.error, icon: 'alert-circle', showCancel: false, confirmText: 'OK' });
+    setPointsBusy(null);
   };
 
   const saveNote = (storeId) => saveOption({ stores: [{ storeId, note: storeNotes[storeId] || '' }] });
@@ -782,6 +792,59 @@ export default function CheckoutScreen({ navigation }) {
           </Animated.View>
         )}
 
+        {/* Rewards points */}
+        {previewData?.loyalty?.enabled && (previewData.loyalty.balance > 0 || previewData.loyalty.earnEstimate > 0) ? (
+          <View style={[styles.section, styles.card]}>
+            <View style={styles.optionRow}>
+              <Feather name="gift" size={18} color={Colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.paymentOptionText}>Rewards points</Text>
+                <Text style={styles.paymentHint}>
+                  You have {previewData.loyalty.balance} points
+                  {previewData.loyalty.appliedPoints > 0 ? ` · using ${previewData.loyalty.appliedPoints} (-${formatPence(previewData.loyalty.value)})` : ''}
+                </Text>
+              </View>
+            </View>
+            {previewData.loyalty.maxPoints > 0 ? (
+              <View style={styles.pointsRow}>
+                {[...new Set([
+                  0,
+                  previewData.loyalty.minRedeemPoints,
+                  Math.floor(previewData.loyalty.maxPoints / 2 / 100) * 100,
+                  previewData.loyalty.maxPoints,
+                ])]
+                  .filter((v) => v === 0 || (v >= previewData.loyalty.minRedeemPoints && v <= previewData.loyalty.maxPoints))
+                  .map((v) => {
+                    const active = previewData.loyalty.appliedPoints === v;
+                    return (
+                      <Pressable
+                        key={v}
+                        onPress={() => !active && choosePoints(v)}
+                        style={[styles.pointsChip, active && styles.pointsChipActive]}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: active }}
+                      >
+                        {pointsBusy === v ? (
+                          <ActivityIndicator size="small" color={active ? Colors.white : Colors.primary} />
+                        ) : (
+                          <Text style={[styles.pointsChipText, active && styles.pointsChipTextActive]}>
+                            {v === 0 ? 'None' : v === previewData.loyalty.maxPoints ? `All ${v}` : v}
+                          </Text>
+                        )}
+                      </Pressable>
+                    );
+                  })}
+              </View>
+            ) : null}
+            {previewData.loyalty.message ? <Text style={[styles.paymentHint, { marginTop: Spacing.sm }]}>{previewData.loyalty.message}</Text> : null}
+            {previewData.loyalty.earnEstimate > 0 ? (
+              <Text style={[styles.paymentHint, { marginTop: Spacing.sm, color: Colors.successText }]}>
+                You'll earn {previewData.loyalty.earnEstimate} points when this is delivered or collected
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
         {/* Summary */}
         {previewData && (
           <Animated.View entering={SECTION_IN[3]} style={styles.section}>
@@ -1076,6 +1139,20 @@ const styles = StyleSheet.create({
   orderTagText: { fontFamily: Typography.family.bold, fontSize: 11, color: Colors.primary },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  pointsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.md },
+  pointsChip: {
+    minWidth: 64,
+    height: 38,
+    paddingHorizontal: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 19,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  pointsChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  pointsChipText: { fontFamily: Typography.family.semibold, fontSize: 13, color: Colors.text },
+  pointsChipTextActive: { color: Colors.white },
   noteInput: { height: 72, paddingTop: Spacing.md, textAlignVertical: 'top', marginBottom: 0 },
   summaryLabel: { fontFamily: Typography.family.regular, fontSize: 14, color: Colors.textSecondary },
   summaryValue: { fontFamily: Typography.family.semibold, fontSize: 14, color: Colors.text },

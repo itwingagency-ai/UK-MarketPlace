@@ -25,6 +25,8 @@ export default function RegisterScreen({ navigation }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteError, setInviteError] = useState('');
   const [nameError, setNameError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -56,13 +58,15 @@ export default function RegisterScreen({ navigation }) {
     if (!validateForm()) { shake(); return; }
     setIsSubmitting(true);
     const normalizedEmail = email.trim().toLowerCase();
-    const result = await register(name.trim(), normalizedEmail, password);
+    const result = await register(name.trim(), normalizedEmail, password, inviteCode.trim());
     setIsSubmitting(false);
 
     if (result.success) {
       navigation.navigate('OtpVerification', { email: normalizedEmail, mode: 'signup' });
     } else {
-      setEmailError(result.error ?? 'Registration failed. Please try again.');
+      // A bad invite code is the user's to fix, not an email problem
+      if (/invite code/i.test(result.error || '')) setInviteError(result.error);
+      else setEmailError(result.error ?? 'Registration failed. Please try again.');
       shake();
     }
   };
@@ -157,6 +161,25 @@ export default function RegisterScreen({ navigation }) {
               </TouchableOpacity>
             </View>
             {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+          </View>
+
+          {/* Invite code (optional) */}
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.label}>Invite code (optional)</Text>
+            <View style={[styles.inputContainer, inviteError && styles.inputContainerError]}>
+              <Feather name="gift" size={18} color={Colors.muted} style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                placeholder="From a friend"
+                placeholderTextColor={Colors.muted}
+                value={inviteCode}
+                onChangeText={(t) => { setInviteCode(t.toUpperCase()); setInviteError(''); }}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={12}
+              />
+            </View>
+            {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
           </View>
 
           <TouchableOpacity

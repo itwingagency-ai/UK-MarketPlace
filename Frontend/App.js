@@ -52,6 +52,7 @@ import ProductDetailScreen from './src/screens/ProductDetailScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
 import OrderSuccessScreen from './src/screens/OrderSuccessScreen';
 import HelpCenterScreen from './src/screens/HelpCenterScreen';
+import RewardsScreen from './src/screens/RewardsScreen';
 import TermsPoliciesScreen from './src/screens/TermsPoliciesScreen';
 import BottomTabBar from './src/components/BottomTabBar';
 import BecomeSellerScreen from './src/screens/BecomeSellerScreen';
@@ -135,6 +136,7 @@ function AccountStack() {
           <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
           <Stack.Screen name="Addresses" component={AddressesScreen} />
           <Stack.Screen name="BecomeSeller" component={BecomeSellerScreen} />
+          <Stack.Screen name="Rewards" component={RewardsScreen} />
         </>
       )}
       <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />

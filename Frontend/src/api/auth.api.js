@@ -5,8 +5,10 @@ export const login = async (email, password) => {
   return data;
 };
 
-export const register = async (name, email, password) => {
-  const { data } = await client.post('/auth/register', { name, email, password });
+export const register = async (name, email, password, referralCode = '') => {
+  const body = { name, email, password };
+  if (referralCode) body.referralCode = referralCode;
+  const { data } = await client.post('/auth/register', body);
   return data;
 };
 
