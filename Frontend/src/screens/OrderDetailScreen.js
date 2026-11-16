@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Linking,
   View,
   Text,
   StyleSheet,
@@ -52,6 +53,12 @@ export default function OrderDetailScreen({ route, navigation }) {
   // The shop accepting / sending the order updates this screen live
   useLiveEvent('order:status_changed', (p) => {
     if (p?.orderId === orderId) fetchOrder({ silent: true });
+  });
+
+  // The rider's last shared position while the order is out for delivery
+  const [riderAt, setRiderAt] = useState(null);
+  useLiveEvent('order:rider_location', (p) => {
+    if (p?.orderId === String(orderId)) setRiderAt({ lat: p.lat, lng: p.lng, at: p.at });
   });
 
   const handleReorder = async () => {
@@ -241,10 +248,19 @@ export default function OrderDetailScreen({ route, navigation }) {
               <Text style={styles.itemQty}>
                 Qty: {item.quantity}  •  £{((item.unitPrice || item.price || 0) / 100).toFixed(2)} each
               </Text>
-              <Text style={styles.itemPrice}>
+              <Text style={[styles.itemPrice, ['unavailable', 'refused'].includes(item.lineStatus) && { textDecorationLine: 'line-through', color: Colors.muted }]}>
                 £{(((item.unitPrice || item.price || 0) * item.quantity) / 100).toFixed(2)}
               </Text>
             </View>
+            {item.lineStatus === 'unavailable' ? (
+              <Text style={[styles.itemQty, { color: Colors.errorText }]}>The store couldn't supply this. Not charged.</Text>
+            ) : item.lineStatus === 'refused' ? (
+              <Text style={[styles.itemQty, { color: Colors.errorText }]}>Not handed over without ID. Not charged.</Text>
+            ) : item.lineStatus === 'substituted' ? (
+              <Text style={[styles.itemQty, { color: Colors.warningText }]}>Swapped for {item.substitutedFor} (never at a higher price)</Text>
+            ) : item.originalQuantity && item.originalQuantity > item.quantity ? (
+              <Text style={[styles.itemQty, { color: Colors.warningText }]}>Only {item.quantity} of {item.originalQuantity} available</Text>
+            ) : null}
           </View>
         </View>
 
@@ -335,6 +351,18 @@ export default function OrderDetailScreen({ route, navigation }) {
   };
   const STATUS_LABELS = { ready_for_collection: 'Ready to collect', shipped: 'Out for delivery' };
   const collecting = order.fulfilment?.method === 'collection';
+  // Live tracking: straight-line distance to the door, at about 20 km/h
+  const here = riderAt || (order.delivery?.lastLocation?.lat != null ? order.delivery.lastLocation : null);
+  const dest = order.shippingAddress?.lat != null ? order.shippingAddress : null;
+  const distanceKm = here && dest ? (() => {
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(dest.lat - here.lat);
+    const dLng = toRad(dest.lng - here.lng);
+    const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(here.lat)) * Math.cos(toRad(dest.lat)) * Math.sin(dLng / 2) ** 2;
+    return 6371 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+  })() : null;
+  const etaMins = distanceKm != null ? Math.max(1, Math.round((distanceKm / 20) * 60)) : null;
+  const refunded = (order.refunds || []).filter((r) => r.status !== 'failed').reduce((a, r) => a + r.amount, 0);
   const canArrive = collecting && ['confirmed', 'packed', 'ready_for_collection'].includes(statusStr);
   const slot = order.fulfilment?.asap === false && order.fulfilment?.slotStart
     ? `${new Date(order.fulfilment.slotStart).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}, ${new Date(order.fulfilment.slotStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}–${new Date(order.fulfilment.slotEnd).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
@@ -376,6 +404,29 @@ export default function OrderDetailScreen({ route, navigation }) {
               <Text style={styles.summaryLabel}>{collecting ? 'You collect' : 'Delivery'}</Text>
               <Text style={styles.summaryValue}>{slot}</Text>
             </View>
+            {statusStr === 'shipped' && order.delivery?.rider ? (
+              <View style={{ marginTop: Spacing.sm, padding: Spacing.md, borderRadius: Radius.lg, backgroundColor: Colors.primarySubtle, gap: 4 }}>
+                <Text style={[styles.summaryValue, { color: Colors.primary }]}>
+                  {order.delivery.riderName || 'Your rider'} is on the way
+                </Text>
+                <Text style={styles.summaryLabel}>
+                  {distanceKm != null
+                    ? `About ${distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`} away · roughly ${etaMins} min`
+                    : 'Waiting for the rider\'s location…'}
+                </Text>
+                {here ? (
+                  <TouchableOpacity onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${here.lat},${here.lng}`)}>
+                    <Text style={[styles.summaryLabel, { color: Colors.primary, fontWeight: '700' }]}>See the rider on a map</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
+            {refunded > 0 ? (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>{order.paymentMethod === 'online' ? 'Refunded' : 'Taken off'}</Text>
+                <Text style={[styles.summaryValue, { color: Colors.successText }]}>£{(refunded / 100).toFixed(2)}</Text>
+              </View>
+            ) : null}
             {collecting && order.fulfilment?.arrivedAt && statusStr !== 'collected' ? (
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Store notified</Text>

@@ -46,6 +46,9 @@ function BasketItem({ item, isLast, onOpen, onChange }) {
         <Pressable onPress={onOpen}>
           <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
         </Pressable>
+        {item.minAge ? (
+          <View style={styles.ageBadge}><Text style={styles.ageBadgeText}>{item.minAge}+ · ID needed on handover</Text></View>
+        ) : null}
         {attributesText(item.attributes) ? (
           <Text style={styles.itemMeta}>{attributesText(item.attributes)}</Text>
         ) : null}
@@ -551,6 +554,8 @@ const styles = StyleSheet.create({
   },
   noteText: { flex: 1, fontFamily: Typography.family.regular, fontSize: 13, lineHeight: 18, color: Colors.primary },
   groupLines: { paddingTop: Spacing.sm },
+  ageBadge: { alignSelf: 'flex-start', marginTop: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: Colors.errorBg },
+  ageBadgeText: { fontFamily: Typography.family.bold, fontSize: 11, color: Colors.errorText },
   nudge: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -137,6 +137,7 @@ const fetchUKAddressSuggestions = async (query) => {
 export default function CheckoutScreen({ navigation }) {
   const { clearCart, fetchCart, items, setCartOptions, setLoyaltyPoints } = useCart();
   const [pointsBusy, setPointsBusy] = useState(null);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const { showAlert } = useCustomAlert();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
@@ -412,6 +413,15 @@ export default function CheckoutScreen({ navigation }) {
       return;
     }
 
+    if (previewData?.ageCheck > 0 && !ageConfirmed) {
+      showAlert({
+        title: `Over ${previewData.ageCheck}s only`,
+        message: `Please confirm you're ${previewData.ageCheck} or over. You'll need photo ID when it's handed over.`,
+        icon: 'alert-circle',
+      });
+      return;
+    }
+
     if (deliveryRangeStatus.checked && !deliveryRangeStatus.inRange) {
       showAlert({
         title: 'Outside Delivery Range',
@@ -449,13 +459,15 @@ export default function CheckoutScreen({ navigation }) {
         }
       }
 
+      const agePart = previewData?.ageCheck > 0 ? { ageConfirmed: true } : {};
       const payload = collectionOnly
-        ? { paymentMethod, clientType: 'mobile' }
+        ? { paymentMethod, clientType: 'mobile', ...agePart }
         : finalAddressId
         ? {
             addressId: finalAddressId,
             paymentMethod,
             clientType: 'mobile',
+            ...agePart,
           }
         : {
             shippingAddress: {
@@ -466,6 +478,7 @@ export default function CheckoutScreen({ navigation }) {
             lng: address.lng != null ? Number(address.lng) : undefined,
             paymentMethod,
             clientType: 'mobile',
+            ...agePart,
           };
 
       const res = await placeOrder(payload);
@@ -791,6 +804,24 @@ export default function CheckoutScreen({ navigation }) {
             </View>
           </Animated.View>
         )}
+
+        {/* Age-restricted items */}
+        {previewData?.ageCheck > 0 ? (
+          <Pressable
+            style={[styles.section, styles.card, styles.optionRow]}
+            onPress={() => setAgeConfirmed(!ageConfirmed)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: ageConfirmed }}
+          >
+            <Feather name={ageConfirmed ? 'check-square' : 'square'} size={22} color={ageConfirmed ? Colors.primary : Colors.textSecondary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.paymentOptionText}>I'm {previewData.ageCheck} or over</Text>
+              <Text style={styles.paymentHint}>
+                Your basket has over-{previewData.ageCheck} items. Have photo ID ready: without it they can't be handed over and are refunded.
+              </Text>
+            </View>
+          </Pressable>
+        ) : null}
 
         {/* Rewards points */}
         {previewData?.loyalty?.enabled && (previewData.loyalty.balance > 0 || previewData.loyalty.earnEstimate > 0) ? (

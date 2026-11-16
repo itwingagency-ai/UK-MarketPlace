@@ -38,6 +38,10 @@ export const adjustStock = async (id, body) => (await client.patch(`${V}/product
 export const getOrders = async (params) => (await client.get(`${V}/orders`, { params })).data;
 export const getOrder = async (id) => (await client.get(`${V}/orders/${id}`)).data;
 export const updateOrderStatus = async (id, body) => (await client.patch(`${V}/orders/${id}/status`, body)).data;
+// Delivery riders (vendor-employed) and changing items while packing
+export const getRiders = async () => (await client.get(`${V}/riders`)).data;
+export const assignRider = async (id, riderId) => (await client.patch(`${V}/orders/${id}/rider`, { riderId })).data;
+export const adjustOrderItem = async (id, index, body) => (await client.patch(`${V}/orders/${id}/items/${index}`, body)).data;
 
 /* ── Store ────────────────────────────────────────────────────────────── */
 export const getStoreSettings = async () => (await client.get(`${V}/settings`)).data;

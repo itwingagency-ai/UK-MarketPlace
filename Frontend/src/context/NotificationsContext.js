@@ -66,7 +66,9 @@ async function getPushToken() {
 
 function openFromNotification(data, role) {
   if (!data?.type) return;
-  if ((data.type === 'order:new' || data.type === 'order:arrived') && role === 'vendor') {
+  if (data.type === 'rider:assigned' && role === 'rider') {
+    navigateWhenReady('RiderDelivery', { orderId: data.orderId });
+  } else if ((data.type === 'order:new' || data.type === 'order:arrived') && role === 'vendor') {
     navigateWhenReady('VendorOrderDetail', { orderId: data.orderId });
   } else if (data.type === 'order:status' && role !== 'vendor') {
     navigateWhenReady('MainTabs', {
@@ -82,7 +84,16 @@ export function NotificationsProvider({ children }) {
   const { isAuthenticated, user } = useAuth();
   const listeners = useRef(new Map());
   const pushEnabled = useRef(false);
+  const socketRef = useRef(null);
   const role = user?.role;
+
+  /** Send an event to the server (e.g. the rider app's "rider:location"). */
+  const send = useCallback((name, payload) => {
+    const socket = socketRef.current;
+    if (!socket?.connected) return false;
+    socket.emit(name, payload);
+    return true;
+  }, []);
 
   const emit = useCallback((name, payload) => {
     (listeners.current.get(name) || []).forEach((fn) => fn(payload));
@@ -140,7 +151,8 @@ export function NotificationsProvider({ children }) {
         trigger: Platform.OS === 'android' ? { channelId: n.channelId || 'default' } : null,
       }).catch(() => {});
     });
-    ['order:created', 'order:status_changed', 'order:customer_arrived'].forEach((name) =>
+    socketRef.current = socket;
+    ['order:created', 'order:status_changed', 'order:customer_arrived', 'order:rider_location'].forEach((name) =>
       socket.on(name, (p) => emit(name, p))
     );
 
@@ -166,7 +178,7 @@ export function NotificationsProvider({ children }) {
     return () => sub.remove();
   }, [role]);
 
-  return <NotificationsContext.Provider value={{ subscribe }}>{children}</NotificationsContext.Provider>;
+  return <NotificationsContext.Provider value={{ subscribe, send }}>{children}</NotificationsContext.Provider>;
 }
 
 export const useNotifications = () => useContext(NotificationsContext);

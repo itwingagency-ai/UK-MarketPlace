@@ -53,6 +53,8 @@ import CheckoutScreen from './src/screens/CheckoutScreen';
 import OrderSuccessScreen from './src/screens/OrderSuccessScreen';
 import HelpCenterScreen from './src/screens/HelpCenterScreen';
 import RewardsScreen from './src/screens/RewardsScreen';
+import RiderHomeScreen from './src/screens/rider/RiderHomeScreen';
+import RiderDeliveryScreen from './src/screens/rider/RiderDeliveryScreen';
 import TermsPoliciesScreen from './src/screens/TermsPoliciesScreen';
 import BottomTabBar from './src/components/BottomTabBar';
 import BecomeSellerScreen from './src/screens/BecomeSellerScreen';
@@ -206,6 +208,19 @@ function VendorRootStack() {
   );
 }
 
+/**
+ * Rider app — shown when the signed-in account's role is "rider" (a store's
+ * own delivery staff). Talks to /api/v1/rider.
+ */
+function RiderRootStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <Stack.Screen name="RiderHome" component={RiderHomeScreen} />
+      <Stack.Screen name="RiderDelivery" component={RiderDeliveryScreen} />
+    </Stack.Navigator>
+  );
+}
+
 function LoadingScreen() {
   return (
     <View style={styles.loadingContainer}>
@@ -232,10 +247,12 @@ function RootNavigator() {
   if (isLoading) return <LoadingScreen />;
 
   const isShopkeeper = isAuthenticated && user?.role === 'vendor';
+  const isRider = isAuthenticated && user?.role === 'rider';
+  const mode = isRider ? 'rider' : isShopkeeper ? 'shopkeeper' : 'customer';
 
   return (
-    <NavigationContainer ref={navigationRef} key={isShopkeeper ? 'shopkeeper' : 'customer'}>
-      {isShopkeeper ? <VendorRootStack /> : <RootStack />}
+    <NavigationContainer ref={navigationRef} key={mode}>
+      {isRider ? <RiderRootStack /> : isShopkeeper ? <VendorRootStack /> : <RootStack />}
     </NavigationContainer>
   );
 }

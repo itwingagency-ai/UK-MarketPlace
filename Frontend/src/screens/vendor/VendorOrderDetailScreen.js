@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, Linking, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { getOrder, updateOrderStatus } from '../../api/vendor.api';
+import { getOrder, updateOrderStatus, getRiders, assignRider, adjustOrderItem } from '../../api/vendor.api';
 import { useCustomAlert } from '../../context/AlertContext';
 import { formatPence } from '../../components/ProductCard';
 import PriceLines from '../../components/PriceLines';
 import Button from '../../components/Button';
-import { ScreenHeader, Card, SectionTitle, Pill, EmptyState, Loading, ActionSheet, sharedStyles } from '../../components/vendor/VendorUI';
+import { ScreenHeader, Card, SectionTitle, Pill, EmptyState, Loading, ActionSheet, PickerSheet, sharedStyles } from '../../components/vendor/VendorUI';
 import { useLiveEvent } from '../../context/NotificationsContext';
 import { CANCELLABLE, ORDER_STATUS_META, isWaitingOutside, nextStepFor, slotText } from './orderStatus';
 import { apiError } from '../../utils/catalog';
@@ -37,10 +37,55 @@ export default function VendorOrderDetailScreen({ navigation, route }) {
   // Payment updates or another device changing the order
   useLiveEvent(['order:status_changed', 'order:customer_arrived'], (p) => { if (p?.orderId === orderId) load(); });
 
-  const changeStatus = async (orderStatus, note, prepMinutes) => {
+  const [riders, setRiders] = useState([]);
+  const [riderOpen, setRiderOpen] = useState(false);
+  const [itemSheet, setItemSheet] = useState(null); // index of the line being changed
+  const [idOpen, setIdOpen] = useState(null); // status waiting for an ID check
+
+  useEffect(() => {
+    getRiders().then((r) => setRiders(r.data || [])).catch(() => setRiders([]));
+  }, []);
+
+  const failed = (title, err) =>
+    showAlert({ title, message: apiError(err, 'Please try again.'), icon: 'alert-circle', showCancel: false, confirmText: 'OK' });
+
+  const pickRider = async (riderId) => {
+    setRiderOpen(false);
     setBusy(true);
     try {
-      const res = await updateOrderStatus(orderId, { orderStatus, note, ...(prepMinutes ? { prepMinutes } : {}) });
+      await assignRider(orderId, riderId);
+      await load();
+    } catch (err) {
+      failed("Couldn't assign the rider", err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const markUnavailable = async (index, quantity) => {
+    setItemSheet(null);
+    setBusy(true);
+    try {
+      const res = await adjustOrderItem(orderId, index, { action: 'unavailable', ...(quantity ? { quantity } : {}) });
+      await load();
+      showAlert({ title: 'Order updated', message: res.message, icon: 'check-circle', showCancel: false, confirmText: 'OK' });
+    } catch (err) {
+      failed("Couldn't change that item", err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Age-restricted orders are only handed over after a photo-ID check
+  const advance = (status) => {
+    if (['delivered', 'collected'].includes(status) && order.ageCheck > 0) setIdOpen(status);
+    else changeStatus(status);
+  };
+
+  const changeStatus = async (orderStatus, note, prepMinutes, extra = {}) => {
+    setBusy(true);
+    try {
+      const res = await updateOrderStatus(orderId, { orderStatus, note, ...(prepMinutes ? { prepMinutes } : {}), ...extra });
       setOrder((prev) => ({ ...prev, ...res.data, items: prev.items }));
     } catch (err) {
       showAlert({ title: "Couldn't update order", message: apiError(err, 'Please try again.'), icon: 'alert-circle', showCancel: false, confirmText: 'OK' });
@@ -120,11 +165,25 @@ export default function VendorOrderDetailScreen({ navigation, route }) {
                   {image ? <Image source={{ uri: image }} style={styles.thumbImg} /> : <Feather name="package" size={18} color={Colors.muted} />}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.itemTitle}>{item.title}</Text>
+                  <Text style={[styles.itemTitle, ['unavailable', 'refused'].includes(item.lineStatus) && { textDecorationLine: 'line-through', color: Colors.muted }]}>
+                    {item.title}{item.minAge ? ` (${item.minAge}+)` : ''}
+                  </Text>
                   {attrs ? <Text style={sharedStyles.help}>{attrs}</Text> : null}
                   <Text style={sharedStyles.help}>{item.quantity} × {formatPence(item.unitPrice)}</Text>
+                  {item.lineStatus && item.lineStatus !== 'ok' ? (
+                    <Text style={[sharedStyles.help, { color: Colors.warningText }]}>
+                      {item.lineStatus === 'substituted' ? `Substitute for ${item.substitutedFor}` : item.lineStatus === 'refused' ? 'Refused (no ID)' : 'Unavailable'}
+                    </Text>
+                  ) : null}
                 </View>
-                <Text style={styles.itemTotal}>{formatPence(item.total)}</Text>
+                <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                  <Text style={styles.itemTotal}>{formatPence(item.total)}</Text>
+                  {['ok', 'substituted'].includes(item.lineStatus || 'ok') && ['pending', 'confirmed', 'packed', 'ready_for_collection'].includes(order.orderStatus) ? (
+                    <Pressable onPress={() => setItemSheet(i)} hitSlop={8} accessibilityLabel={`Change ${item.title}`}>
+                      <Text style={{ fontFamily: Typography.family.bold, fontSize: 12, color: Colors.primary }}>Out of stock?</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
             );
           })}
@@ -138,6 +197,20 @@ export default function VendorOrderDetailScreen({ navigation, route }) {
 
         <SectionTitle>Picking</SectionTitle>
         <Card style={{ gap: Spacing.sm }}>
+          {order.fulfilment?.method !== 'collection' ? (
+            <Pressable
+              style={styles.pickRow}
+              disabled={!['pending', 'confirmed', 'packed'].includes(order.orderStatus)}
+              onPress={() => setRiderOpen(true)}
+              accessibilityRole="button"
+            >
+              <Feather name="truck" size={16} color={Colors.textSecondary} />
+              <Text style={[styles.body, { flex: 1 }]}>Rider</Text>
+              <Text style={[styles.body, { color: order.delivery?.rider ? Colors.text : Colors.primary, fontFamily: Typography.family.semibold }]}>
+                {order.delivery?.riderName || (['pending', 'confirmed', 'packed'].includes(order.orderStatus) ? 'Assign' : 'None')}
+              </Text>
+            </Pressable>
+          ) : null}
           <View style={styles.pickRow}>
             <Feather name="repeat" size={16} color={Colors.textSecondary} />
             <Text style={[styles.body, { flex: 1 }]}>Substitutions</Text>
@@ -199,7 +272,7 @@ export default function VendorOrderDetailScreen({ navigation, route }) {
               size="full"
               loading={busy}
               // Accepting asks how long it will take, so the customer knows
-              onPress={() => (next.status === 'confirmed' ? setPrepOpen(true) : changeStatus(next.status))}
+              onPress={() => (next.status === 'confirmed' ? setPrepOpen(true) : advance(next.status))}
               icon={<Feather name={next.icon} size={18} color={Colors.white} />}
             />
           ) : null}
@@ -208,6 +281,48 @@ export default function VendorOrderDetailScreen({ navigation, route }) {
           ) : null}
         </View>
       ) : null}
+
+      <PickerSheet
+        visible={riderOpen}
+        title="Who's delivering?"
+        options={riders.filter((r) => r.status === 'active').map((r) => ({ value: r._id, label: r.name }))}
+        selected={order.delivery?.rider || null}
+        onSelect={(v) => pickRider(v)}
+        onClose={() => setRiderOpen(false)}
+        emptyLabel="Add riders in the web dashboard (Riders)"
+      />
+
+      <ActionSheet
+        visible={itemSheet !== null}
+        title={itemSheet !== null ? order.items[itemSheet]?.title : ''}
+        onClose={() => setItemSheet(null)}
+        actions={itemSheet === null ? [] : [
+          { label: 'None available', icon: 'x-circle', onPress: () => markUnavailable(itemSheet) },
+          ...(order.items[itemSheet]?.quantity > 1
+            ? [{ label: 'One fewer available', icon: 'minus-circle', onPress: () => markUnavailable(itemSheet, 1) }]
+            : []),
+        ]}
+      />
+
+      <ActionSheet
+        visible={Boolean(idOpen)}
+        title={`Photo ID checked (${order.ageCheck}+)?`}
+        onClose={() => setIdOpen(null)}
+        actions={[
+          ['passport', 'Passport'],
+          ['driving_licence', 'Driving licence'],
+          ['pass_card', 'PASS card'],
+          ['other_photo_id', 'Other photo ID'],
+        ].map(([idType, label]) => ({
+          label,
+          icon: 'credit-card',
+          onPress: () => {
+            const status = idOpen;
+            setIdOpen(null);
+            changeStatus(status, undefined, undefined, { ageVerified: true, idType });
+          },
+        }))}
+      />
 
       <ActionSheet
         visible={prepOpen}
