@@ -16,6 +16,17 @@
  */
 
 const asyncHandler = require("../lib/asyncHandler");
+const {
+  dayLabel,
+  fulfilmentOf,
+  localDate,
+  methodEnabled,
+  safeZone,
+  slotDates,
+  slotsForDate,
+  zonedToUtc,
+} = require("../lib/slots");
+const { bookingsBetween } = require("../lib/slotBookings");
 const ApiError = require("../lib/ApiError");
 const {
   geocodeAddress,
@@ -103,8 +114,60 @@ const formatStore = (store, distanceKm, status, branding, reviewData = null, shi
       : null,
     isBusy:           Boolean(status.isBusy),
     busyUntil:        status.busyUntil || null,
+    // How the store hands orders over (see GET /stores/:slug/slots)
+    deliveryEnabled:   fulfilmentOf(store).deliveryEnabled !== false,
+    collectionEnabled: Boolean(fulfilmentOf(store).collectionEnabled),
+    schedulingEnabled: fulfilmentOf(store).daysAhead > 0,
+    minimumOrder:      store.minimumOrder || 0, // pence
   };
 };
+
+/**
+ * GET /api/v1/stores/:slug/slots?method=delivery|collection
+ * Bookable time windows for the store's offered days, in its timezone.
+ * Slots are derived from opening hours; "remaining" is null when the store
+ * sets no per-slot limit.
+ */
+const getStoreSlots = asyncHandler(async (req, res) => {
+  const { slug } = req.params;
+  const method = req.query.method === "collection" ? "collection" : "delivery";
+  const query = /^[a-f\d]{24}$/i.test(slug) ? { _id: slug } : { slug: slug.toLowerCase() };
+  const store = await Store.findOne({ ...query, status: "active" }).select(
+    "name slug operatingHours timezone ordersPausedUntil fulfilment"
+  );
+  if (!store) throw new ApiError(404, "Store not found");
+
+  const now = new Date();
+  const dates = slotDates(store, now);
+  const zone = safeZone(store.timezone || "UTC");
+  const today = localDate(now, zone);
+  const enabled = methodEnabled(store, method);
+
+  let days = [];
+  if (enabled && dates.length) {
+    const from = zonedToUtc(dates[0], 0, zone);
+    const to = zonedToUtc(dates[dates.length - 1], 48 * 60, zone);
+    const bookings = await bookingsBetween(store._id, from, to);
+    days = dates.map((date) => ({
+      date,
+      label: dayLabel(date, today),
+      slots: slotsForDate({ store, date, bookings, now }),
+    }));
+  }
+
+  const status = applyBusyStatus(computeOpenStatus(store.operatingHours, zone), store);
+  res.status(200).json({
+    data: {
+      storeId: store._id,
+      method,
+      methodEnabled: enabled,
+      timezone: zone,
+      // ASAP needs the store open now (stores with no hours set count as open)
+      asapAvailable: enabled && status.isOpen !== false && !status.isBusy,
+      days,
+    },
+  });
+});
 
 // ── Controllers ───────────────────────────────────────────────────────────────
 
@@ -171,7 +234,7 @@ const getNearbyStores = asyncHandler(async (req, res) => {
     locationSet: true,
     ...(categoryStoreIds && { _id: { $in: categoryStoreIds } }),
   }).select(
-    "name slug status contact address location deliveryRadiusKm operatingHours branding timezone ordersPausedUntil"
+    "name slug status contact address location deliveryRadiusKm operatingHours branding timezone ordersPausedUntil fulfilment minimumOrder"
   );
   // Note: skip/limit cannot be used with $nearSphere in all MongoDB drivers reliably
   // for large sets; we post-filter and paginate in memory (candidate count is small
@@ -258,7 +321,7 @@ const getStoreBySlug = asyncHandler(async (req, res) => {
   const { slug } = req.params;
 
   const store = await Store.findOne({ slug: slug.toLowerCase(), status: "active" }).select(
-    "name slug status contact address location deliveryRadiusKm operatingHours branding timezone ordersPausedUntil"
+    "name slug status contact address location deliveryRadiusKm operatingHours branding timezone ordersPausedUntil fulfilment minimumOrder"
   );
 
   if (!store) throw new ApiError(404, "Store not found");
@@ -598,6 +661,7 @@ const getStoreCategories = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  getStoreSlots,
   getNearbyStores,
   getStoreBySlug,
   getStoreStatus,

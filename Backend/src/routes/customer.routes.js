@@ -14,6 +14,7 @@ const {
   listMyOrders,
   reorder,
   cancelMyOrder,
+  markArrived,
 } = require("../controllers/customerOrders.controller");
 const {
   createStockAlert,
@@ -46,6 +47,7 @@ router.get("/orders/:id", getMyOrderById);
 router.get("/orders/:id/history", getMyOrderHistory);
 router.post("/orders/:id/reorder", reorder);
 router.post("/orders/:id/cancel", cancelMyOrder);
+router.post("/orders/:id/arrived", markArrived);
 
 router.get("/stock-alerts", listStockAlerts);
 router.post("/stock-alerts", createStockAlert);

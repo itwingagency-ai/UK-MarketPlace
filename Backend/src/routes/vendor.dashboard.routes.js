@@ -70,7 +70,9 @@ const {
   salesReport,
 } = require("../controllers/vendorReports.controller");
 const {
+  getFulfilment,
   getSettings,
+  updateFulfilment,
   updateSettings,
 } = require("../controllers/vendorSettings.controller");
 const { requireResourceInScope } = require("../middleware/storeScope.middleware");
@@ -169,6 +171,8 @@ router.delete(
   deleteShippingMethod
 );
 
+router.get("/fulfilment", getFulfilment);
+router.patch("/fulfilment", updateFulfilment);
 router.get("/settings", getSettings);
 router.patch("/settings", upload.fields([{ name: "bannerImage", maxCount: 1 }, { name: "logoImage", maxCount: 1 }]), updateSettings);
 

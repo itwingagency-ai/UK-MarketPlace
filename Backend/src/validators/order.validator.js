@@ -6,6 +6,8 @@ const ALLOWED_STATUSES = [
   "packed",
   "shipped",
   "delivered",
+  "ready_for_collection",
+  "collected",
   "cancelled",
 ];
 
@@ -32,6 +34,18 @@ const STATUS_TRANSITIONS = {
   cancelled: [],
 };
 
+// Collection orders skip shipping: they're made ready, then handed over
+const COLLECTION_TRANSITIONS = {
+  pending: ["confirmed", "cancelled"],
+  confirmed: ["packed", "ready_for_collection", "cancelled"],
+  packed: ["ready_for_collection", "cancelled"],
+  ready_for_collection: ["collected", "cancelled"],
+  collected: [],
+  cancelled: [],
+};
+
+const transitionsFor = (method) => (method === "collection" ? COLLECTION_TRANSITIONS : STATUS_TRANSITIONS);
+
 const TRACKING_EDITABLE_FIELDS = [
   "carrier",
   "trackingNumber",
@@ -39,12 +53,12 @@ const TRACKING_EDITABLE_FIELDS = [
   "cancellationReason",
 ];
 
-const validateOrderStatusUpdate = (currentStatus, nextStatus) => {
+const validateOrderStatusUpdate = (currentStatus, nextStatus, method = "delivery") => {
   if (!ALLOWED_STATUSES.includes(nextStatus)) {
     throw new ApiError(400, "Invalid target order status");
   }
 
-  const allowedNext = STATUS_TRANSITIONS[currentStatus] || [];
+  const allowedNext = transitionsFor(method)[currentStatus] || [];
   if (!allowedNext.includes(nextStatus)) {
     throw new ApiError(
       400,
@@ -53,7 +67,7 @@ const validateOrderStatusUpdate = (currentStatus, nextStatus) => {
   }
 };
 
-const validateOrderStatusPayload = (payload, currentStatus) => {
+const validateOrderStatusPayload = (payload, currentStatus, method = "delivery") => {
   if (!payload || typeof payload !== "object") {
     throw new ApiError(400, "Invalid status update payload");
   }
@@ -63,7 +77,7 @@ const validateOrderStatusPayload = (payload, currentStatus) => {
     throw new ApiError(400, "orderStatus is required");
   }
 
-  validateOrderStatusUpdate(currentStatus, nextStatus);
+  validateOrderStatusUpdate(currentStatus, nextStatus, method);
 
   if (payload.note !== undefined && payload.note !== null) {
     if (typeof payload.note !== "string") {
@@ -143,6 +157,8 @@ const validateShipmentEventPayload = (payload) => {
 module.exports = {
   ALLOWED_STATUSES,
   STATUS_TRANSITIONS,
+  COLLECTION_TRANSITIONS,
+  transitionsFor,
   TRACKING_EDITABLE_FIELDS,
   SHIPMENT_EVENT_STATUSES,
   SYSTEM_ONLY_SHIPMENT_STATUSES,

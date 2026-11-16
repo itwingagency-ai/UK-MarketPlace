@@ -83,6 +83,19 @@ const cartSchema = new mongoose.Schema(
     notes: { type: Map, of: String, default: () => new Map() },
     // storeId -> codes of removable fees the customer switched off (e.g. "bag")
     declinedFees: { type: Map, of: [String], default: () => new Map() },
+    // storeId -> { method: "delivery" | "collection", slotStart: Date | null }
+    // Missing = delivery, as soon as possible.
+    fulfilment: {
+      type: Map,
+      of: new mongoose.Schema(
+        {
+          method: { type: String, enum: ["delivery", "collection"], default: "delivery" },
+          slotStart: { type: Date, default: null },
+        },
+        { _id: false }
+      ),
+      default: () => new Map(),
+    },
     // May the store swap an unavailable item for a close match?
     allowSubstitutions: { type: Boolean, default: true },
   },

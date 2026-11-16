@@ -20,6 +20,9 @@ const { couponBlocker } = require("../lib/offers");
 const Coupon = require("../models/Coupon");
 const CouponUsage = require("../models/CouponUsage");
 const Order = require("../models/Order");
+const Store = require("../models/Store");
+const { validateCartFulfilmentPayload } = require("../validators/fulfilment.validator");
+const { STORE_FULFILMENT_FIELDS, resolveFulfilment } = require("../lib/fulfilment");
 
 const getCart = asyncHandler(async (req, res) => {
   const cart = await getOrCreateCart(req.user.id);
@@ -262,7 +265,37 @@ const setCartOptions = asyncHandler(async (req, res) => {
   res.status(200).json({ message: "Basket updated", data: summary });
 });
 
+/**
+ * PUT /cart/fulfilment { storeId, method: "delivery" | "collection", slotStart }
+ * slotStart null = as soon as possible. The slot must be one the store
+ * offers right now; capacity is claimed for real only at checkout.
+ */
+const setFulfilment = asyncHandler(async (req, res) => {
+  validateCartFulfilmentPayload(req.body);
+  const cart = await getOrCreateCart(req.user.id);
+  const storeId = String(req.body.storeId);
+  if (!storesInCart(cart).has(storeId)) throw new ApiError(400, "That store isn't in your basket");
+
+  const store = await Store.findById(storeId).select(STORE_FULFILMENT_FIELDS);
+  if (!store) throw new ApiError(404, "Store not found");
+  const choice = {
+    method: req.body.method,
+    slotStart: req.body.slotStart ? new Date(req.body.slotStart) : null,
+  };
+  const resolved = await resolveFulfilment({ store, choice });
+  if (resolved.issue) throw new ApiError(409, resolved.issue);
+
+  cart.fulfilment.set(storeId, choice);
+  await cart.save();
+  const summary = await buildCartSummary(cart);
+  res.status(200).json({
+    message: choice.method === "collection" ? `Collect from ${store.name}: ${resolved.label}` : `Delivery: ${resolved.label}`,
+    data: summary,
+  });
+});
+
 module.exports = {
+  setFulfilment,
   applyCoupon,
   removeCoupon,
   setTip,

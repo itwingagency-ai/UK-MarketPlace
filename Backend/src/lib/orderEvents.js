@@ -57,6 +57,21 @@ const emitOrderStatusChanged = (order, previousStatus) => {
   });
 };
 
+/** The customer is outside to collect — the store's devices and the order room. */
+const emitCustomerArrived = (order) => {
+  const io = getIO();
+  if (!io) return;
+  const orderId = String(order._id || order.id || "");
+  io.to([`store:${String(order.store)}`, `order:${orderId}`, "admin:orders"]).emit("order:customer_arrived", {
+    orderId,
+    orderNumber: order.orderNumber,
+    storeId: String(order.store),
+    customerName: order.customerSnapshot?.name || "",
+    note: order.fulfilment?.arrivalNote || "",
+    arrivedAt: order.fulfilment?.arrivedAt || new Date(),
+  });
+};
+
 const emitOrderPaymentUpdated = (order) => {
   broadcastToOrder("order:payment_updated", order, {
     orderId: (order._id || order.id || "").toString(),
@@ -88,6 +103,7 @@ const emitOrderShipmentEvent = (order, event) => {
 };
 
 module.exports = {
+  emitCustomerArrived,
   emitOrderCreated,
   emitOrderStatusChanged,
   emitOrderPaymentUpdated,

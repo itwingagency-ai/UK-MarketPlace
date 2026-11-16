@@ -76,14 +76,26 @@ const sumItems = (items) => {
  * @param {object}  [p.store]           Store doc (reserved: minimum order, opt-ins)
  * @param {object}  [p.settings]        StoreSettings doc (shipping config, pounds)
  * @param {object}  [p.shippingMethod]  ShippingMethod doc or null
+ * @param {string}  [p.fulfilmentMethod] "delivery" (default) | "collection"
  * @param {Array}   [p.adjustments]     [{ kind, code, ref, label, info, amount, fundedBy, removable }]
  *                                      ref: id of the Coupon / Promotion behind the line
  * @returns {{ subtotal, shippingFee, lines, discountTotal, feeTotal, tipAmount, total, commissionBase }}
  */
 // eslint-disable-next-line no-unused-vars
-const priceStoreGroup = ({ items, store = null, settings = null, shippingMethod = null, adjustments = [] }) => {
+const priceStoreGroup = ({
+  items,
+  store = null,
+  settings = null,
+  shippingMethod = null,
+  adjustments = [],
+  fulfilmentMethod = "delivery",
+}) => {
   const subtotal = sumItems(items || []);
-  const shippingFee = computeShippingFeeForStore({ method: shippingMethod, settings, subtotal });
+  // Collected orders are never charged for delivery
+  const shippingFee =
+    fulfilmentMethod === "collection"
+      ? 0
+      : computeShippingFeeForStore({ method: shippingMethod, settings, subtotal });
 
   let reducible = subtotal + shippingFee;
   const lines = [];

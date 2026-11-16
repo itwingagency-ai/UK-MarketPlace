@@ -132,7 +132,7 @@ const couponAdjustment = (coupon, amount) => ({
 
 /**
  * @param {object} p
- * @param {Array}  p.groups       [{ storeId, store, settings, shippingMethod,
+ * @param {Array}  p.groups       [{ storeId, store, settings, shippingMethod, method?,
  *                                   items: [{ product, category, unitPrice, quantity }] }]
  * @param {Array}  p.couponCodes  codes attached to the cart, in the order added
  * @param {Array}  p.coupons      Coupon docs found for those codes
@@ -161,6 +161,7 @@ const priceCart = ({
       store: g.store,
       settings: g.settings,
       shippingMethod: g.shippingMethod,
+      fulfilmentMethod: g.method,
     });
     return {
       g,
@@ -403,6 +404,7 @@ const priceCart = ({
       store: st.g.store,
       settings: st.g.settings,
       shippingMethod: st.g.shippingMethod,
+      fulfilmentMethod: st.g.method,
       adjustments: st.adjustments,
     });
     const appliedCoupons = priced.lines

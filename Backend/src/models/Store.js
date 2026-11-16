@@ -105,6 +105,16 @@ const storeSchema = new mongoose.Schema(
         },
       },
     },
+    // How this store hands orders over (see lib/slots for how slots are derived)
+    fulfilment: {
+      deliveryEnabled: { type: Boolean, default: true },
+      collectionEnabled: { type: Boolean, default: false },
+      slotLengthMins: { type: Number, default: 60, min: 15, max: 240 },
+      leadTimeMins: { type: Number, default: 60, min: 0, max: 1440 },
+      maxOrdersPerSlot: { type: Number, default: 0, min: 0, max: 1000 }, // 0 = no limit
+      daysAhead: { type: Number, default: 0, min: 0, max: 14 }, // 0 = ASAP only
+      collectionInstructions: { type: String, default: "", trim: true, maxlength: 300 },
+    },
     // Smallest basket (goods, before discounts) this store accepts, pence. 0 = none.
     minimumOrder: {
       type: Number,

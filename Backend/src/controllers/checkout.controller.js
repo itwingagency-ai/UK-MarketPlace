@@ -15,6 +15,8 @@ const {
 const { orderPricingFields } = require("../lib/pricing");
 const { priceCartWithOffers } = require("../lib/offers");
 const { claimCouponRedemptions } = require("../lib/couponRedemptions");
+const { claimSlots } = require("../lib/slotBookings");
+const { STORE_FULFILMENT_FIELDS, choiceFor, resolveFulfilment } = require("../lib/fulfilment");
 const { getPlatformCurrency } = require("../lib/currency");
 const { getStripeClient, isStripeConfigured } = require("../lib/stripeClient");
 const { appendPaymentEvent } = require("../lib/paymentService");
@@ -162,21 +164,29 @@ const priceGroups = async (groups, { cart, userId }) => {
   const list = Array.from(groups.values());
   const stores = list.length
     ? await Store.find({ _id: { $in: list.map((g) => g.storeId) } }).select(
-      "name slug location locationSet deliveryRadiusKm minimumOrder"
+      `slug location locationSet deliveryRadiusKm minimumOrder ${STORE_FULFILMENT_FIELDS}`
     )
     : [];
   const storesById = new Map(stores.map((st) => [String(st._id), st]));
+
+  for (const group of list) {
+    group.store = storesById.get(String(group.storeId)) || null;
+    // eslint-disable-next-line no-await-in-loop
+    group.fulfilment = await resolveFulfilment({ store: group.store, choice: choiceFor(cart, group.storeId) });
+    // Collected orders have no delivery method
+    if (group.fulfilment.method === "collection") group.shippingMethod = null;
+  }
 
   const result = await priceCartWithOffers({
     cart,
     userId,
     groups: list.map((group) => {
-      group.store = storesById.get(String(group.storeId)) || null;
       return {
         storeId: group.storeId,
         store: group.store,
         settings: group.shippingSettings,
         shippingMethod: group.shippingMethod,
+        method: group.fulfilment.method,
         items: group.items.map(({ item, status }) => ({
           product: item.product,
           unitPrice: Number(status.live.unitPrice),
@@ -194,6 +204,12 @@ const priceGroups = async (groups, { cart, userId }) => {
     group.shippingFee = priced.shippingFee;
     group.total = priced.total;
   });
+  result.blockingIssues = [
+    ...result.blockingIssues,
+    ...list
+      .filter((g) => g.fulfilment.issue)
+      .map((g) => ({ kind: "fulfilment", storeId: g.storeId, message: g.fulfilment.issue })),
+  ];
   return result;
 };
 
@@ -251,6 +267,7 @@ const buildPreviewResponse = async (evaluatedItems, selections, { cart, userId }
       optionalFees: group.offers.optionalFees,
       nearMisses: group.offers.nearMisses,
       minimumOrder: store?.minimumOrder || 0,
+      fulfilment: group.fulfilment,
       note: notes[String(group.storeId)] || "",
       availableShippingMethods: (group.availableShippingMethods || []).map(
         buildMethodSnapshot
@@ -460,6 +477,12 @@ const buildOrderDoc = ({
     },
   ],
   shippingMethod: buildShippingMethodSnapshot(storeGroup.shippingMethod),
+  fulfilment: {
+    method: storeGroup.fulfilment?.method || "delivery",
+    asap: storeGroup.fulfilment?.asap !== false,
+    slotStart: storeGroup.fulfilment?.slotStart || null,
+    slotEnd: storeGroup.fulfilment?.slotEnd || null,
+  },
 });
 
 // What the order keeps from the cart besides items: the note for that store
@@ -482,7 +505,10 @@ const orderDocsFor = ({ cart, storeGroups, user, shippingAddress, paymentMethod,
 
 // After placement the cart is empty and its one-off choices are spent.
 // allowSubstitutions is a standing preference, so it stays.
-const CLEARED_CART = { items: [], couponCodes: [], tips: {}, notes: {}, declinedFees: {} };
+const CLEARED_CART = { items: [], couponCodes: [], tips: {}, notes: {}, declinedFees: {}, fulfilment: {} };
+
+const storesOf = (storeGroups) =>
+  new Map(Array.from(storeGroups.values()).map((g) => [String(g.storeId), g.store]));
 
 const placeOrdersWithTransaction = async ({
   cart,
@@ -509,6 +535,7 @@ const placeOrdersWithTransaction = async ({
     const orders = await Order.create(orderDocs, { session, ordered: true });
 
     await claimCouponRedemptions({ orders, userId: user._id, checkoutId, session });
+    await claimSlots({ orders, storesById: storesOf(storeGroups), session });
 
     await Cart.updateOne(
       { _id: cart._id },
@@ -542,6 +569,7 @@ const placeOrdersWithCompensation = async ({
   const decrementedItems = [];
   const createdOrderIds = [];
   let couponClaim = null;
+  let slotClaim = null;
 
   try {
     for (const group of storeGroups.values()) {
@@ -562,11 +590,13 @@ const placeOrdersWithCompensation = async ({
 
     // Undoes its own partial claims if it throws
     couponClaim = await claimCouponRedemptions({ orders, userId: user._id, checkoutId });
+    slotClaim = await claimSlots({ orders, storesById: storesOf(storeGroups) });
 
     await Cart.updateOne({ _id: cart._id }, { $set: CLEARED_CART });
 
     return orders;
   } catch (err) {
+    if (slotClaim) await slotClaim.undo().catch(() => { });
     if (couponClaim) await couponClaim.undo().catch(() => { });
     for (const item of decrementedItems) {
       // eslint-disable-next-line no-await-in-loop
@@ -671,7 +701,12 @@ const createStripePaymentIntentForOrders = async ({ orders, user, transactionId,
 };
 
 const placeOrder = asyncHandler(async (req, res) => {
-  validateCheckoutPayload(req.body);
+  const cart = await getOrCreateCart(req.user.id);
+  // Collection-only baskets don't need a delivery address
+  const collectionOnly =
+    cart.items.length > 0 &&
+    cart.items.every((i) => choiceFor(cart, i.store).method === "collection");
+  validateCheckoutPayload(req.body, { addressRequired: !collectionOnly });
 
   // Admin can switch payment methods off platform-wide
   const { features = {} } = await PlatformSettings.getOrInit();
@@ -692,9 +727,11 @@ const placeOrder = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id);
   if (!user) throw new ApiError(404, "User not found");
 
-  const shippingAddress = resolveShippingAddress(user, req.body);
+  const shippingAddress =
+    req.body.addressId || req.body.shippingAddress
+      ? resolveShippingAddress(user, req.body)
+      : { fullName: user.name, phone: user.phone || "" };
 
-  const cart = await getOrCreateCart(req.user.id);
   if (!cart.items || cart.items.length === 0) {
     throw new ApiError(400, "Cart is empty");
   }

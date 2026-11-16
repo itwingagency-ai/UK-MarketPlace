@@ -7,7 +7,7 @@ const VALID_PAYMENT_METHODS = ["cod", "online"];
 const isPlainObject = (value) =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-const validateCheckoutPayload = (payload) => {
+const validateCheckoutPayload = (payload, { addressRequired = true } = {}) => {
   if (!isPlainObject(payload)) {
     throw new ApiError(400, "Invalid checkout payload");
   }
@@ -15,7 +15,7 @@ const validateCheckoutPayload = (payload) => {
   const hasAddressId = Boolean(payload.addressId);
   const hasInlineAddress = Boolean(payload.shippingAddress);
 
-  if (!hasAddressId && !hasInlineAddress) {
+  if (addressRequired && !hasAddressId && !hasInlineAddress) {
     throw new ApiError(
       400,
       "Either addressId or shippingAddress must be provided"

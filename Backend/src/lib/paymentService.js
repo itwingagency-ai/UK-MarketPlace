@@ -19,6 +19,7 @@ const Store = require("../models/Store");
 const User = require("../models/User");
 const { getStripeClient, isStripeConfigured } = require("./stripeClient");
 const { releaseCouponRedemptions } = require("./couponRedemptions");
+const { releaseSlot } = require("./slotBookings");
 
 const restoreStockForOrder = async (order) => {
   for (const item of order.items || []) {
@@ -57,12 +58,13 @@ const restoreStockForOrderOnce = async (order) => {
 };
 
 /**
- * Everything a cancelled order hands back: its stock (exactly once) and the
- * coupon uses it held. Every cancellation path calls this.
+ * Everything a cancelled order hands back: its stock (exactly once), the
+ * coupon uses it held and its time slot. Every cancellation path calls this.
  */
 const releaseCancelledOrder = async (order, { reason = "Order cancelled" } = {}) => {
   await restoreStockForOrderOnce(order);
   await releaseCouponRedemptions(order, { reason });
+  await releaseSlot(order);
 };
 
 /**
@@ -223,7 +225,7 @@ const cancelOrdersAndRestoreStock = async ({
   for (const order of orders) {
     if (
       order.orderStatus === "cancelled" ||
-      order.orderStatus === "delivered"
+      Order.COMPLETED_STATUSES.includes(order.orderStatus)
     ) {
       continue;
     }

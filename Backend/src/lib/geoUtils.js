@@ -394,4 +394,5 @@ module.exports = {
   haversineKm,
   getOpenStatus,
   computeOpenStatus,
+  toMinutes,
 };

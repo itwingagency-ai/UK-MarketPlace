@@ -38,7 +38,7 @@ const overview = asyncHandler(async (req, res) => {
     Product.countDocuments({ isActive: true }),
     Order.countDocuments(),
     Order.countDocuments({ orderStatus: "pending" }),
-    Order.countDocuments({ orderStatus: "delivered" }),
+    Order.countDocuments({ orderStatus: { $in: Order.COMPLETED_STATUSES } }),
     Order.countDocuments({ orderStatus: "cancelled" }),
     VendorApplication.countDocuments({ status: "pending" }),
   ]);

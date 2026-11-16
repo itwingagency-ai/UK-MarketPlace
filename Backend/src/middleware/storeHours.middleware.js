@@ -23,6 +23,7 @@ const { computeOpenStatus } = require("../lib/geoUtils");
 const { applyBusyStatus, isOrdersPaused } = require("../lib/storeAvailability");
 const Store = require("../models/Store");
 const Cart = require("../models/Cart");
+const { choiceFor } = require("../lib/fulfilment");
 
 /**
  * Express middleware.
@@ -53,6 +54,11 @@ const requireStoresOpen = async (req, res, next) => {
         (store.operatingHours instanceof Map
           ? store.operatingHours.size > 0
           : Object.keys(store.operatingHours).length > 0);
+
+      // A booked slot is checked against the store's hours when it's chosen,
+      // so a store may be closed right now and still take a scheduled order.
+      // Busy mode (paused) still stops everything.
+      if (choiceFor(cart, store._id).slotStart && !isOrdersPaused(store)) continue;
 
       // A busy (paused) store is closed even if it has no hours configured
       if (!hasHours && !isOrdersPaused(store)) continue; // no hours configured → treat as always open

@@ -58,8 +58,24 @@ const STATUS_COPY = {
   packed: () => "Your order is packed and will be on its way soon.",
   shipped: () => "Your order is out for delivery.",
   delivered: () => "Your order has been delivered. Enjoy!",
+  ready_for_collection: () => "Your order is ready to collect. Tap \"I've arrived\" when you get there.",
+  collected: () => "Order collected. Thanks for shopping with us!",
   cancelled: () => "Your order was cancelled. You have not been charged for unavailable items.",
 };
+
+/** A collecting customer is outside → the store's phones. */
+const notifyCustomerArrived = (order) =>
+  safely("customer arrived", async () => {
+    const vendors = await User.find({ storeId: order.store, role: "vendor", status: "active" }).select("_id").lean();
+    if (vendors.length === 0) return;
+    const note = order.fulfilment?.arrivalNote;
+    deliver(vendors.map((v) => String(v._id)), {
+      title: `Customer outside · #${order.orderNumber}`,
+      body: `${order.customerSnapshot?.name || "Your customer"} is here to collect${note ? ` (${note})` : ""}.`,
+      data: { type: "order:arrived", orderId: String(order._id), orderNumber: order.orderNumber },
+      channelId: "orders",
+    });
+  });
 
 /** Order status change → the customer who placed it. */
 const notifyOrderStatus = (order) =>
@@ -85,6 +101,7 @@ const notifyBackInStock = (userIds, { product, variantLabel, storeName }) =>
   });
 
 module.exports = {
+  notifyCustomerArrived,
   notifyBackInStock,
   notifyNewOrder,
   notifyOrderStatus,

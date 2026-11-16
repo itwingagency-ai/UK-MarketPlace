@@ -5,6 +5,8 @@ const Store = require("../models/Store");
 const StoreSettings = require("../models/StoreSettings");
 const { validateSettingsPayload } = require("../validators/store.validator");
 const { deleteFileFromS3 } = require("../lib/s3Utils");
+const { DEFAULT_FULFILMENT, fulfilmentOf } = require("../lib/slots");
+const { validateFulfilmentSettings } = require("../validators/fulfilment.validator");
 
 const getSettings = asyncHandler(async (req, res) => {
   const storeId = resolveTargetStoreId(req);
@@ -97,7 +99,37 @@ const updateSettings = asyncHandler(async (req, res) => {
   });
 });
 
+/** GET /vendor/dashboard/fulfilment — delivery, collection and slot settings */
+const getFulfilment = asyncHandler(async (req, res) => {
+  const storeId = resolveTargetStoreId(req);
+  const store = await Store.findById(storeId).select("fulfilment operatingHours timezone");
+  if (!store) throw new ApiError(404, "Store not found");
+  const hasHours = store.operatingHours instanceof Map ? store.operatingHours.size > 0 : false;
+  res.status(200).json({ data: { ...fulfilmentOf(store), timezone: store.timezone || "UTC", hasHours } });
+});
+
+/** PATCH /vendor/dashboard/fulfilment */
+const updateFulfilment = asyncHandler(async (req, res) => {
+  validateFulfilmentSettings(req.body);
+  const storeId = resolveTargetStoreId(req);
+  const store = await Store.findById(storeId).select("fulfilment operatingHours timezone");
+  if (!store) throw new ApiError(404, "Store not found");
+
+  const next = { ...fulfilmentOf(store) };
+  for (const key of Object.keys(DEFAULT_FULFILMENT).concat("collectionInstructions")) {
+    if (req.body[key] !== undefined) next[key] = req.body[key];
+  }
+  if (!next.deliveryEnabled && !next.collectionEnabled) {
+    throw new ApiError(400, "Offer at least one of delivery or collection");
+  }
+  store.fulfilment = next;
+  await store.save();
+  res.status(200).json({ message: "Fulfilment settings saved", data: fulfilmentOf(store) });
+});
+
 module.exports = {
   getSettings,
   updateSettings,
+  getFulfilment,
+  updateFulfilment,
 };

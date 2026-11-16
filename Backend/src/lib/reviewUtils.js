@@ -73,7 +73,7 @@ const findEligibleDeliveredOrder = async (userId, productId) => {
   if (!userId || !productId) return null;
   return Order.findOne({
     customer: userId,
-    orderStatus: { $in: ["delivered", "completed"] },
+    orderStatus: { $in: ["delivered", "collected", "completed"] },
     paymentStatus: "paid",
     "items.product": productId,
   })

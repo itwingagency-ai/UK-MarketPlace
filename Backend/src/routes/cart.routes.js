@@ -4,6 +4,7 @@ const {
   applyCoupon,
   removeCoupon,
   setCartOptions,
+  setFulfilment,
   setTip,
   clearCart,
   getCart,
@@ -22,5 +23,6 @@ router.post("/coupon", applyCoupon);
 router.delete("/coupon/:code", removeCoupon);
 router.put("/tip", setTip);
 router.put("/options", setCartOptions);
+router.put("/fulfilment", setFulfilment);
 
 module.exports = router;

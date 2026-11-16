@@ -13,8 +13,8 @@ const {
   refundOrderIfPaid,
   releaseCancelledOrder,
 } = require("../lib/paymentService");
-const { notifyOrderStatus } = require("../lib/appNotifications");
-const { emitOrderStatusChanged } = require("../lib/orderEvents");
+const { notifyCustomerArrived, notifyOrderStatus } = require("../lib/appNotifications");
+const { emitCustomerArrived, emitOrderStatusChanged } = require("../lib/orderEvents");
 const { onOrderCancelled } = require("../lib/notificationHooks");
 
 const PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded"];
@@ -287,7 +287,42 @@ const cancelMyOrder = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * POST /customer/orders/:id/arrived { note? }
+ * The customer is outside to collect. Tells the store's devices straight away
+ * (Socket.IO + push). Can be sent again, e.g. to update the note.
+ */
+const markArrived = asyncHandler(async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    throw new ApiError(400, "Invalid order id");
+  }
+  const note = typeof req.body?.note === "string" ? req.body.note.trim().slice(0, 200) : "";
+  const order = await Order.findOne({ _id: req.params.id, customer: req.user.id });
+  if (!order) throw new ApiError(404, "Order not found");
+  if (order.fulfilment?.method !== "collection") {
+    throw new ApiError(409, "This order is being delivered, not collected");
+  }
+  if (!["confirmed", "packed", "ready_for_collection"].includes(order.orderStatus)) {
+    throw new ApiError(
+      409,
+      order.orderStatus === "pending"
+        ? "The store hasn't accepted this order yet"
+        : "This order can't be collected any more"
+    );
+  }
+
+  order.fulfilment.arrivedAt = new Date();
+  order.fulfilment.arrivalNote = note;
+  await order.save();
+
+  emitCustomerArrived(order);
+  notifyCustomerArrived(order);
+
+  res.status(200).json({ message: "The store knows you're here", data: order });
+});
+
 module.exports = {
+  markArrived,
   cancelMyOrder,
   reorder,
   listMyOrders,

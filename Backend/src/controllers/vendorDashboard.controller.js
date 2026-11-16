@@ -12,7 +12,7 @@ const getOverview = asyncHandler(async (req, res) => {
       Product.countDocuments({ ...scopeFilter, isActive: true }),
       Order.countDocuments({ ...scopeFilter }),
       Order.countDocuments({ ...scopeFilter, orderStatus: "pending" }),
-      Order.countDocuments({ ...scopeFilter, orderStatus: "delivered" }),
+      Order.countDocuments({ ...scopeFilter, orderStatus: { $in: Order.COMPLETED_STATUSES } }),
     ]);
 
   const revenueAgg = await Order.aggregate([

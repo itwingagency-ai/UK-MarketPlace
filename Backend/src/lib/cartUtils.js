@@ -9,6 +9,7 @@ const {
   findActiveShippingMethodsByStores,
 } = require("./shippingUtils");
 const { priceCartWithOffers } = require("./offers");
+const { STORE_FULFILMENT_FIELDS, choiceFor, resolveFulfilment } = require("./fulfilment");
 
 const getOrCreateCart = async (userId) => {
   const cart = await Cart.findOneAndUpdate(
@@ -199,7 +200,7 @@ const buildCartSummary = async (cart) => {
       : Promise.resolve([]),
     findActiveShippingMethodsByStores(storeIds),
     storeIds.length
-      ? Store.find({ _id: { $in: storeIds } }).select("name slug location locationSet deliveryRadiusKm minimumOrder")
+      ? Store.find({ _id: { $in: storeIds } }).select(`slug location locationSet deliveryRadiusKm minimumOrder ${STORE_FULFILMENT_FIELDS}`)
       : Promise.resolve([]),
   ]);
   const settingsByStore = new Map(
@@ -210,7 +211,12 @@ const buildCartSummary = async (cart) => {
   );
 
   const groups = Array.from(byStoreMap.values());
-  const pricingInputs = groups.map((group) => {
+  const fulfilments = await Promise.all(
+    groups.map((group) =>
+      resolveFulfilment({ store: storesById.get(String(group.storeId)), choice: choiceFor(cart, group.storeId) })
+    )
+  );
+  const pricingInputs = groups.map((group, i) => {
     const storeKey = String(group.storeId);
     const methods = methodsByStore.get(storeKey) || [];
     const storeObj = storesById.get(storeKey);
@@ -222,12 +228,15 @@ const buildCartSummary = async (cart) => {
     group.minimumOrder = storeObj?.minimumOrder || 0;
     group.availableShippingMethods = methods.map(buildMethodSnapshot);
     group.defaultShippingMethod = buildMethodSnapshot(methods[0] || null);
+    group.fulfilment = fulfilments[i];
+    const collecting = fulfilments[i].method === "collection";
     // The cart prices from its snapshot unit prices; checkout re-prices live.
     return {
       storeId: group.storeId,
       store: storeObj,
       settings: settingsByStore.get(storeKey),
-      shippingMethod: methods[0] || null,
+      shippingMethod: collecting ? null : methods[0] || null,
+      method: fulfilments[i].method,
       items: group.items.map((i) => ({ product: i.product, unitPrice: i.unitPrice, quantity: i.quantity })),
     };
   });
@@ -279,7 +288,12 @@ const buildCartSummary = async (cart) => {
     grandTotal,
     coupons: result.coupons,
     nearMisses: result.nearMisses,
-    blockingIssues: result.blockingIssues,
+    blockingIssues: [
+      ...result.blockingIssues,
+      ...groups
+        .filter((g) => g.fulfilment.issue)
+        .map((g) => ({ kind: "fulfilment", storeId: g.storeId, message: g.fulfilment.issue })),
+    ],
     options: {
       allowSubstitutions: cart.allowSubstitutions !== false,
       tips,

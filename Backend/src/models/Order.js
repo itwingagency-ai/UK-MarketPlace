@@ -1,14 +1,20 @@
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 
+// Delivery: pending -> confirmed -> packed -> shipped -> delivered
+// Collection: pending -> confirmed (-> packed) -> ready_for_collection -> collected
 const ORDER_STATUS = [
   "pending",
   "confirmed",
   "packed",
   "shipped",
   "delivered",
+  "ready_for_collection",
+  "collected",
   "cancelled",
 ];
+// Statuses that mean the customer has their goods
+const COMPLETED_STATUSES = ["delivered", "collected"];
 const PAYMENT_METHODS = ["cod", "online"];
 const PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded"];
 
@@ -200,6 +206,23 @@ const priceLineSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const orderFulfilmentSchema = new mongoose.Schema(
+  {
+    method: { type: String, enum: ["delivery", "collection"], default: "delivery" },
+    // true = as soon as possible; false = booked into [slotStart, slotEnd)
+    asap: { type: Boolean, default: true },
+    slotStart: { type: Date, default: null, index: true },
+    slotEnd: { type: Date, default: null },
+    readyAt: { type: Date, default: null },
+    arrivedAt: { type: Date, default: null },
+    arrivalNote: { type: String, default: "", maxlength: 200 },
+    collectedAt: { type: Date, default: null },
+    // Set once when a cancelled order gives its slot back
+    slotReleasedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const orderShippingMethodSchema = new mongoose.Schema(
   {
     id: {
@@ -337,6 +360,10 @@ const orderSchema = new mongoose.Schema(
       type: orderShippingMethodSchema,
       default: () => ({}),
     },
+    fulfilment: {
+      type: orderFulfilmentSchema,
+      default: () => ({}),
+    },
     tracking: {
       type: trackingSchema,
       default: () => ({}),
@@ -375,6 +402,7 @@ orderSchema.pre("validate", function preValidateOrder() {
 });
 
 orderSchema.statics.ORDER_STATUS = ORDER_STATUS;
+orderSchema.statics.COMPLETED_STATUSES = COMPLETED_STATUSES;
 orderSchema.statics.PAYMENT_METHODS = PAYMENT_METHODS;
 orderSchema.statics.PAYMENT_STATUSES = PAYMENT_STATUSES;
 orderSchema.statics.SHIPMENT_EVENT_STATUSES = SHIPMENT_EVENT_STATUSES;

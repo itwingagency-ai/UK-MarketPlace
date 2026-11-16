@@ -20,6 +20,7 @@ const { geocodeAddress, haversineKm, isValidLatLng } = require("../lib/geoUtils"
 const Store = require("../models/Store");
 const Cart = require("../models/Cart");
 const User = require("../models/User");
+const { choiceFor } = require("../lib/fulfilment");
 
 /**
  * Resolve the customer's delivery coordinates from the request body.
@@ -98,9 +99,10 @@ const requireWithinDeliveryZone = async (req, res, next) => {
     const cart = await Cart.findOne({ user: req.user.id }).lean();
     if (!cart || !cart.items || cart.items.length === 0) return next();
 
+    // Orders the customer collects don't need the address in range
     const storeIds = [
       ...new Set(cart.items.map((i) => String(i.store)).filter(Boolean)),
-    ];
+    ].filter((id) => choiceFor(cart, id).method !== "collection");
     if (storeIds.length === 0) return next();
 
     // Step 3 — Fetch stores with location data

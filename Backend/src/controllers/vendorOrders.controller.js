@@ -47,6 +47,10 @@ const buildListFilter = (req) => {
     filter.orderStatus = req.query.status;
   }
 
+  if (["delivery", "collection"].includes(req.query.method)) {
+    filter["fulfilment.method"] = req.query.method === "delivery" ? { $ne: "collection" } : "collection";
+  }
+
   if (req.query.paymentStatus) {
     if (!PAYMENT_STATUSES.includes(req.query.paymentStatus)) {
       throw new ApiError(400, "Invalid paymentStatus filter");
@@ -82,13 +86,19 @@ const listOrders = asyncHandler(async (req, res) => {
 
   const filter = buildListFilter(req);
 
+  // sort=slot: booked slots soonest first (ASAP orders, with no slot, lead)
+  const sort =
+    req.query.sort === "slot"
+      ? { "fulfilment.slotStart": 1, createdAt: 1 }
+      : { createdAt: -1 };
+
   const [orders, total] = await Promise.all([
     Order.find(filter)
-      .sort({ createdAt: -1 })
+      .sort(sort)
       .skip(skip)
       .limit(limit)
       .select(
-        "orderNumber customer customerSnapshot subtotal shippingFee total paymentMethod paymentStatus orderStatus tracking createdAt"
+        "orderNumber customer customerSnapshot subtotal shippingFee total paymentMethod paymentStatus orderStatus tracking fulfilment createdAt"
       )
       .populate("customer", "name email"),
     Order.countDocuments(filter),
@@ -139,7 +149,8 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   const order = req.scopedResource;
   if (!order) throw new ApiError(404, "Order not found");
 
-  const { nextStatus } = validateOrderStatusPayload(req.body, order.orderStatus);
+  const method = order.fulfilment?.method || "delivery";
+  const { nextStatus } = validateOrderStatusPayload(req.body, order.orderStatus, method);
   const previousStatus = order.orderStatus;
 
   // Accepting an order can promise a ready time ("ready in 30 min")
@@ -209,9 +220,16 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   if (nextStatus === "cancelled" && !order.tracking.cancelledAt) {
     order.tracking.cancelledAt = now;
   }
+  if (nextStatus === "ready_for_collection" && !order.fulfilment.readyAt) {
+    order.fulfilment.readyAt = now;
+  }
+  if (nextStatus === "collected" && !order.fulfilment.collectedAt) {
+    order.fulfilment.collectedAt = now;
+  }
 
+  // Cash is taken at the door, or at the counter for collections
   if (
-    nextStatus === "delivered" &&
+    Order.COMPLETED_STATUSES.includes(nextStatus) &&
     order.paymentMethod === "cod" &&
     order.paymentStatus !== "paid"
   ) {
@@ -222,7 +240,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
       provider: "cod",
       by: req.user.id,
       byRole: req.user.role,
-      note: "Cash collected on delivery",
+      note: nextStatus === "collected" ? "Cash taken at collection" : "Cash collected on delivery",
     });
   }
 
@@ -259,6 +277,10 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     onOrderShipped(order);
   } else if (nextStatus === "delivered") {
     onOrderDelivered(order);
+    if (order.paymentMethod === "cod" && order.paymentStatus === "paid") {
+      onOrderPaymentSucceeded(order);
+    }
+  } else if (nextStatus === "collected") {
     if (order.paymentMethod === "cod" && order.paymentStatus === "paid") {
       onOrderPaymentSucceeded(order);
     }
