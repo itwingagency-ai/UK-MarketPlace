@@ -1,6 +1,35 @@
 const ApiError = require("../lib/ApiError");
 const { validateFeesPayload } = require("./offers.validator");
 
+const validateLoyaltyPayload = (L) => {
+  if (!L || typeof L !== "object" || Array.isArray(L)) throw new ApiError(400, "loyalty must be an object");
+  const ints = {
+    earnPointsPerPound: [0, 100],
+    pointValuePence: [1, 100],
+    minRedeemPoints: [0, 1000000],
+    maxRedeemPoints: [0, 1000000],
+    minBasketToRedeem: [0, 100000000],
+    expiryMonths: [1, 60],
+  };
+  for (const [k, [min, max]] of Object.entries(ints)) {
+    if (L[k] === undefined) continue;
+    if (!Number.isInteger(L[k]) || L[k] < min || L[k] > max) {
+      throw new ApiError(400, `loyalty.${k} must be a whole number from ${min} to ${max}`);
+    }
+  }
+  if (L.enabled !== undefined && typeof L.enabled !== "boolean") throw new ApiError(400, "loyalty.enabled must be true or false");
+  if (L.referral !== undefined) {
+    const R = L.referral;
+    if (!R || typeof R !== "object") throw new ApiError(400, "loyalty.referral must be an object");
+    if (R.enabled !== undefined && typeof R.enabled !== "boolean") throw new ApiError(400, "loyalty.referral.enabled must be true or false");
+    for (const k of ["referrerPoints", "refereeCouponValue", "refereeMinSubtotal"]) {
+      if (R[k] !== undefined && (!Number.isInteger(R[k]) || R[k] < 0 || R[k] > 100000000)) {
+        throw new ApiError(400, `loyalty.referral.${k} must be a whole number, 0 or more`);
+      }
+    }
+  }
+};
+
 const isPlainObject = (value) =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
@@ -207,6 +236,7 @@ const validatePlatformSettingsUpdate = (payload) => {
   }
 
   if (payload.fees !== undefined) validateFeesPayload(payload.fees);
+  if (payload.loyalty !== undefined) validateLoyaltyPayload(payload.loyalty);
 
   if (payload.policies !== undefined && !isPlainObject(payload.policies)) {
     throw new ApiError(400, "policies must be an object");

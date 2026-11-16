@@ -59,8 +59,9 @@ const isLive = (doc, now) =>
   (!doc.endsAt || new Date(doc.endsAt) > now);
 
 /** Reasons a coupon can never apply to this customer right now; null if none. */
-const couponBlocker = (coupon, { now, usageCount = 0, isFirstOrder = true }) => {
+const couponBlocker = (coupon, { now, usageCount = 0, isFirstOrder = true, userId = null }) => {
   if (!coupon) return "We don't recognise that code";
+  if (coupon.allowedUser && String(coupon.allowedUser) !== String(userId)) return "This code belongs to another account";
   if (coupon.isActive === false) return "This code is no longer active";
   if (coupon.startsAt && new Date(coupon.startsAt) > now) return "This code isn't active yet";
   if (coupon.endsAt && new Date(coupon.endsAt) <= now) return "This code has expired";
@@ -131,6 +132,70 @@ const couponAdjustment = (coupon, amount) => ({
 });
 
 /**
+ * Spend rewards points on the basket, after coupons. Mutates each state's
+ * adjustments and goodsLeft. Points only reduce goods at stores that take
+ * part (store.loyaltyOptIn), are spread across them in proportion, and are
+ * capped by: balance, the per-checkout maximum, the goods left, and the
+ * minimum basket. Below the minimum spend of points, none are used.
+ */
+const applyLoyalty = (states, loyalty) => {
+  const off = { enabled: false, balance: 0, requestedPoints: 0, appliedPoints: 0, value: 0, maxPoints: 0, earnEstimate: 0, message: "" };
+  if (!loyalty?.cfg?.enabled) return off;
+  const { cfg, balance = 0, requestedPoints = 0 } = loyalty;
+  const eligible = states.filter((st) => st.g.store?.loyaltyOptIn);
+  const base = {
+    ...off,
+    enabled: eligible.length > 0,
+    balance,
+    requestedPoints,
+    pointValuePence: cfg.pointValuePence,
+    minRedeemPoints: cfg.minRedeemPoints,
+    earnPointsPerPound: cfg.earnPointsPerPound,
+  };
+  if (!eligible.length) return base;
+
+  const eligibleSubtotal = sumBy(eligible, (st) => st.subtotal);
+  const capacities = eligible.map((st) => Math.floor(Math.max(0, st.goodsLeft) / cfg.pointValuePence));
+  let maxPoints = Math.min(balance, sumBy(capacities, (c) => c));
+  if (cfg.maxRedeemPoints > 0) maxPoints = Math.min(maxPoints, cfg.maxRedeemPoints);
+  if (eligibleSubtotal < cfg.minBasketToRedeem) {
+    base.message = `Spend ${pounds(cfg.minBasketToRedeem)} to use your points`;
+    maxPoints = 0;
+  } else if (maxPoints < cfg.minRedeemPoints) {
+    if (balance < cfg.minRedeemPoints) base.message = `You can use points once you have ${cfg.minRedeemPoints}`;
+    maxPoints = 0;
+  }
+  base.maxPoints = maxPoints;
+
+  let applied = Math.min(Math.max(0, Math.floor(requestedPoints)), maxPoints);
+  if (applied > 0 && applied < cfg.minRedeemPoints) {
+    base.message = `Use at least ${cfg.minRedeemPoints} points`;
+    applied = 0;
+  }
+  if (!applied) return base;
+
+  const shares = allocate(applied, capacities);
+  eligible.forEach((st, i) => {
+    if (!shares[i]) return;
+    const amount = shares[i] * cfg.pointValuePence;
+    st.goodsLeft -= amount;
+    st.loyaltyPoints = shares[i];
+    st.adjustments.push({
+      kind: "loyalty",
+      code: "points",
+      label: `${shares[i]} points`,
+      info: "Rewards points, paid for by the marketplace",
+      amount,
+      fundedBy: "platform",
+    });
+  });
+  base.appliedPoints = applied;
+  base.value = applied * cfg.pointValuePence;
+  if (requestedPoints > applied) base.message = `Using ${applied} points, the most this basket allows`;
+  return base;
+};
+
+/**
  * @param {object} p
  * @param {Array}  p.groups       [{ storeId, store, settings, shippingMethod, method?,
  *                                   items: [{ product, category, unitPrice, quantity }] }]
@@ -153,6 +218,8 @@ const priceCart = ({
   couponUsage = new Map(),
   isFirstOrder = true,
   now = new Date(),
+  userId = null,
+  loyalty = null,
 }) => {
   const couponByCode = new Map(coupons.map((c) => [String(c.code).toUpperCase(), c]));
   const states = groups.map((g) => {
@@ -240,6 +307,7 @@ const priceCart = ({
       now,
       usageCount: coupon ? couponUsage.get(String(coupon._id)) || 0 : 0,
       isFirstOrder,
+      userId,
     });
     if (blocker) {
       result.message = blocker;
@@ -319,6 +387,9 @@ const priceCart = ({
     result.status = "applied";
     result.message = shares.some((x) => x > 0) ? "" : "Delivery is already free for this order";
   }
+
+  // 3b. Rewards points: platform-funded, only on taking-part stores' goods
+  const loyaltyResult = applyLoyalty(states, loyalty);
 
   // 4-5. Fees, tip, store rules
   const service = fees.service || {};
@@ -413,6 +484,7 @@ const priceCart = ({
     return {
       storeId: st.g.storeId,
       priced,
+      loyaltyPoints: st.loyaltyPoints || 0,
       appliedCoupons,
       promotion: st.promotion,
       optionalFees: st.optionalFees,
@@ -426,8 +498,18 @@ const priceCart = ({
     result.discount = sumBy(out, (g) => sumBy(g.appliedCoupons.filter((c) => c.code === result.code), (c) => c.amount));
   }
 
+  if (loyaltyResult.enabled) {
+    // Points this basket would earn once delivered / collected
+    loyaltyResult.earnEstimate = out.reduce((acc, g, i) => {
+      if (!states[i].g.store?.loyaltyOptIn) return acc;
+      const paid = Math.max(0, g.priced.subtotal - g.priced.discountTotal);
+      return acc + Math.floor((paid / 100) * loyalty.cfg.earnPointsPerPound);
+    }, 0);
+  }
+
   return {
     groups: out,
+    loyalty: loyaltyResult,
     coupons: couponResults,
     nearMisses: out.flatMap((g) => g.nearMisses),
     blockingIssues: out.flatMap((g) => g.blocking),
@@ -443,6 +525,8 @@ const priceCart = ({
  * @param {Array}  p.couponCodes
  */
 const loadOfferContext = async ({ userId, storeIds, productIds, couponCodes = [] }) => {
+  // eslint-disable-next-line global-require
+  const { getBalance, loyaltyConfig } = require("./loyalty");
   /* eslint-disable global-require */
   const Coupon = require("../models/Coupon");
   const CouponUsage = require("../models/CouponUsage");
@@ -473,8 +557,11 @@ const loadOfferContext = async ({ userId, storeIds, productIds, couponCodes = []
       ? await CouponUsage.find({ user: userId, coupon: { $in: coupons.map((c) => c._id) } }).lean()
       : [];
 
+  const loyaltyCfg = loyaltyConfig(settings);
   return {
     now,
+    loyaltyCfg,
+    loyaltyBalance: loyaltyCfg.enabled && userId ? await getBalance(userId) : 0,
     coupons,
     couponCodes: codes,
     promotions,
@@ -515,6 +602,8 @@ const priceCartWithOffers = async ({ cart, userId, groups }) => {
     couponUsage: ctx.couponUsage,
     isFirstOrder: ctx.isFirstOrder,
     now: ctx.now,
+    userId,
+    loyalty: { cfg: ctx.loyaltyCfg, balance: ctx.loyaltyBalance, requestedPoints: Number(cart?.loyaltyPoints || 0) },
   });
 };
 

@@ -90,6 +90,23 @@ const platformSettingsSchema = new mongoose.Schema(
         info: { type: String, default: "Paid to the store. Remove it if you don't need bags", trim: true, maxlength: 200 },
       },
     },
+    // Rewards points. Off until an admin turns it on; stores also opt in
+    // (Store.loyaltyOptIn). The platform pays for points spent.
+    loyalty: {
+      enabled: { type: Boolean, default: false },
+      earnPointsPerPound: { type: Number, default: 1, min: 0, max: 100 },
+      pointValuePence: { type: Number, default: 1, min: 1, max: 100 }, // 100 points = £1
+      minRedeemPoints: { type: Number, default: 100, min: 0 },
+      maxRedeemPoints: { type: Number, default: 0, min: 0 }, // per checkout, 0 = no cap
+      minBasketToRedeem: { type: Number, default: 0, min: 0 }, // pence, goods at taking-part stores
+      expiryMonths: { type: Number, default: 12, min: 1, max: 60 },
+      referral: {
+        enabled: { type: Boolean, default: false },
+        referrerPoints: { type: Number, default: 500, min: 0 },
+        refereeCouponValue: { type: Number, default: 500, min: 0 }, // pence off the first order
+        refereeMinSubtotal: { type: Number, default: 1500, min: 0 },
+      },
+    },
     // One-off data fixes already applied to this document
     migrations: {
       currencyFromEnvAt: { type: Date, default: null },

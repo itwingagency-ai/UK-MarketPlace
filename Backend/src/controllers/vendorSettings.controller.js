@@ -37,6 +37,7 @@ const getSettings = asyncHandler(async (req, res) => {
     shipping: settings?.shipping || { flatFee: 0, freeShippingThreshold: 0 },
     // Pence. Baskets below this (goods, before discounts) can't be checked out.
     minimumOrder: store.minimumOrder || 0,
+    loyaltyOptIn: Boolean(store.loyaltyOptIn),
   };
 
   return res.status(200).json({ data: result });
@@ -46,7 +47,7 @@ const updateSettings = asyncHandler(async (req, res) => {
   validateSettingsPayload(req.body);
   const storeId = resolveTargetStoreId(req);
 
-  const { storeName, description, logoUrl, contactEmail, contactPhone, minimumOrder, ...otherSettings } = req.body;
+  const { storeName, description, logoUrl, contactEmail, contactPhone, minimumOrder, loyaltyOptIn, ...otherSettings } = req.body;
 
   // 1. Update the Store document for root fields
   const storeUpdates = {};
@@ -54,6 +55,7 @@ const updateSettings = asyncHandler(async (req, res) => {
   if (description !== undefined) storeUpdates.description = description;
   // Multipart forms send numbers as strings
   if (minimumOrder !== undefined) storeUpdates.minimumOrder = Number(minimumOrder);
+  if (loyaltyOptIn !== undefined) storeUpdates.loyaltyOptIn = loyaltyOptIn === true || loyaltyOptIn === "true";
   if (contactEmail !== undefined || contactPhone !== undefined) {
     const store = await Store.findById(storeId).select("contact");
     storeUpdates.contact = {

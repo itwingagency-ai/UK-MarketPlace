@@ -200,7 +200,7 @@ const buildCartSummary = async (cart) => {
       : Promise.resolve([]),
     findActiveShippingMethodsByStores(storeIds),
     storeIds.length
-      ? Store.find({ _id: { $in: storeIds } }).select(`slug location locationSet deliveryRadiusKm minimumOrder ${STORE_FULFILMENT_FIELDS}`)
+      ? Store.find({ _id: { $in: storeIds } }).select(`slug location locationSet deliveryRadiusKm minimumOrder loyaltyOptIn ${STORE_FULFILMENT_FIELDS}`)
       : Promise.resolve([]),
   ]);
   const settingsByStore = new Map(
@@ -264,6 +264,8 @@ const buildCartSummary = async (cart) => {
     group.total = priced.total;
     group.promotion = result.groups[i].promotion;
     group.optionalFees = result.groups[i].optionalFees;
+    group.loyaltyOptIn = Boolean(storesById.get(String(group.storeId))?.loyaltyOptIn);
+    group.loyaltyPoints = result.groups[i].loyaltyPoints;
     group.nearMisses = result.groups[i].nearMisses;
     group.note = notes[String(group.storeId)] || "";
 
@@ -287,6 +289,7 @@ const buildCartSummary = async (cart) => {
     tipTotal,
     grandTotal,
     coupons: result.coupons,
+    loyalty: result.loyalty,
     nearMisses: result.nearMisses,
     blockingIssues: [
       ...result.blockingIssues,

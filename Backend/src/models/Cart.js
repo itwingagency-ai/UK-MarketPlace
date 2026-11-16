@@ -96,6 +96,8 @@ const cartSchema = new mongoose.Schema(
       ),
       default: () => new Map(),
     },
+    // Rewards points the customer wants to spend (capped server-side)
+    loyaltyPoints: { type: Number, default: 0, min: 0 },
     // May the store swap an unavailable item for a close match?
     allowSubstitutions: { type: Boolean, default: true },
   },

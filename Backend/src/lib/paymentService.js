@@ -20,6 +20,7 @@ const User = require("../models/User");
 const { getStripeClient, isStripeConfigured } = require("./stripeClient");
 const { releaseCouponRedemptions } = require("./couponRedemptions");
 const { releaseSlot } = require("./slotBookings");
+const loyalty = require("./loyalty");
 
 const restoreStockForOrder = async (order) => {
   for (const item of order.items || []) {
@@ -65,6 +66,25 @@ const releaseCancelledOrder = async (order, { reason = "Order cancelled" } = {})
   await restoreStockForOrderOnce(order);
   await releaseCouponRedemptions(order, { reason });
   await releaseSlot(order);
+  const platform = await PlatformSettings.getOrInit();
+  await loyalty.restoreRedemption(order, loyalty.loyaltyConfig(platform));
+};
+
+/**
+ * An order reached delivered / collected: credit its points (taking-part
+ * stores only) and check whether it completes a referral. Never throws.
+ */
+const onOrderCompleted = async (order) => {
+  try {
+    const [platform, store] = await Promise.all([
+      PlatformSettings.getOrInit(),
+      Store.findById(order.store).select("loyaltyOptIn"),
+    ]);
+    await loyalty.awardForOrder(order, { cfg: loyalty.loyaltyConfig(platform), store });
+    await loyalty.qualifyReferral(order);
+  } catch (err) {
+    console.error(`[loyalty] completion hook failed for ${order.orderNumber}: ${err.message}`);
+  }
 };
 
 /**
@@ -116,6 +136,8 @@ const refundOrderIfPaid = async (order, { by = null, byRole = "system", reason =
   }
 
   order.paymentStatus = "refunded";
+  // Points earned on a refunded order are taken back
+  await loyalty.reverseEarned(order);
   appendPaymentEvent(order, {
     status: "refunded",
     provider: "stripe",
@@ -299,6 +321,7 @@ module.exports = {
   restoreStockForOrder,
   restoreStockForOrderOnce,
   releaseCancelledOrder,
+  onOrderCompleted,
   refundOrderIfPaid,
   appendPaymentEvent,
   appendStatusHistory,

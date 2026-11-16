@@ -101,6 +101,15 @@ const userSchema = new mongoose.Schema(
         ref: "Product",
       },
     ],
+    // This customer's invite code (made on first visit to Rewards)
+    referralCode: {
+      type: String,
+      default: undefined,
+      unique: true,
+      sparse: true,
+      uppercase: true,
+      trim: true,
+    },
     googleId: {
       type: String,
       sparse: true,

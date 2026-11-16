@@ -57,6 +57,7 @@ const {
 } = require("../controllers/globalCategories.controller");
 
 const offers = require("../controllers/offersManagement.controller");
+const loyaltyAdmin = require("../controllers/loyalty.controller");
 
 const router = express.Router();
 
@@ -91,6 +92,12 @@ router.get("/settings", getSettings);
 router.patch("/settings", updateSettings);
 
 router.get("/commission/summary", commissionSummary);
+
+// Rewards points and referrals
+router.get("/loyalty/ledger", loyaltyAdmin.adminLedger);
+router.post("/loyalty/adjust", loyaltyAdmin.adminAdjust);
+router.get("/referrals", loyaltyAdmin.adminReferrals);
+router.patch("/referrals/:id", loyaltyAdmin.adminReviewReferral);
 
 // Coupons and automatic offers (redemptions must stay above /coupons/:id)
 router.get("/coupons/redemptions", offers.listRedemptions);

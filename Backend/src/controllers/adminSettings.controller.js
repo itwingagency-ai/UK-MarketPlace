@@ -33,6 +33,18 @@ const updateSettings = asyncHandler(async (req, res) => {
     settings.currency = req.body.currency.toLowerCase().trim();
   }
 
+  if (req.body.loyalty && typeof req.body.loyalty === "object") {
+    const L = req.body.loyalty;
+    for (const key of ["enabled", "earnPointsPerPound", "pointValuePence", "minRedeemPoints", "maxRedeemPoints", "minBasketToRedeem", "expiryMonths"]) {
+      if (L[key] !== undefined) settings.set(`loyalty.${key}`, L[key]);
+    }
+    if (L.referral && typeof L.referral === "object") {
+      for (const key of ["enabled", "referrerPoints", "refereeCouponValue", "refereeMinSubtotal"]) {
+        if (L.referral[key] !== undefined) settings.set(`loyalty.referral.${key}`, L.referral[key]);
+      }
+    }
+  }
+
   if (req.body.fees && typeof req.body.fees === "object") {
     for (const section of ["service", "smallOrder", "bag"]) {
       const patch = req.body.fees[section];

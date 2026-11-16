@@ -46,6 +46,8 @@ const couponSchema = new mongoose.Schema(
     firstOrderOnly: { type: Boolean, default: false },
     fundedBy: { type: String, enum: ["platform", "vendor"], required: true },
     isActive: { type: Boolean, default: true, index: true },
+    // Only this customer may use it (referral welcome codes)
+    allowedUser: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     // Checkouts currently holding this coupon (claimed atomically at placement,
     // released when every order of that checkout is cancelled)
     redemptionCount: { type: Number, default: 0, min: 0 },

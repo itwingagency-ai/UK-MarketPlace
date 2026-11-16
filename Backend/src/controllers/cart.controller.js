@@ -184,6 +184,7 @@ const applyCoupon = asyncHandler(async (req, res) => {
     now: new Date(),
     usageCount: usage?.count || 0,
     isFirstOrder: !priorOrder,
+    userId: req.user.id,
   });
   if (blocker) throw new ApiError(coupon ? 409 : 404, blocker);
 
@@ -294,7 +295,28 @@ const setFulfilment = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * PUT /cart/loyalty { points } — points to spend, 0 to stop using them.
+ * The server caps it (balance, per-checkout maximum, the goods at taking-part
+ * stores) and the summary says how many are actually being used.
+ */
+const setLoyaltyPoints = asyncHandler(async (req, res) => {
+  const points = req.body?.points;
+  if (!Number.isInteger(points) || points < 0 || points > 10000000) {
+    throw new ApiError(400, "points must be a whole number, 0 or more");
+  }
+  const cart = await getOrCreateCart(req.user.id);
+  cart.loyaltyPoints = points;
+  await cart.save();
+  const summary = await buildCartSummary(cart);
+  res.status(200).json({
+    message: points ? summary.loyalty?.message || `Using ${summary.loyalty?.appliedPoints || 0} points` : "Not using points",
+    data: summary,
+  });
+});
+
 module.exports = {
+  setLoyaltyPoints,
   setFulfilment,
   applyCoupon,
   removeCoupon,

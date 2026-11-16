@@ -16,6 +16,7 @@ const { orderPricingFields } = require("../lib/pricing");
 const { priceCartWithOffers } = require("../lib/offers");
 const { claimCouponRedemptions } = require("../lib/couponRedemptions");
 const { claimSlots } = require("../lib/slotBookings");
+const { claimRedemption } = require("../lib/loyalty");
 const { STORE_FULFILMENT_FIELDS, choiceFor, resolveFulfilment } = require("../lib/fulfilment");
 const { getPlatformCurrency } = require("../lib/currency");
 const { getStripeClient, isStripeConfigured } = require("../lib/stripeClient");
@@ -164,7 +165,7 @@ const priceGroups = async (groups, { cart, userId }) => {
   const list = Array.from(groups.values());
   const stores = list.length
     ? await Store.find({ _id: { $in: list.map((g) => g.storeId) } }).select(
-      `slug location locationSet deliveryRadiusKm minimumOrder ${STORE_FULFILMENT_FIELDS}`
+      `slug location locationSet deliveryRadiusKm minimumOrder loyaltyOptIn ${STORE_FULFILMENT_FIELDS}`
     )
     : [];
   const storesById = new Map(stores.map((st) => [String(st._id), st]));
@@ -268,6 +269,8 @@ const buildPreviewResponse = async (evaluatedItems, selections, { cart, userId }
       nearMisses: group.offers.nearMisses,
       minimumOrder: store?.minimumOrder || 0,
       fulfilment: group.fulfilment,
+      loyaltyOptIn: Boolean(store?.loyaltyOptIn),
+      loyaltyPoints: group.offers.loyaltyPoints,
       note: notes[String(group.storeId)] || "",
       availableShippingMethods: (group.availableShippingMethods || []).map(
         buildMethodSnapshot
@@ -295,6 +298,7 @@ const buildPreviewResponse = async (evaluatedItems, selections, { cart, userId }
     tipTotal,
     grandTotal,
     coupons: offers.coupons,
+    loyalty: offers.loyalty,
     nearMisses: offers.nearMisses,
     blockingIssues: offers.blockingIssues,
     options: { allowSubstitutions: cart.allowSubstitutions !== false },
@@ -477,6 +481,7 @@ const buildOrderDoc = ({
     },
   ],
   shippingMethod: buildShippingMethodSnapshot(storeGroup.shippingMethod),
+  loyalty: { pointsRedeemed: storeGroup.offers?.loyaltyPoints || 0 },
   fulfilment: {
     method: storeGroup.fulfilment?.method || "delivery",
     asap: storeGroup.fulfilment?.asap !== false,
@@ -505,7 +510,7 @@ const orderDocsFor = ({ cart, storeGroups, user, shippingAddress, paymentMethod,
 
 // After placement the cart is empty and its one-off choices are spent.
 // allowSubstitutions is a standing preference, so it stays.
-const CLEARED_CART = { items: [], couponCodes: [], tips: {}, notes: {}, declinedFees: {}, fulfilment: {} };
+const CLEARED_CART = { items: [], couponCodes: [], tips: {}, notes: {}, declinedFees: {}, fulfilment: {}, loyaltyPoints: 0 };
 
 const storesOf = (storeGroups) =>
   new Map(Array.from(storeGroups.values()).map((g) => [String(g.storeId), g.store]));
@@ -536,6 +541,7 @@ const placeOrdersWithTransaction = async ({
 
     await claimCouponRedemptions({ orders, userId: user._id, checkoutId, session });
     await claimSlots({ orders, storesById: storesOf(storeGroups), session });
+    await claimRedemption({ orders, userId: user._id, session });
 
     await Cart.updateOne(
       { _id: cart._id },
@@ -570,6 +576,7 @@ const placeOrdersWithCompensation = async ({
   const createdOrderIds = [];
   let couponClaim = null;
   let slotClaim = null;
+  let pointsClaim = null;
 
   try {
     for (const group of storeGroups.values()) {
@@ -591,11 +598,13 @@ const placeOrdersWithCompensation = async ({
     // Undoes its own partial claims if it throws
     couponClaim = await claimCouponRedemptions({ orders, userId: user._id, checkoutId });
     slotClaim = await claimSlots({ orders, storesById: storesOf(storeGroups) });
+    pointsClaim = await claimRedemption({ orders, userId: user._id });
 
     await Cart.updateOne({ _id: cart._id }, { $set: CLEARED_CART });
 
     return orders;
   } catch (err) {
+    if (pointsClaim) await pointsClaim.undo().catch(() => { });
     if (slotClaim) await slotClaim.undo().catch(() => { });
     if (couponClaim) await couponClaim.undo().catch(() => { });
     for (const item of decrementedItems) {

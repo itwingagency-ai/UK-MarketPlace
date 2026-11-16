@@ -5,6 +5,7 @@ const {
   removeCoupon,
   setCartOptions,
   setFulfilment,
+  setLoyaltyPoints,
   setTip,
   clearCart,
   getCart,
@@ -24,5 +25,6 @@ router.delete("/coupon/:code", removeCoupon);
 router.put("/tip", setTip);
 router.put("/options", setCartOptions);
 router.put("/fulfilment", setFulfilment);
+router.put("/loyalty", setLoyaltyPoints);
 
 module.exports = router;

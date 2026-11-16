@@ -1,4 +1,6 @@
 const ms = require("ms");
+const PlatformSettings = require("../models/PlatformSettings");
+const { loyaltyConfig, startReferral } = require("../lib/loyalty");
 const ApiError = require("../lib/ApiError");
 const asyncHandler = require("../lib/asyncHandler");
 const {
@@ -58,6 +60,18 @@ const register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
   const normalizedEmail = email.trim().toLowerCase();
 
+  // Optional invite code: reject a mistyped one before creating anything
+  const inviteCode = typeof req.body.referralCode === "string" ? req.body.referralCode.trim().toUpperCase() : "";
+  let loyaltyCfg = null;
+  if (inviteCode) {
+    loyaltyCfg = loyaltyConfig(await PlatformSettings.getOrInit());
+    if (loyaltyCfg.enabled && loyaltyCfg.referral.enabled) {
+      if (!(await User.exists({ referralCode: inviteCode, status: "active" }))) {
+        throw new ApiError(400, "That invite code isn't valid");
+      }
+    }
+  }
+
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
     if (existingUser.status === "active") {
@@ -78,6 +92,13 @@ const register = asyncHandler(async (req, res) => {
       password,
       role: "customer",
       status: "unverified",
+    });
+  }
+
+  if (inviteCode && loyaltyCfg) {
+    // Never block sign-up on the referral side effects
+    await startReferral({ referee: user, code: inviteCode, cfg: loyaltyCfg }).catch((err) => {
+      console.error(`[referral] not started for ${normalizedEmail}: ${err.message}`);
     });
   }
 

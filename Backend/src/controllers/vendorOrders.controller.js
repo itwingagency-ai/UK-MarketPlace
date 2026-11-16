@@ -5,6 +5,7 @@ const {
   applyCommissionSnapshot,
   refundOrderIfPaid,
   releaseCancelledOrder,
+  onOrderCompleted,
 } = require("../lib/paymentService");
 const { computeEstimatedDelivery } = require("../lib/shippingUtils");
 const {
@@ -266,6 +267,11 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
       byRole: req.user.role,
       reason: "Refunded after cancellation",
     });
+  }
+
+  // Points and referral rewards are earned only once goods are handed over
+  if (Order.COMPLETED_STATUSES.includes(nextStatus)) {
+    await onOrderCompleted(order);
   }
 
   // Live update for anyone watching the order, and an alert to the customer

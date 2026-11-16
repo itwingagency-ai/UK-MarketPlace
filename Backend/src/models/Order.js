@@ -364,6 +364,12 @@ const orderSchema = new mongoose.Schema(
       type: orderFulfilmentSchema,
       default: () => ({}),
     },
+    // Rewards points on this order (the loyalty price line holds their value)
+    loyalty: {
+      pointsRedeemed: { type: Number, default: 0, min: 0 },
+      pointsEarned: { type: Number, default: 0, min: 0 },
+      earnedAt: { type: Date, default: null },
+    },
     tracking: {
       type: trackingSchema,
       default: () => ({}),

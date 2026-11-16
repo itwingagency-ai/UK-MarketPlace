@@ -115,6 +115,9 @@ const storeSchema = new mongoose.Schema(
       daysAhead: { type: Number, default: 0, min: 0, max: 14 }, // 0 = ASAP only
       collectionInstructions: { type: String, default: "", trim: true, maxlength: 300 },
     },
+    // Takes part in marketplace rewards: its orders earn points and customers
+    // can spend points on them (the platform pays for points spent).
+    loyaltyOptIn: { type: Boolean, default: false },
     // Smallest basket (goods, before discounts) this store accepts, pence. 0 = none.
     minimumOrder: {
       type: Number,
