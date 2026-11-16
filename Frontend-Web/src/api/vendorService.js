@@ -294,4 +294,10 @@ export const vendorService = {
     const { data } = await client.patch(`/vendor/dashboard/orders/${orderId}/items/${index}`, payload);
     return data;
   },
+
+  /* ── Repeat orders coming up ── */
+  getUpcomingRepeatOrders: async (days = 14) => {
+    const { data } = await client.get('/vendor/dashboard/subscriptions/upcoming', { params: { days } });
+    return data;
+  },
 };

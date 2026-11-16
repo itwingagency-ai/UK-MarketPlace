@@ -23,6 +23,7 @@ import {
   GalleryHorizontal,
   CalendarClock,
   Bike,
+  Repeat,
   MapPin,
   Clock,
   FolderTree,
@@ -86,6 +87,7 @@ const vendorNav = [
     label: 'Sales',
     items: [
       { to: '/vendor/orders', icon: ShoppingCart, text: 'Orders' },
+      { to: '/vendor/repeat-orders', icon: Repeat, text: 'Repeat orders' },
       { to: '/vendor/offers', icon: Ticket, text: 'Coupons & Offers' },
       { to: '/vendor/reviews', icon: Star, text: 'Reviews' },
       { to: '/vendor/reports', icon: FileText, text: 'Reports' },

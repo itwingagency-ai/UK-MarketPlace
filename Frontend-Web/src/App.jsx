@@ -47,6 +47,7 @@ import ReviewsPage from './pages/vendor/ReviewsPage';
 import ReportsPage from './pages/vendor/ReportsPage';
 import CommissionPageVendor from './pages/vendor/CommissionPage';
 import VendorOffersPage from './pages/vendor/OffersPage';
+import RepeatOrdersPage from './pages/vendor/RepeatOrdersPage';
 /* ── Shared ── */
 import PlaceholderPage from './components/common/PlaceholderPage';
 
@@ -114,6 +115,7 @@ export default function App() {
             <Route path="orders" element={<OrdersPage />} />
             <Route path="reviews" element={<ReviewsPage />} />
             <Route path="offers" element={<VendorOffersPage />} />
+            <Route path="repeat-orders" element={<RepeatOrdersPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="analytics" element={<VendorAnalyticsPage />} />
             <Route path="commission" element={<CommissionPageVendor />} />
