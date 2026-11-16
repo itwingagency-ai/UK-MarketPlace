@@ -27,6 +27,7 @@ import CommissionPage from './pages/admin/CommissionPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
 import CategoryStudioPage from './pages/admin/CategoryStudioPage';
 import AdminOffersPage from './pages/admin/OffersPage';
+import RewardsPage from './pages/admin/RewardsPage';
 
 /* ── Vendor Pages ── */
 import VendorDashboard from './pages/vendor/VendorDashboard';
@@ -80,6 +81,7 @@ export default function App() {
             <Route path="settings" element={<PlatformSettingsPage />} />
             <Route path="commission" element={<CommissionPage />} />
             <Route path="offers" element={<AdminOffersPage />} />
+            <Route path="rewards" element={<RewardsPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
           </Route>
 

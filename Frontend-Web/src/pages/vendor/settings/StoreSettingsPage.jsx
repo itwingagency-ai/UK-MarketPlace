@@ -46,6 +46,7 @@ export default function StoreSettingsPage() {
     contactEmail: '',
     contactPhone: '',
     minimumOrderPounds: '',
+    loyaltyOptIn: false,
   });
 
   useEffect(() => {
@@ -67,6 +68,7 @@ export default function StoreSettingsPage() {
         contactPhone: data.contactPhone || '',
         // Stored in pence; edited in pounds
         minimumOrderPounds: data.minimumOrder ? (data.minimumOrder / 100).toFixed(2) : '',
+        loyaltyOptIn: Boolean(data.loyaltyOptIn),
       };
       setFormData(normalized);
       initialData.current = JSON.stringify(normalized);
@@ -79,9 +81,9 @@ export default function StoreSettingsPage() {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData((prev) => {
-      const next = { ...prev, [name]: value };
+      const next = { ...prev, [name]: type === 'checkbox' ? checked : value };
       setIsDirty(JSON.stringify(next) !== initialData.current);
       return next;
     });
@@ -109,7 +111,9 @@ export default function StoreSettingsPage() {
       setSaving(true);
       const payload = new FormData();
       Object.keys(formData).forEach(key => {
-        if (key === 'minimumOrderPounds') {
+        if (key === 'loyaltyOptIn') {
+          payload.append('loyaltyOptIn', formData.loyaltyOptIn ? 'true' : 'false');
+        } else if (key === 'minimumOrderPounds') {
           payload.append('minimumOrder', String(Math.round(Number(formData.minimumOrderPounds || 0) * 100)));
         } else if (key === 'bannerFile') {
           if (formData.bannerFile) payload.append('bannerImage', formData.bannerFile);
@@ -332,6 +336,15 @@ export default function StoreSettingsPage() {
               />
               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 'var(--space-1)' }}>
                 Customers can't check out below this (goods only, before discounts). Leave empty for no minimum.
+              </p>
+            </div>
+            <div className="form-group">
+              <label className="flex items-center cursor-pointer" style={{ gap: '0.5rem', fontWeight: 600 }}>
+                <input type="checkbox" name="loyaltyOptIn" checked={formData.loyaltyOptIn} onChange={handleChange} id="loyalty-optin-input" />
+                Take part in marketplace Rewards
+              </label>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: 'var(--space-1)' }}>
+                Customers earn points on your orders and can spend points with you. The marketplace pays for points spent, so your payout isn't reduced.
               </p>
             </div>
           </div>

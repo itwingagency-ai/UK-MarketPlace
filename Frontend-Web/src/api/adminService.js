@@ -204,4 +204,22 @@ export const adminService = {
     const { data } = await client.delete(`/admin/promotions/${id}`);
     return data;
   },
+
+  /* ── Rewards points and referrals ── */
+  getLoyaltyLedger: async (params) => {
+    const { data } = await client.get('/admin/loyalty/ledger', { params });
+    return data;
+  },
+  adjustLoyalty: async (payload) => {
+    const { data } = await client.post('/admin/loyalty/adjust', payload);
+    return data;
+  },
+  getReferrals: async (params) => {
+    const { data } = await client.get('/admin/referrals', { params });
+    return data;
+  },
+  reviewReferral: async (id, payload) => {
+    const { data } = await client.patch(`/admin/referrals/${id}`, payload);
+    return data;
+  },
 };
