@@ -21,6 +21,7 @@ import {
   Ticket,
   Gift,
   CalendarClock,
+  Bike,
   MapPin,
   Clock,
   FolderTree,
@@ -94,6 +95,7 @@ const vendorNav = [
     items: [
       { to: '/vendor/settings', icon: Settings, text: 'Store Settings' },
       { to: '/vendor/fulfilment', icon: CalendarClock, text: 'Delivery & Collection' },
+      { to: '/vendor/riders', icon: Bike, text: 'Riders' },
       { to: '/vendor/shipping', icon: Truck, text: 'Shipping Methods' },
       { to: '/vendor/operating-hours', icon: Clock, text: 'Operating Hours' },
       { to: '/vendor/location', icon: MapPin, text: 'Location' },

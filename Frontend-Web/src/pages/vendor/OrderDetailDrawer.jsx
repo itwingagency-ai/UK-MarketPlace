@@ -49,6 +49,50 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
   const [trackingNumber, setTrackingNumber] = useState('');
   const [trackingUrl, setTrackingUrl] = useState('');
   const [cancellationReason, setCancellationReason] = useState('');
+  const [riders, setRiders] = useState([]);
+  const [idType, setIdType] = useState('');
+  const [itemEdit, setItemEdit] = useState(null); // { index, action, quantity, productId, variantId }
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    if (!open) return;
+    vendorService.getRiders().then((r) => setRiders(r?.data || [])).catch(() => setRiders([]));
+  }, [open]);
+
+  const assign = async (riderId) => {
+    try {
+      const res = await vendorService.assignRider(orderId, riderId || null);
+      toast.success(res.message);
+      fetchOrder();
+      onStatusChanged?.();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Couldn't assign the rider");
+    }
+  };
+
+  const openItemEdit = async (index, action) => {
+    setItemEdit({ index, action, quantity: String(order.items[index].quantity), productId: '', variantId: '' });
+    if (action === 'substitute' && products.length === 0) {
+      const res = await vendorService.getProducts({ limit: 100 }).catch(() => null);
+      setProducts(res?.data || []);
+    }
+  };
+
+  const saveItemEdit = async () => {
+    const { index, action, quantity, productId, variantId } = itemEdit;
+    const body = action === 'unavailable'
+      ? { action, quantity: Number(quantity) }
+      : { action, productId, ...(variantId ? { variantId } : {}) };
+    try {
+      const res = await vendorService.adjustOrderItem(orderId, index, body);
+      toast.success(res.message);
+      setItemEdit(null);
+      fetchOrder();
+      onStatusChanged?.();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Couldn't change that item");
+    }
+  };
 
   useEffect(() => {
     if (open && orderId) {
@@ -79,9 +123,18 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
   };
 
   const handleStatusUpdate = async (nextStatus) => {
+    // Age-restricted goods are handed over only after a photo-ID check
+    if (['delivered', 'collected'].includes(nextStatus) && order?.ageCheck > 0 && !idType) {
+      toast.error(`Pick the photo ID you checked (${order.ageCheck}+) first`);
+      return;
+    }
     try {
       setUpdating(true);
       const payload = { orderStatus: nextStatus, note: note.trim() || undefined };
+      if (['delivered', 'collected'].includes(nextStatus) && order?.ageCheck > 0) {
+        payload.ageVerified = true;
+        payload.idType = idType;
+      }
 
       if (nextStatus === 'shipped') {
         payload.tracking = {};
@@ -240,6 +293,58 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
                     <span>{order.tipAmount ? formatCurrency(order.tipAmount) : '—'}</span>
                   </div>
                 </div>
+                {order.fulfilment?.method !== 'collection' ? (
+                  <div className="form-group" style={{ marginTop: 'var(--space-2)' }}>
+                    <label className="form-label">Rider</label>
+                    <select
+                      className="form-select"
+                      value={order.delivery?.rider || ''}
+                      disabled={!['pending', 'confirmed', 'packed'].includes(order.orderStatus)}
+                      onChange={(e) => assign(e.target.value)}
+                    >
+                      <option value="">No rider (deliver yourself or by courier)</option>
+                      {riders.filter((r) => r.status === 'active' || r._id === order.delivery?.rider).map((r) => (
+                        <option key={r._id} value={r._id}>{r.name}</option>
+                      ))}
+                    </select>
+                    {order.delivery?.lastLocation?.at && order.orderStatus === 'shipped' ? (
+                      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)', marginTop: 4 }}>
+                        Last seen {formatDateTime(order.delivery.lastLocation.at)} ·{' '}
+                        <a href={`https://www.google.com/maps/search/?api=1&query=${order.delivery.lastLocation.lat},${order.delivery.lastLocation.lng}`} target="_blank" rel="noreferrer">map</a>
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+                {order.ageCheck > 0 && !['delivered', 'collected', 'cancelled'].includes(order.orderStatus) ? (
+                  <div className="form-group" style={{ marginTop: 'var(--space-2)' }}>
+                    <label className="form-label" style={{ color: '#b91c1c' }}>Photo ID checked on handover ({order.ageCheck}+)</label>
+                    <select className="form-select" value={idType} onChange={(e) => setIdType(e.target.value)}>
+                      <option value="">Not checked yet</option>
+                      <option value="passport">Passport</option>
+                      <option value="driving_licence">Driving licence</option>
+                      <option value="pass_card">PASS card</option>
+                      <option value="other_photo_id">Other photo ID</option>
+                    </select>
+                  </div>
+                ) : null}
+                {order.delivery?.proof?.recipientName || order.delivery?.proof?.photoUrl ? (
+                  <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-sm)' }}>
+                    Handed to <strong>{order.delivery.proof.recipientName || 'customer'}</strong>
+                    {order.delivery.proof.ageVerified ? ` · ID: ${order.delivery.proof.idType.replace('_', ' ')}` : ''}
+                    {order.delivery.proof.photoUrl ? (
+                      <div><a href={order.delivery.proof.photoUrl} target="_blank" rel="noreferrer">Doorstep photo</a></div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {(order.refunds || []).length > 0 ? (
+                  <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-sm)' }}>
+                    {order.refunds.map((r) => (
+                      <div key={r._id} style={{ color: r.status === 'failed' ? '#b91c1c' : 'var(--text-secondary)' }}>
+                        {formatCurrency(r.amount)} {r.provider === 'cod' ? 'off the cash due' : r.status === 'failed' ? 'refund FAILED, do it by hand' : 'refunded to card'} · {r.reason}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 {order.fulfilment?.arrivedAt && !['collected', 'cancelled'].includes(order.orderStatus) ? (
                   <div style={{ marginTop: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: '#fef3c7', color: '#92400e', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
                     Customer is outside (since {formatDateTime(order.fulfilment.arrivedAt)})
@@ -319,6 +424,40 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
                 </div>
               )}
 
+              {itemEdit ? (
+                <div className="order-section" style={{ background: '#fffbeb', borderRadius: 'var(--radius-md)', padding: 'var(--space-3)' }}>
+                  <div className="order-section-title">
+                    {itemEdit.action === 'unavailable' ? 'Mark unavailable' : 'Swap for'}: {order.items[itemEdit.index]?.title}
+                  </div>
+                  {itemEdit.action === 'unavailable' ? (
+                    <div className="form-group">
+                      <label className="form-label">How many can't you supply?</label>
+                      <input type="number" className="form-input" min="1" max={order.items[itemEdit.index]?.quantity} value={itemEdit.quantity} onChange={(e) => setItemEdit({ ...itemEdit, quantity: e.target.value })} />
+                    </div>
+                  ) : (
+                    <>
+                      <select className="form-select" value={itemEdit.productId} onChange={(e) => setItemEdit({ ...itemEdit, productId: e.target.value, variantId: '' })}>
+                        <option value="">Choose a product</option>
+                        {products.filter((p) => p.isActive !== false).map((p) => <option key={p._id} value={p._id}>{p.title}</option>)}
+                      </select>
+                      {(products.find((p) => p._id === itemEdit.productId)?.variants || []).length > 0 ? (
+                        <select className="form-select" style={{ marginTop: 'var(--space-2)' }} value={itemEdit.variantId} onChange={(e) => setItemEdit({ ...itemEdit, variantId: e.target.value })}>
+                          <option value="">Choose a size</option>
+                          {products.find((p) => p._id === itemEdit.productId).variants.map((v) => (
+                            <option key={v._id} value={v._id}>{Object.values(v.attributes || {}).join(' / ') || v.sku} · {formatCurrency(v.price)}</option>
+                          ))}
+                        </select>
+                      ) : null}
+                      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)', marginTop: 4 }}>The customer never pays more than the original price; a cheaper swap is refunded.</p>
+                    </>
+                  )}
+                  <div className="flex justify-end" style={{ gap: '0.5rem', marginTop: 'var(--space-2)' }}>
+                    <button className="btn btn-sm btn-outline" onClick={() => setItemEdit(null)}>Cancel</button>
+                    <button className="btn btn-sm btn-primary" onClick={saveItemEdit} disabled={itemEdit.action === 'substitute' && !itemEdit.productId}>Save and refund</button>
+                  </div>
+                </div>
+              ) : null}
+
               {/* ── Order Items ── */}
               <div className="order-section">
                 <div className="order-section-title"><Package size={12} style={{ display: 'inline', marginRight: 4 }} />Items ({order.items?.length || 0})</div>
@@ -329,6 +468,7 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
                       <th style={{ textAlign: 'right' }}>Qty</th>
                       <th style={{ textAlign: 'right' }}>Price</th>
                       <th style={{ textAlign: 'right' }}>Total</th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -348,9 +488,17 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
                               )}
                             </div>
                             <div>
-                              <div style={{ fontWeight: 500, fontSize: 'var(--text-sm)' }}>
+                              <div style={{ fontWeight: 500, fontSize: 'var(--text-sm)', textDecoration: ['unavailable', 'refused'].includes(item.lineStatus) ? 'line-through' : 'none' }}>
                                 {item.product?.title || item.title || 'Product'}
+                                {item.minAge ? <span style={{ marginLeft: 6, color: '#b91c1c', fontWeight: 700 }}>{item.minAge}+</span> : null}
                               </div>
+                              {item.lineStatus && item.lineStatus !== 'ok' ? (
+                                <div style={{ fontSize: 'var(--text-xs)', color: '#b45309' }}>
+                                  {item.lineStatus === 'substituted' ? `Substitute for ${item.substitutedFor}` : item.lineStatus === 'refused' ? 'Refused at handover (no ID)' : 'Unavailable, refunded'}
+                                </div>
+                              ) : item.originalQuantity && item.originalQuantity > item.quantity ? (
+                                <div style={{ fontSize: 'var(--text-xs)', color: '#b45309' }}>{item.originalQuantity - item.quantity} of {item.originalQuantity} unavailable, refunded</div>
+                              ) : null}
                               {item.variantSnapshot?.attributes?.description && (
                                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>
                                   {item.variantSnapshot.attributes.description}
@@ -363,6 +511,16 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
                         <td style={{ textAlign: 'right' }}>{formatCurrency(item.unitPrice || item.price || 0)}</td>
                         <td style={{ textAlign: 'right', fontWeight: 500 }}>
                           {formatCurrency((item.unitPrice || item.price || 0) * (item.quantity || 1))}
+                        </td>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {['ok', 'substituted'].includes(item.lineStatus || 'ok') && ['pending', 'confirmed', 'packed', 'ready_for_collection'].includes(order.orderStatus) ? (
+                            <>
+                              <button className="btn btn-sm btn-ghost" onClick={() => openItemEdit(i, 'unavailable')}>Unavailable</button>
+                              {order.allowSubstitutions !== false && ['pending', 'confirmed', 'packed'].includes(order.orderStatus) ? (
+                                <button className="btn btn-sm btn-ghost" onClick={() => openItemEdit(i, 'substitute')}>Swap</button>
+                              ) : null}
+                            </>
+                          ) : null}
                         </td>
                       </tr>
                     ))}

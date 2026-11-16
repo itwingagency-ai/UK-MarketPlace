@@ -28,6 +28,7 @@ const EMPTY_PRODUCT = {
   description: '',
   category: '',
   size: '',
+  minAge: '0',
   regularPrice: '',
   salePrice: '',
   stock: 0,
@@ -178,6 +179,7 @@ export default function ProductsPage() {
       description: editingProduct.description || '',
       category: editingProduct.category?._id || '',
       size: editingProduct.size || '',
+      minAge: String(editingProduct.minAge || 0),
       ...toPriceFields(editingProduct.price, editingProduct.compareAtPrice),
       stock: editingProduct.stock ?? 0,
       isActive: editingProduct.isActive,
@@ -190,6 +192,7 @@ export default function ProductsPage() {
     payload.append('description', values.description || '');
     payload.append('category', values.category || '');
     payload.append('isActive', values.isActive ? 'true' : 'false');
+    payload.append('minAge', String(values.minAge || 0));
 
     if (variantState.enabled) {
       const built = variantPayload(variantState);
@@ -402,6 +405,17 @@ export default function ProductsPage() {
       type: 'textarea',
       placeholder: 'What customers should know: ingredients, flavour, serving size…',
       rows: 4,
+    },
+    {
+      name: 'minAge',
+      label: 'Age restriction',
+      type: 'select',
+      options: [
+        { value: '0', label: 'None' },
+        { value: '16', label: '16+ (e.g. lottery, some solvents)' },
+        { value: '18', label: '18+ (alcohol, tobacco, vapes, knives)' },
+      ],
+      helpText: 'Customers confirm their age at checkout and must show photo ID on delivery or collection.',
     },
     {
       name: 'category',

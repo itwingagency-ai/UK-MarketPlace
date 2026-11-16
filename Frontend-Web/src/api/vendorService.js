@@ -272,4 +272,26 @@ export const vendorService = {
     const { data } = await client.patch('/vendor/dashboard/fulfilment', payload);
     return data;
   },
+
+  /* ── Delivery riders and item changes ── */
+  getRiders: async () => {
+    const { data } = await client.get('/vendor/dashboard/riders');
+    return data;
+  },
+  createRider: async (payload) => {
+    const { data } = await client.post('/vendor/dashboard/riders', payload);
+    return data;
+  },
+  updateRider: async (id, payload) => {
+    const { data } = await client.patch(`/vendor/dashboard/riders/${id}`, payload);
+    return data;
+  },
+  assignRider: async (orderId, riderId) => {
+    const { data } = await client.patch(`/vendor/dashboard/orders/${orderId}/rider`, { riderId });
+    return data;
+  },
+  adjustOrderItem: async (orderId, index, payload) => {
+    const { data } = await client.patch(`/vendor/dashboard/orders/${orderId}/items/${index}`, payload);
+    return data;
+  },
 };
