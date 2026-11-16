@@ -153,8 +153,12 @@ const runLoyaltyScenarios = ({ replSet }) => {
         body: { name: "Friend", email: "friend@example.test", password: "Passw0rdX", referralCode: code.toLowerCase() },
       });
       assert.equal(reg.status, 201, reg.text);
-      const otp = await model("Otp").findOne({ email: "friend@example.test" }).lean();
-      const verified = await h.api("POST", "/api/v1/auth/verify-signup", { body: { email: "friend@example.test", otp: otp.otp } });
+      // Codes are stored hashed, so plant a known one
+      const known = require("crypto").createHash("sha256").update("424242").digest("hex"); // eslint-disable-line global-require
+      const stored = await model("Otp").findOne({ email: "friend@example.test" }).lean();
+      assert.notEqual(stored.otp.length, 6, "the code isn't stored as typed");
+      await model("Otp").updateOne({ _id: stored._id }, { $set: { otp: known } });
+      const verified = await h.api("POST", "/api/v1/auth/verify-signup", { body: { email: "friend@example.test", otp: "424242" } });
       assert.equal(verified.status, 200, verified.text);
 
       const friend = await model("User").findOne({ email: "friend@example.test" });

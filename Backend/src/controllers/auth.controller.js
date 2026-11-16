@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const ms = require("ms");
 const PlatformSettings = require("../models/PlatformSettings");
 const { loyaltyConfig, startReferral } = require("../lib/loyalty");
@@ -49,6 +50,10 @@ const issueAuthTokens = async (user) => {
     refreshToken: refresh.token,
   };
 };
+
+// Codes are stored hashed: a database leak doesn't hand out live sign-up or
+// password-reset codes. (Codes are short-lived and rate-limited per email.)
+const hashOtp = (code) => crypto.createHash("sha256").update(String(code).trim()).digest("hex");
 
 const generateOtp = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -106,7 +111,7 @@ const register = asyncHandler(async (req, res) => {
   await Otp.deleteMany({ email: normalizedEmail, purpose: "signup" });
 
   const otp = generateOtp();
-  await Otp.create({ email: normalizedEmail, otp, purpose: "signup" });
+  await Otp.create({ email: normalizedEmail, otp: hashOtp(otp), purpose: "signup" });
 
   await sendEmail({
     to: normalizedEmail,
@@ -127,7 +132,7 @@ const verifySignup = asyncHandler(async (req, res) => {
   }
   const normalizedEmail = email.trim().toLowerCase();
 
-  const otpRecord = await Otp.findOne({ email: normalizedEmail, otp, purpose: "signup" });
+  const otpRecord = await Otp.findOne({ email: normalizedEmail, otp: hashOtp(otp), purpose: "signup" });
   if (!otpRecord) {
     throw new ApiError(400, "Invalid or expired OTP");
   }
@@ -169,7 +174,7 @@ const resendSignupOtp = asyncHandler(async (req, res) => {
 
   await Otp.deleteMany({ email: normalizedEmail, purpose: "signup" });
   const otp = generateOtp();
-  await Otp.create({ email: normalizedEmail, otp, purpose: "signup" });
+  await Otp.create({ email: normalizedEmail, otp: hashOtp(otp), purpose: "signup" });
 
   await sendEmail({
     to: normalizedEmail,
@@ -197,7 +202,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
   await Otp.deleteMany({ email: normalizedEmail, purpose: "reset_password" });
   const otp = generateOtp();
-  await Otp.create({ email: normalizedEmail, otp, purpose: "reset_password" });
+  await Otp.create({ email: normalizedEmail, otp: hashOtp(otp), purpose: "reset_password" });
 
   await sendEmail({
     to: normalizedEmail,
@@ -215,7 +220,7 @@ const verifyResetOtp = asyncHandler(async (req, res) => {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const otpRecord = await Otp.findOne({ email: normalizedEmail, otp, purpose: "reset_password" });
+  const otpRecord = await Otp.findOne({ email: normalizedEmail, otp: hashOtp(otp), purpose: "reset_password" });
   
   if (!otpRecord) {
     throw new ApiError(400, "Invalid or expired OTP");
@@ -234,7 +239,7 @@ const resetPassword = asyncHandler(async (req, res) => {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const otpRecord = await Otp.findOne({ email: normalizedEmail, otp, purpose: "reset_password" });
+  const otpRecord = await Otp.findOne({ email: normalizedEmail, otp: hashOtp(otp), purpose: "reset_password" });
   
   if (!otpRecord) {
     throw new ApiError(400, "Invalid or expired OTP");

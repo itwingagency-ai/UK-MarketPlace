@@ -25,7 +25,8 @@ export default function PlatformSettingsPage() {
         if (res.data) {
           setSettings({
             defaultCommissionRate: Number(((res.data.commission?.defaultRate || 0) * 100).toFixed(2)),
-            platformFee: res.data.commission?.defaultFixed || 0,
+            // Stored in pence like every other amount; edited in pounds
+            platformFee: ((res.data.commission?.defaultFixed || 0) / 100).toFixed(2),
             supportEmail: res.data.supportEmail || '',
             supportPhone: res.data.supportPhone || '',
             autoApproveVendors: res.data.features?.vendorSelfRegistration || false,
@@ -58,7 +59,7 @@ export default function PlatformSettingsPage() {
         commission: {
           type: 'percentage',
           defaultRate: Number(settings.defaultCommissionRate) / 100,
-          defaultFixed: Number(settings.platformFee),
+          defaultFixed: Math.round(Number(settings.platformFee || 0) * 100),
         },
         features: {
           vendorSelfRegistration: settings.autoApproveVendors,
@@ -118,9 +119,9 @@ export default function PlatformSettingsPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Fixed Platform Fee (£)</label>
+              <label className="form-label">Fixed commission per order (£)</label>
               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
-                A fixed fee added to every order processed through the platform.
+                Taken from each order of stores set to a fixed commission instead of a percentage. Customers never see it; for customer-facing charges use Customer fees below.
               </p>
               <input
                 type="number"

@@ -131,7 +131,8 @@ export default function StoreInfoScreen({ route, navigation }) {
               <Text style={styles.infoTitle}>Delivery fee</Text>
               <Text style={styles.infoDesc}>
                 {store?.deliveryFee != null ? `Starting from £${store.deliveryFee.toFixed(2)}. ` : ''}
-                Delivery fee is charged based on time of day, distance and surge conditions.
+                {store?.freeDeliveryOver ? `Free on orders over £${Number(store.freeDeliveryOver).toFixed(2)}. ` : ''}
+                The exact fee for your basket is shown before you pay.
               </Text>
             </View>
 
