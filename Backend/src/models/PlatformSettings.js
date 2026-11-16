@@ -107,6 +107,14 @@ const platformSettingsSchema = new mongoose.Schema(
         refereeMinSubtotal: { type: Number, default: 1500, min: 0 },
       },
     },
+    // Mobile app version gate (GET /app/config). Versions are "1.2.3".
+    app: {
+      minVersion: { type: String, default: "0.0.0", trim: true, maxlength: 20 }, // below = must update
+      latestVersion: { type: String, default: "", trim: true, maxlength: 20 }, // below = may update
+      iosUrl: { type: String, default: "", trim: true, maxlength: 300 },
+      androidUrl: { type: String, default: "", trim: true, maxlength: 300 },
+      message: { type: String, default: "", trim: true, maxlength: 300 },
+    },
     // One-off data fixes already applied to this document
     migrations: {
       currencyFromEnvAt: { type: Date, default: null },

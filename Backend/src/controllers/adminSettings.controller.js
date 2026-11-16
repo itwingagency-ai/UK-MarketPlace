@@ -33,6 +33,12 @@ const updateSettings = asyncHandler(async (req, res) => {
     settings.currency = req.body.currency.toLowerCase().trim();
   }
 
+  if (req.body.app && typeof req.body.app === "object") {
+    for (const key of ["minVersion", "latestVersion", "iosUrl", "androidUrl", "message"]) {
+      if (req.body.app[key] !== undefined) settings.set(`app.${key}`, String(req.body.app[key]).trim());
+    }
+  }
+
   if (req.body.loyalty && typeof req.body.loyalty === "object") {
     const L = req.body.loyalty;
     for (const key of ["enabled", "earnPointsPerPound", "pointValuePence", "minRedeemPoints", "maxRedeemPoints", "minBasketToRedeem", "expiryMonths"]) {

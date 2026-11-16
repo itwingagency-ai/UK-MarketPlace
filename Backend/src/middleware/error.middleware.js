@@ -1,4 +1,5 @@
 const env = require("../config/env");
+const { reportError } = require("../lib/monitoring");
 
 const notFoundHandler = (req, res) => {
   res.status(404).json({
@@ -24,6 +25,7 @@ const errorHandler = (err, req, res, next) => {
     // eslint-disable-next-line no-console
     console.error(err);
   }
+  if (statusCode >= 500) reportError(err, req);
 
   res.status(statusCode).json({
     message,

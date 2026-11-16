@@ -237,6 +237,21 @@ const validatePlatformSettingsUpdate = (payload) => {
 
   if (payload.fees !== undefined) validateFeesPayload(payload.fees);
   if (payload.loyalty !== undefined) validateLoyaltyPayload(payload.loyalty);
+  if (payload.app !== undefined) {
+    const A = payload.app;
+    if (!A || typeof A !== "object") throw new ApiError(400, "app must be an object");
+    for (const k of ["minVersion", "latestVersion"]) {
+      if (A[k] !== undefined && A[k] !== "" && !/^\d+(\.\d+){0,2}$/.test(String(A[k]).trim())) {
+        throw new ApiError(400, `app.${k} must look like 1.2.3`);
+      }
+    }
+    for (const k of ["iosUrl", "androidUrl"]) {
+      if (A[k] !== undefined && A[k] !== "" && !/^https:\/\//.test(String(A[k]).trim())) {
+        throw new ApiError(400, `app.${k} must start with https://`);
+      }
+    }
+    if (A.message !== undefined && String(A.message).length > 300) throw new ApiError(400, "app.message is too long");
+  }
 
   if (payload.policies !== undefined && !isPlainObject(payload.policies)) {
     throw new ApiError(400, "policies must be an object");

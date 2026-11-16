@@ -45,7 +45,7 @@ const runCouponScenarios = ({ replSet }) => {
       const placed = await place({ paymentMethod: "online", clientType: "mobile" });
       assert.equal(placed.status, 201, placed.text);
       assert.equal(placed.body.data.payment.amount, 2848);
-      assert.equal(h.stripeCalls[0].args.amount, 2848);
+      assert.equal(h.stripeCalls.find((c) => c.api === "paymentIntents.create").args.amount, 2848);
 
       const orders = await model("Order").find({ customer: m.customer._id }).lean();
       assert.equal(orders.reduce((a, o) => a + o.total, 0), 2848);

@@ -48,4 +48,14 @@ const perAccountLimiter = (limit) =>
 const otpLimiter = perAccountLimiter(10);
 const loginLimiter = perAccountLimiter(10);
 
-module.exports = { authLimiter, otpLimiter, loginLimiter };
+// Signed-in actions that send email or are irreversible: per account
+const accountActionLimiter = rateLimit({
+  windowMs: WINDOW_MS,
+  limit: 5,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  keyGenerator: (req) => `user:${req.user?.id || req.ip}`,
+  handler,
+});
+
+module.exports = { authLimiter, otpLimiter, loginLimiter, accountActionLimiter };

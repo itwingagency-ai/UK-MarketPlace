@@ -17,6 +17,7 @@ const { priceCartWithOffers } = require("../lib/offers");
 const { claimCouponRedemptions } = require("../lib/couponRedemptions");
 const { claimSlots } = require("../lib/slotBookings");
 const { claimRedemption } = require("../lib/loyalty");
+const { savedCardAccess } = require("../lib/stripeCustomer");
 const { STORE_FULFILMENT_FIELDS, choiceFor, resolveFulfilment } = require("../lib/fulfilment");
 const { getPlatformCurrency } = require("../lib/currency");
 const { getStripeClient, isStripeConfigured } = require("../lib/stripeClient");
@@ -694,7 +695,7 @@ const createStripeSessionForOrders = async ({ orders, user, transactionId, curre
   return session;
 };
 
-const createStripePaymentIntentForOrders = async ({ orders, user, transactionId, currency }) => {
+const createStripePaymentIntentForOrders = async ({ orders, user, transactionId, currency, customer }) => {
   const stripe = getStripeClient();
   const orderNumbers = orders.map((o) => o.orderNumber).join(",");
   const totalAmount = orders.reduce((acc, o) => acc + Number(o.total), 0);
@@ -702,7 +703,10 @@ const createStripePaymentIntentForOrders = async ({ orders, user, transactionId,
   const paymentIntent = await stripe.paymentIntents.create({
     amount: Math.round(totalAmount),
     currency,
+    // Wallets (Apple Pay) are card payments, so "card" covers them
     payment_method_types: ["card"],
+    // With a customer, PaymentSheet lists saved cards and offers to save this one
+    ...(customer ? { customer } : {}),
     receipt_email: user.email,
     metadata: {
       transactionId: String(transactionId),
@@ -861,7 +865,9 @@ const placeOrder = asyncHandler(async (req, res) => {
 
     try {
       if (req.body.clientType === "mobile") {
+        const cardAccess = await savedCardAccess(user);
         const paymentIntent = await createStripePaymentIntentForOrders({
+          customer: cardAccess?.customer,
           orders,
           user,
           transactionId: transaction._id,
@@ -886,6 +892,8 @@ const placeOrder = asyncHandler(async (req, res) => {
           provider: "stripe",
           transactionId: transaction._id,
           clientSecret: paymentIntent.client_secret,
+          customerId: cardAccess?.customer || null,
+          customerEphemeralKeySecret: cardAccess?.ephemeralKey || null,
           amount: totalAmount,
           currency,
         };

@@ -4,7 +4,9 @@ const validator = require("validator");
 
 // rider: delivers for one store (storeId), created by that store's vendor
 const ROLES = ["admin", "vendor", "customer", "rider"];
-const STATUSES = ["active", "suspended", "unverified"];
+// deleted: the customer closed their account; personal data was removed
+// (lib/accountDeletion) and the record stays only so past orders add up
+const STATUSES = ["active", "suspended", "unverified", "deleted"];
 
 const addressSchema = new mongoose.Schema(
   {
@@ -102,6 +104,9 @@ const userSchema = new mongoose.Schema(
         ref: "Product",
       },
     ],
+    // Stripe Customer for saved cards (created on first card payment)
+    stripeCustomerId: { type: String, default: "", select: false },
+    deletedAt: { type: Date, default: null },
     // This customer's invite code (made on first visit to Rewards)
     referralCode: {
       type: String,

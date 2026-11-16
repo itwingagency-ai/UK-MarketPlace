@@ -90,7 +90,7 @@ const runLoyaltyScenarios = ({ replSet }) => {
 
       const placed = await h.api("POST", "/api/v1/checkout", { token: m.token, body: checkoutBody({ paymentMethod: "online", clientType: "mobile" }) });
       assert.equal(placed.status, 201, placed.text);
-      assert.equal(h.stripeCalls[0].args.amount, 3048);
+      assert.equal(h.stripeCalls.find((c) => c.api === "paymentIntents.create").args.amount, 3048);
       assert.equal(await balanceOf(m.customer), 200);
       const alpha = await model("Order").findOne({ store: m.stores.alpha._id }).lean();
       assert.equal(alpha.loyalty.pointsRedeemed, 300);

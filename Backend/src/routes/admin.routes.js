@@ -93,6 +93,15 @@ router.patch("/settings", updateSettings);
 
 router.get("/commission/summary", commissionSummary);
 
+// Home banners
+const appPlatform = require("../controllers/appPlatform.controller");
+const bannerUpload = require("../middleware/upload.middleware");
+
+router.get("/banners", appPlatform.adminListBanners);
+router.post("/banners", bannerUpload.single("image"), appPlatform.adminCreateBanner);
+router.patch("/banners/:id", bannerUpload.single("image"), appPlatform.adminUpdateBanner);
+router.delete("/banners/:id", appPlatform.adminDeleteBanner);
+
 // Rewards points and referrals
 router.get("/loyalty/ledger", loyaltyAdmin.adminLedger);
 router.post("/loyalty/adjust", loyaltyAdmin.adminAdjust);

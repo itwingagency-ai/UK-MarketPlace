@@ -48,7 +48,7 @@ describe("currency and stored pricing", () => {
       });
       assert.equal(res.status, 201, res.text);
       assert.equal(res.body.data.payment.currency, "eur");
-      assert.equal(h.stripeCalls[0].args.currency, "eur");
+      assert.equal(h.stripeCalls.find((c) => c.api === "paymentIntents.create").args.currency, "eur");
     });
   });
 

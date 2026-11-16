@@ -57,6 +57,27 @@ const installFakeStripe = () => {
         },
       },
     },
+    customers: {
+      create: async (args) => {
+        n += 1;
+        calls.push({ api: "customers.create", args });
+        return { id: `cus_test_${n}` };
+      },
+    },
+    ephemeralKeys: {
+      create: async (args) => {
+        calls.push({ api: "ephemeralKeys.create", args });
+        return { secret: `ek_test_${args.customer}` };
+      },
+    },
+    paymentMethods: {
+      list: async ({ customer }) => ({ data: [{ id: "pm_test_1", customer, card: { brand: "visa", last4: "4242", exp_month: 12, exp_year: 2030 } }] }),
+      retrieve: async (id) => (id === "pm_test_1" ? { id, customer: "cus_test_1" } : { id, customer: "cus_someone_else" }),
+      detach: async (id) => {
+        calls.push({ api: "paymentMethods.detach", args: { id } });
+        return { id };
+      },
+    },
     refunds: {
       create: async (args) => {
         n += 1;

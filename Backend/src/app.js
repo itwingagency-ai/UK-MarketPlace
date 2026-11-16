@@ -80,6 +80,11 @@ app.get(["/api/v1/platform/settings", "/api/v1/settings"], async (req, res) => {
 });
 
 app.use("/api/v1/auth", authLimiter, authRoutes);
+// App plumbing: version gate + feature switches, home banners (public)
+const appPlatform = require("./controllers/appPlatform.controller");
+app.get("/api/v1/app/config", appPlatform.getAppConfig);
+app.get("/api/v1/banners", appPlatform.listBanners);
+app.get("/api/v1/address/lookup", authenticate, appPlatform.addressLookup);
 app.use("/api/v1/protected", protectedRoutes);
 app.use("/api/v1/track", orderTrackingRoutes);
 app.use("/api/v1/products", productSearchRoutes);  // search + suggest + detail

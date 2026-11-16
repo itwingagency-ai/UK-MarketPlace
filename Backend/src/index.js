@@ -1,4 +1,6 @@
 const http = require("http");
+// Error reporting first, so it sees everything that follows (off without SENTRY_DSN)
+require("./lib/monitoring").initMonitoring();
 const app = require("./app");
 const env = require("./config/env");
 const connectDb = require("./config/db");
