@@ -365,7 +365,7 @@ export default function OrderDetailScreen({ route, navigation }) {
   const refunded = (order.refunds || []).filter((r) => r.status !== 'failed').reduce((a, r) => a + r.amount, 0);
   const canArrive = collecting && ['confirmed', 'packed', 'ready_for_collection'].includes(statusStr);
   const slot = order.fulfilment?.asap === false && order.fulfilment?.slotStart
-    ? `${new Date(order.fulfilment.slotStart).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}, ${new Date(order.fulfilment.slotStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}–${new Date(order.fulfilment.slotEnd).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+    ? `${new Date(order.fulfilment.slotStart).toLocaleDateString('en-GB', { timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'short' })}, ${new Date(order.fulfilment.slotStart).toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' })}–${new Date(order.fulfilment.slotEnd).toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' })}`
     : 'As soon as possible';
   const colorSet = statusColors[statusStr] || statusColors.pending;
 

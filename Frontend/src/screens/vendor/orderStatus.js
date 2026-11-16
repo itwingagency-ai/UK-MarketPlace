@@ -39,8 +39,10 @@ export const CANCELLABLE = new Set(['pending', 'confirmed', 'packed', 'ready_for
 export const slotText = (f) => {
   if (!f || f.asap !== false || !f.slotStart) return 'ASAP';
   const start = new Date(f.slotStart);
-  const t = (d) => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const day = start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  // Slots are store-local (UK) times, whatever timezone the phone is in
+  const tz = { timeZone: 'Europe/London' };
+  const t = (d) => d.toLocaleTimeString('en-GB', { ...tz, hour: '2-digit', minute: '2-digit' });
+  const day = start.toLocaleDateString('en-GB', { ...tz, weekday: 'short', day: 'numeric', month: 'short' });
   return `${day}, ${t(start)}${f.slotEnd ? `–${t(new Date(f.slotEnd))}` : ''}`;
 };
 

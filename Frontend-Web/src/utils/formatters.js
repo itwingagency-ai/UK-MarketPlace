@@ -17,8 +17,10 @@ export function formatSlot(fulfilment) {
   if (!fulfilment || fulfilment.asap !== false || !fulfilment.slotStart) return 'ASAP';
   const start = new Date(fulfilment.slotStart);
   const end = fulfilment.slotEnd ? new Date(fulfilment.slotEnd) : null;
-  const day = start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-  const t = (d) => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  // Slots are store-local (UK) times, whatever timezone the browser is in
+  const opts = { timeZone: 'Europe/London' };
+  const day = start.toLocaleDateString('en-GB', { ...opts, weekday: 'short', day: 'numeric', month: 'short' });
+  const t = (d) => d.toLocaleTimeString('en-GB', { ...opts, hour: '2-digit', minute: '2-digit' });
   return `${day}, ${t(start)}${end ? `–${t(end)}` : ''}`;
 }
 
