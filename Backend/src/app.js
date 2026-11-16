@@ -25,6 +25,7 @@ const adminRoutes = require("./routes/admin.routes");
 const publicReviewsRoutes = require("./routes/publicReviews.routes");
 const productSearchRoutes = require("./routes/productSearch.routes");
 const storeDiscoveryRoutes = require("./routes/storeDiscovery.routes");
+const riderRoutes = require("./routes/rider.routes");
 const { USE_LOCAL_UPLOADS, LOCAL_UPLOAD_DIR } = require("./middleware/upload.middleware");
 
 const app = express();
@@ -113,6 +114,7 @@ app.use("/api/v1/cart", authenticate, cartRoutes);
 app.use("/api/v1/checkout", authenticate, checkoutRoutes);
 app.use("/api/v1/payments", authenticate, paymentRoutes);
 app.use("/api/v1/admin", authenticate, authorize("admin"), adminRoutes);
+app.use("/api/v1/rider", authenticate, authorize("rider"), riderRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

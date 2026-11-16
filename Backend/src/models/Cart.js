@@ -36,6 +36,8 @@ const cartItemSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Snapshot of Product.minAge (16 / 18), 0 when not restricted
+    minAge: { type: Number, default: 0 },
     unitPrice: {
       type: Number,
       required: true,

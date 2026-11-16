@@ -267,6 +267,12 @@ const validateProductPayload = (payload, isPatch = false) => {
     }
   }
 
+  if (payload.minAge !== undefined && payload.minAge !== null && payload.minAge !== "") {
+    if (![0, 16, 18].includes(Number(payload.minAge))) {
+      throw new ApiError(400, "minAge must be 0, 16 or 18");
+    }
+  }
+
   if (payload.size !== undefined && payload.size !== null) {
     if (typeof payload.size !== "string") {
       throw new ApiError(400, "size must be a string");

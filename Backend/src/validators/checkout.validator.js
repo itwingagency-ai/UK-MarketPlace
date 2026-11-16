@@ -55,6 +55,10 @@ const validateCheckoutPayload = (payload, { addressRequired = true } = {}) => {
     }
   }
 
+  if (payload.ageConfirmed !== undefined && typeof payload.ageConfirmed !== "boolean") {
+    throw new ApiError(400, "ageConfirmed must be true or false");
+  }
+
   if (payload.clientType !== undefined && payload.clientType !== null) {
     if (typeof payload.clientType !== "string") {
       throw new ApiError(400, "clientType must be a string");

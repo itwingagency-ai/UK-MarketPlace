@@ -2,7 +2,8 @@ const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 const validator = require("validator");
 
-const ROLES = ["admin", "vendor", "customer"];
+// rider: delivers for one store (storeId), created by that store's vendor
+const ROLES = ["admin", "vendor", "customer", "rider"];
 const STATUSES = ["active", "suspended", "unverified"];
 
 const addressSchema = new mongoose.Schema(

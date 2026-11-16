@@ -231,6 +231,7 @@ const buildPreviewResponse = async (evaluatedItems, selections, { cart, userId }
     snapshotPrice: item.unitPrice,
     livePrice: status.live ? status.live.unitPrice : null,
     priceChanged: Boolean(status.live && status.live.priceChanged),
+    minAge: status.live ? Number(status.live.minAge || 0) : 0,
     quantity: item.quantity,
     available: status.available,
     reason: status.reason,
@@ -299,6 +300,7 @@ const buildPreviewResponse = async (evaluatedItems, selections, { cart, userId }
     grandTotal,
     coupons: offers.coupons,
     loyalty: offers.loyalty,
+    ageCheck: Math.max(0, ...items.filter((x) => x.available).map((x) => x.minAge || 0)),
     nearMisses: offers.nearMisses,
     blockingIssues: offers.blockingIssues,
     options: { allowSubstitutions: cart.allowSubstitutions !== false },
@@ -421,6 +423,7 @@ const buildOrderItems = (groupItems) =>
       quantity: item.quantity,
       unitPrice,
       total,
+      minAge: Number(status.live.minAge || 0),
     };
   });
 
@@ -482,6 +485,8 @@ const buildOrderDoc = ({
   ],
   shippingMethod: buildShippingMethodSnapshot(storeGroup.shippingMethod),
   loyalty: { pointsRedeemed: storeGroup.offers?.loyaltyPoints || 0 },
+  ageCheck: Math.max(0, ...storeGroup.items.map(({ status }) => Number(status.live.minAge || 0))),
+  ageConfirmedAt: storeGroup.items.some(({ status }) => Number(status.live.minAge || 0) > 0) ? new Date() : null,
   fulfilment: {
     method: storeGroup.fulfilment?.method || "delivery",
     asap: storeGroup.fulfilment?.asap !== false,
@@ -740,6 +745,11 @@ const placeOrder = asyncHandler(async (req, res) => {
     req.body.addressId || req.body.shippingAddress
       ? resolveShippingAddress(user, req.body)
       : { fullName: user.name, phone: user.phone || "" };
+  // Where the delivery-zone check placed the customer, for the rider's map
+  if (req.deliveryCoords) {
+    shippingAddress.lat = req.deliveryCoords.lat;
+    shippingAddress.lng = req.deliveryCoords.lng;
+  }
 
   if (!cart.items || cart.items.length === 0) {
     throw new ApiError(400, "Cart is empty");
@@ -749,6 +759,12 @@ const placeOrder = asyncHandler(async (req, res) => {
   const blocking = evaluatedItems.filter(({ status }) => !status.available);
   if (blocking.length > 0) {
     throw new ApiError(409, "Some items are no longer available; review your cart");
+  }
+
+  // Age-restricted goods: the customer confirms their age now and shows ID on handover
+  const ageCheck = Math.max(0, ...evaluatedItems.map(({ status }) => Number(status.live?.minAge || 0)));
+  if (ageCheck > 0 && req.body.ageConfirmed !== true) {
+    throw new ApiError(400, `Your basket has items for over-${ageCheck}s. Please confirm you're ${ageCheck} or over`);
   }
 
   const storeGroups = groupByStore(evaluatedItems);

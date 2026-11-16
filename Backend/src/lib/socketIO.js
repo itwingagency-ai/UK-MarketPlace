@@ -3,6 +3,7 @@ const { verifyAccessToken } = require("./jwt");
 const env = require("../config/env");
 const User = require("../models/User");
 const Order = require("../models/Order");
+const { handleRiderLocation } = require("./riderLocation");
 
 let io = null;
 
@@ -74,7 +75,7 @@ const initSocketIO = (httpServer) => {
 
         // Admins can watch any order; vendors can watch their store's
         // orders; customers can only watch their own.
-        const order = await Order.findById(orderId).select("customer store");
+        const order = await Order.findById(orderId).select("customer store delivery.rider");
         if (!order) {
           return typeof ack === "function"
             ? ack({ error: "Order not found" })
@@ -85,8 +86,9 @@ const initSocketIO = (httpServer) => {
         const isStoreVendor =
           role === "vendor" && storeId === order.store.toString();
         const isAdmin = role === "admin";
+        const isRider = role === "rider" && String(order.delivery?.rider || "") === id;
 
-        if (!isOwner && !isStoreVendor && !isAdmin) {
+        if (!isOwner && !isStoreVendor && !isAdmin && !isRider) {
           return typeof ack === "function"
             ? ack({ error: "Not authorized" })
             : undefined;
@@ -98,6 +100,9 @@ const initSocketIO = (httpServer) => {
         if (typeof ack === "function") ack({ error: "Server error" });
       }
     });
+
+    // ── Rider app: live position while out for delivery ─────────
+    socket.on("rider:location", (payload, ack) => handleRiderLocation(io, socket, payload, ack));
 
     // ── Client-initiated: unsubscribe from an order ─────────────
     socket.on("leave:order", (orderId) => {

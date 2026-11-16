@@ -59,6 +59,16 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    minAge: { type: Number, default: 0 },
+    // ok | unavailable (store couldn't supply) | substituted (swapped by the
+    // store) | refused (age-restricted item refused at the door)
+    lineStatus: {
+      type: String,
+      enum: ["ok", "unavailable", "substituted", "refused"],
+      default: "ok",
+    },
+    originalQuantity: { type: Number, default: null },
+    substitutedFor: { type: String, default: "" },
   },
   { _id: false }
 );
@@ -102,6 +112,9 @@ const addressSchema = new mongoose.Schema(
     state: { type: String, default: "" },
     postalCode: { type: String, default: "" },
     country: { type: String, default: "" },
+    // Where the delivery-zone check placed the customer (for riders' maps)
+    lat: { type: Number, default: null },
+    lng: { type: Number, default: null },
   },
   { _id: false }
 );
@@ -221,6 +234,45 @@ const orderFulfilmentSchema = new mongoose.Schema(
     slotReleasedAt: { type: Date, default: null },
   },
   { _id: false }
+);
+
+// Who is delivering, and how it went (vendor-employed riders)
+const orderDeliverySchema = new mongoose.Schema(
+  {
+    rider: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
+    riderName: { type: String, default: "" },
+    assignedAt: { type: Date, default: null },
+    pickedUpAt: { type: Date, default: null },
+    deliveredAt: { type: Date, default: null },
+    // Last position the rider shared (not a history)
+    lastLocation: {
+      lat: { type: Number, default: null },
+      lng: { type: Number, default: null },
+      at: { type: Date, default: null },
+    },
+    proof: {
+      photoUrl: { type: String, default: "" },
+      signatureSvg: { type: String, default: "", maxlength: 50000 },
+      recipientName: { type: String, default: "", maxlength: 80 },
+      ageVerified: { type: Boolean, default: false },
+      idType: { type: String, default: "" },
+    },
+  },
+  { _id: false }
+);
+
+// Money given back after the order was placed (unavailable or refused items)
+const orderRefundSchema = new mongoose.Schema(
+  {
+    amount: { type: Number, required: true, min: 0 },
+    reason: { type: String, default: "", maxlength: 300 },
+    provider: { type: String, enum: ["stripe", "cod"], default: "stripe" },
+    providerRef: { type: String, default: "" },
+    status: { type: String, enum: ["succeeded", "failed", "not_charged"], default: "succeeded" },
+    at: { type: Date, default: Date.now },
+    by: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+  },
+  { _id: true }
 );
 
 const orderShippingMethodSchema = new mongoose.Schema(
@@ -364,6 +416,15 @@ const orderSchema = new mongoose.Schema(
       type: orderFulfilmentSchema,
       default: () => ({}),
     },
+    delivery: {
+      type: orderDeliverySchema,
+      default: () => ({}),
+    },
+    // Highest age restriction among the items (0 = none); confirmed by the
+    // customer at checkout and checked against ID on handover
+    ageCheck: { type: Number, default: 0 },
+    ageConfirmedAt: { type: Date, default: null },
+    refunds: { type: [orderRefundSchema], default: [] },
     // Rewards points on this order (the loyalty price line holds their value)
     loyalty: {
       pointsRedeemed: { type: Number, default: 0, min: 0 },

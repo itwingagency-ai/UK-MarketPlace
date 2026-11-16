@@ -17,6 +17,7 @@ const {
 } = require("../lib/notificationHooks");
 const Order = require("../models/Order");
 const { transitionOrder } = require("../lib/orderTransitions");
+const { ID_TYPES } = require("./rider.controller");
 const { notifyOrderStatus } = require("../lib/appNotifications");
 const { emitOrderStatusChanged } = require("../lib/orderEvents");
 const {
@@ -164,6 +165,18 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
       throw new ApiError(400, "prepMinutes must be a whole number from 5 to 240");
     }
     order.tracking.estimatedReadyAt = new Date(Date.now() + prep * 60 * 1000);
+  }
+
+  // Age-restricted goods are only handed over after an ID check
+  if (Order.COMPLETED_STATUSES.includes(nextStatus) && order.ageCheck > 0) {
+    if (req.body.ageVerified !== true || !ID_TYPES.includes(req.body.idType)) {
+      throw new ApiError(
+        400,
+        `This order has over-${order.ageCheck} items: confirm you checked photo ID (ageVerified, idType), or mark those items refused first`
+      );
+    }
+    order.delivery.proof.ageVerified = true;
+    order.delivery.proof.idType = req.body.idType;
   }
 
   if (req.body.tracking) {

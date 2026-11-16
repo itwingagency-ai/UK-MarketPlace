@@ -63,6 +63,34 @@ const STATUS_COPY = {
   cancelled: () => "Your order was cancelled. You have not been charged for unavailable items.",
 };
 
+/** The store changed what's in an order (unavailable / substituted / refused). */
+const notifyOrderChanged = (order, { note, refundAmount = 0 }) =>
+  safely("order changed", async () => {
+    if (!order.customer) return;
+    const back = refundAmount > 0
+      ? order.paymentMethod === "online"
+        ? ` ${money(refundAmount)} is on its way back to your card.`
+        : ` You'll pay ${money(refundAmount)} less.`
+      : "";
+    deliver([String(order.customer)], {
+      title: `Order #${order.orderNumber} changed`,
+      body: `${note}.${back}`,
+      data: { type: "order:status", orderId: String(order._id), orderStatus: order.orderStatus },
+      channelId: "orders",
+    });
+  });
+
+/** A delivery was given to a rider → that rider's phone. */
+const notifyRiderAssigned = (order, rider) =>
+  safely("rider assigned", async () => {
+    deliver([String(rider._id)], {
+      title: `New delivery · #${order.orderNumber}`,
+      body: [order.shippingAddress?.line1, order.shippingAddress?.postalCode].filter(Boolean).join(", ") || "Open the app for details",
+      data: { type: "rider:assigned", orderId: String(order._id), orderNumber: order.orderNumber },
+      channelId: "orders",
+    });
+  });
+
 /** A collecting customer is outside → the store's phones. */
 const notifyCustomerArrived = (order) =>
   safely("customer arrived", async () => {
@@ -101,6 +129,8 @@ const notifyBackInStock = (userIds, { product, variantLabel, storeName }) =>
   });
 
 module.exports = {
+  notifyOrderChanged,
+  notifyRiderAssigned,
   notifyCustomerArrived,
   notifyBackInStock,
   notifyNewOrder,

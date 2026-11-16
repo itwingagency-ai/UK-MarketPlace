@@ -83,6 +83,7 @@ const Review = require("../models/Review");
 const ShippingMethod = require("../models/ShippingMethod");
 const upload = require("../middleware/upload.middleware");
 const offers = require("../controllers/offersManagement.controller");
+const riders = require("../controllers/vendorRiders.controller");
 
 const router = express.Router();
 
@@ -170,6 +171,13 @@ router.delete(
   requireResourceInScope(ShippingMethod),
   deleteShippingMethod
 );
+
+// Delivery riders, assigning them, and changing items while packing
+router.get("/riders", riders.listRiders);
+router.post("/riders", riders.createRider);
+router.patch("/riders/:id", riders.updateRider);
+router.patch("/orders/:id/rider", requireResourceInScope(Order), riders.assignRider);
+router.patch("/orders/:id/items/:index", requireResourceInScope(Order), riders.adjustItem);
 
 router.get("/fulfilment", getFulfilment);
 router.patch("/fulfilment", updateFulfilment);

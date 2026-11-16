@@ -211,6 +211,8 @@ const createProduct = asyncHandler(async (req, res) => {
       title: req.body.title.trim(),
       description: req.body.description || "",
       size: typeof req.body.size === "string" ? req.body.size.trim() : "",
+      // Multipart forms send numbers as strings
+      minAge: hasValue(req.body.minAge) ? Number(req.body.minAge) : 0,
       // Variant products get their listing price from the model's pre-validate hook
       price: hasValue(req.body.price) ? Number(req.body.price) : 0,
       compareAtPrice: toPriceOrNull(req.body.compareAtPrice),
@@ -256,6 +258,9 @@ const updateProduct = asyncHandler(async (req, res) => {
     }
     if (req.body.size !== undefined) {
       product.size = (req.body.size || "").trim();
+    }
+    if (req.body.minAge !== undefined) {
+      product.minAge = hasValue(req.body.minAge) ? Number(req.body.minAge) : 0;
     }
 
     // Images: `images` is the list of existing URLs to keep (in display

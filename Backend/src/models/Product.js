@@ -112,6 +112,13 @@ const productSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    // Age-restricted goods (alcohol, tobacco, knives...): 16 or 18; 0 = none.
+    // Customers confirm their age at checkout and show ID on handover.
+    minAge: {
+      type: Number,
+      enum: [0, 16, 18],
+      default: 0,
+    },
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",

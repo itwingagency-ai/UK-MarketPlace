@@ -68,6 +68,7 @@ const addItem = asyncHandler(async (req, res) => {
     existing.sku = resolved.sku;
     existing.attributes = resolved.attributes;
     existing.image = resolved.image;
+    existing.minAge = resolved.minAge;
   } else {
     cart.items.push({
       product: resolved.product._id,
@@ -77,6 +78,7 @@ const addItem = asyncHandler(async (req, res) => {
       sku: resolved.sku,
       attributes: resolved.attributes,
       image: resolved.image,
+      minAge: resolved.minAge,
       unitPrice: resolved.unitPrice,
       compareAtPrice: resolved.compareAtPrice,
       quantity,
@@ -127,6 +129,7 @@ const updateItemQuantity = asyncHandler(async (req, res) => {
   item.sku = resolved.sku;
   item.attributes = resolved.attributes;
   item.image = resolved.image;
+  item.minAge = resolved.minAge;
 
   await cart.save();
   const summary = await buildCartSummary(cart);

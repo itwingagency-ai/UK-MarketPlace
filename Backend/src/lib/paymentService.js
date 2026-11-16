@@ -24,6 +24,8 @@ const loyalty = require("./loyalty");
 
 const restoreStockForOrder = async (order) => {
   for (const item of order.items || []) {
+    // Lines marked unavailable or refused already went back on the shelf
+    if (item.lineStatus === "unavailable" || item.lineStatus === "refused") continue;
     if (item.variantId) {
       // eslint-disable-next-line no-await-in-loop
       await Product.updateOne(

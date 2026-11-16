@@ -87,6 +87,7 @@ const resolveProductForCart = async ({ productId, variantId }) => {
     compareAtPrice: variant ? (variant.compareAtPrice ? Number(variant.compareAtPrice) : null) : (product.compareAtPrice ? Number(product.compareAtPrice) : null),
     availableStock: variant ? Number(variant.stock) : Number(product.stock),
     title: product.title,
+    minAge: Number(product.minAge || 0),
     sku: variant ? variant.sku || "" : "",
     attributes: variantAttributesToObject(variant),
     image: getProductImage(product, variant),
@@ -144,6 +145,7 @@ const buildLiveSnapshotForItem = async (item) => {
       unitPrice: livePrice,
       stock: liveStock,
       title: product.title,
+      minAge: Number(product.minAge || 0),
       priceChanged: livePrice !== Number(item.unitPrice),
     },
   };
@@ -188,6 +190,7 @@ const buildCartSummary = async (cart) => {
       unitPrice: item.unitPrice,
       compareAtPrice: item.compareAtPrice,
       quantity: item.quantity,
+      minAge: item.minAge || 0,
       lineTotal,
     });
     group.itemCount += Number(item.quantity);
@@ -290,6 +293,8 @@ const buildCartSummary = async (cart) => {
     grandTotal,
     coupons: result.coupons,
     loyalty: result.loyalty,
+    // Highest age restriction in the basket: checkout asks the customer to confirm it
+    ageCheck: Math.max(0, ...cart.items.map((i) => Number(i.minAge || 0))),
     nearMisses: result.nearMisses,
     blockingIssues: [
       ...result.blockingIssues,
