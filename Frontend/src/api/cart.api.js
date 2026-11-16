@@ -76,3 +76,12 @@ export const setCartOptions = async (options) => {
   const { data } = await client.put('/cart/options', options);
   return data;
 };
+
+/**
+ * PUT /api/v1/cart/fulfilment — delivery or collection for one store,
+ * slotStart null = as soon as possible.
+ */
+export const setFulfilment = async (storeId, method, slotStart = null) => {
+  const { data } = await client.put('/cart/fulfilment', { storeId, method, slotStart });
+  return data;
+};

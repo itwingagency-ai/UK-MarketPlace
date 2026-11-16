@@ -6,7 +6,7 @@ import { getOrders } from '../../api/vendor.api';
 import { useLiveEvent } from '../../context/NotificationsContext';
 import { formatPence } from '../../components/ProductCard';
 import { ScreenHeader, Card, Chip, ChipRow, Pill, EmptyState, Loading, sharedStyles } from '../../components/vendor/VendorUI';
-import { ORDER_FILTERS, ORDER_STATUS_META } from './orderStatus';
+import { ORDER_FILTERS, ORDER_STATUS_META, isWaitingOutside, slotText } from './orderStatus';
 import { apiError } from '../../utils/catalog';
 import { Colors, Radius, Spacing, Typography } from '../../theme';
 
@@ -57,7 +57,7 @@ export default function VendorOrdersScreen({ navigation, route }) {
 
   useFocusEffect(useCallback(() => { load(1); }, [load]));
   // New orders and status changes appear without pulling to refresh
-  useLiveEvent(['order:created', 'order:status_changed'], () => load(1));
+  useLiveEvent(['order:created', 'order:status_changed', 'order:customer_arrived'], () => load(1));
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -78,6 +78,10 @@ export default function VendorOrdersScreen({ navigation, route }) {
             {item.paymentMethod === 'cod' ? 'Cash on delivery' : 'Paid online'}
             {item.paymentStatus === 'paid' ? ' · Paid' : ''}
           </Text>
+          <Text style={[sharedStyles.help, { color: Colors.text }]}>
+            {item.fulfilment?.method === 'collection' ? 'Collection' : 'Delivery'} · {slotText(item.fulfilment)}
+          </Text>
+          {isWaitingOutside(item) ? <Pill label="Customer outside" tone="warning" /> : null}
         </View>
         <View style={{ alignItems: 'flex-end', gap: 6 }}>
           <Text style={styles.total}>{formatPence(item.total)}</Text>

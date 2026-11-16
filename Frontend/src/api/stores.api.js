@@ -105,3 +105,12 @@ export const getMarketplaceCategories = async (params = {}) => {
   const { data } = await client.get('/categories', { params });
   return data;
 };
+
+/**
+ * GET /api/v1/stores/:slug/slots?method=delivery|collection
+ * Bookable time windows for the store's offered days ({ days: [{ date, label, slots }] }).
+ */
+export const getStoreSlots = async (slug, method = 'delivery') => {
+  const { data } = await client.get(`/stores/${slug}/slots`, { params: { method } });
+  return data.data ?? data;
+};

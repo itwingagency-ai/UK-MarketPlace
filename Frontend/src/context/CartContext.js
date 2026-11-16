@@ -155,6 +155,12 @@ export const CartProvider = ({ children }) => {
     [runCartAction]
   );
 
+  const setFulfilment = useCallback(
+    (storeId, method, slotStart = null) =>
+      runCartAction(() => CartAPI.setFulfilment(storeId, method, slotStart), "Couldn't change that"),
+    [runCartAction]
+  );
+
   const clearCart = useCallback(async () => {
     if (!isAuthenticated) return { success: false, error: 'Please login to clear cart' };
     try {
@@ -185,6 +191,7 @@ export const CartProvider = ({ children }) => {
         removeCoupon,
         setTip,
         setCartOptions,
+        setFulfilment,
         itemCount: state.itemCount,
         storeId: state.storeId,
         defaultShippingMethod: state.defaultShippingMethod,

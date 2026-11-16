@@ -8,7 +8,7 @@ import PriceLines from '../../components/PriceLines';
 import Button from '../../components/Button';
 import { ScreenHeader, Card, SectionTitle, Pill, EmptyState, Loading, ActionSheet, sharedStyles } from '../../components/vendor/VendorUI';
 import { useLiveEvent } from '../../context/NotificationsContext';
-import { CANCELLABLE, NEXT_STEP, ORDER_STATUS_META } from './orderStatus';
+import { CANCELLABLE, ORDER_STATUS_META, isWaitingOutside, nextStepFor, slotText } from './orderStatus';
 import { apiError } from '../../utils/catalog';
 import { Colors, Radius, Spacing, Typography } from '../../theme';
 
@@ -35,7 +35,7 @@ export default function VendorOrderDetailScreen({ navigation, route }) {
 
   useEffect(() => { load(); }, [load]);
   // Payment updates or another device changing the order
-  useLiveEvent('order:status_changed', (p) => { if (p?.orderId === orderId) load(); });
+  useLiveEvent(['order:status_changed', 'order:customer_arrived'], (p) => { if (p?.orderId === orderId) load(); });
 
   const changeStatus = async (orderStatus, note, prepMinutes) => {
     setBusy(true);
@@ -73,7 +73,7 @@ export default function VendorOrderDetailScreen({ navigation, route }) {
   const readyText = readyAt
     ? new Date(readyAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
     : null;
-  const next = NEXT_STEP[order.orderStatus];
+  const next = nextStepFor(order);
   const address = order.shippingAddress || {};
   const customer = order.customerSnapshot || {};
   const placedNote = (order.statusHistory || [])[0]?.note || '';
@@ -91,6 +91,14 @@ export default function VendorOrderDetailScreen({ navigation, route }) {
             <View style={{ marginTop: 4 }}><Pill label={meta.label} tone={meta.tone} /></View>
             {readyText && ['confirmed', 'packed'].includes(order.orderStatus) ? (
               <Text style={[sharedStyles.help, { marginTop: 6 }]}>Customer told: ready by {readyText}</Text>
+            ) : null}
+            <Text style={[sharedStyles.help, { marginTop: 6, color: Colors.text }]}>
+              {order.fulfilment?.method === 'collection' ? 'Customer collects' : 'Delivery'} · {slotText(order.fulfilment)}
+            </Text>
+            {isWaitingOutside(order) ? (
+              <View style={{ marginTop: 6 }}>
+                <Pill label={`Customer outside${order.fulfilment.arrivalNote ? ` · ${order.fulfilment.arrivalNote}` : ''}`} tone="warning" />
+              </View>
             ) : null}
           </View>
           <View style={{ alignItems: 'flex-end' }}>

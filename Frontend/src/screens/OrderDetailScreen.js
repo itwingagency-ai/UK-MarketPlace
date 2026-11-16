@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 import { Feather } from '@expo/vector-icons';
-import { getMyOrderById, reorder, cancelMyOrder } from '../api/orders.api';
+import { getMyOrderById, reorder, cancelMyOrder, markArrived } from '../api/orders.api';
 import { useCart } from '../context/CartContext';
 import { useLiveEvent } from '../context/NotificationsContext';
 import Button from '../components/Button';
@@ -43,6 +43,7 @@ export default function OrderDetailScreen({ route, navigation }) {
   const { fetchCart } = useCart();
   const [reordering, setReordering] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [arriving, setArriving] = useState(false);
 
   useEffect(() => {
     fetchOrder();
@@ -106,6 +107,19 @@ export default function OrderDetailScreen({ route, navigation }) {
     });
   };
 
+  const handleArrived = async () => {
+    setArriving(true);
+    try {
+      const res = await markArrived(orderId);
+      await fetchOrder({ silent: true });
+      showAlert({ title: 'The store knows you\'re here', message: res.message || 'Someone will bring your order out.', icon: 'check-circle', showCancel: false, confirmText: 'OK' });
+    } catch (err) {
+      showAlert({ title: "Couldn't let the store know", message: err.response?.data?.message || 'Please try again.', icon: 'alert-circle', showCancel: false, confirmText: 'OK' });
+    } finally {
+      setArriving(false);
+    }
+  };
+
   const fetchOrder = async ({ silent = false } = {}) => {
     try {
       if (!silent) setLoading(true);
@@ -113,7 +127,7 @@ export default function OrderDetailScreen({ route, navigation }) {
       const res = await getMyOrderById(orderId);
       setOrder(res.data);
       const statusStr = (res.data?.orderStatus || '').toLowerCase();
-      if (['shipped', 'delivered', 'completed'].includes(statusStr)) {
+      if (['shipped', 'delivered', 'collected', 'completed'].includes(statusStr)) {
         try {
           const revRes = await getMyReviews({ limit: 100 });
           setMyReviews(revRes.data || []);
@@ -212,7 +226,7 @@ export default function OrderDetailScreen({ route, navigation }) {
     });
 
     const isOrderCompleted = order && 
-      ['delivered', 'completed'].includes((order.orderStatus || '').toLowerCase()) && 
+      ['delivered', 'collected', 'completed'].includes((order.orderStatus || '').toLowerCase()) && 
       (order.paymentStatus || '').toLowerCase() === 'paid';
 
     return (
@@ -315,8 +329,16 @@ export default function OrderDetailScreen({ route, navigation }) {
     packed: { bg: '#E1BEE7', text: '#8E24AA' },
     shipped: { bg: '#E8EAF6', text: '#3F51B5' },
     delivered: { bg: '#E8F5E9', text: '#2E7D32' },
+    ready_for_collection: { bg: '#EDE0FD', text: '#6920C2' },
+    collected: { bg: '#E8F5E9', text: '#2E7D32' },
     cancelled: { bg: '#FFEBEE', text: '#D32F2F' },
   };
+  const STATUS_LABELS = { ready_for_collection: 'Ready to collect', shipped: 'Out for delivery' };
+  const collecting = order.fulfilment?.method === 'collection';
+  const canArrive = collecting && ['confirmed', 'packed', 'ready_for_collection'].includes(statusStr);
+  const slot = order.fulfilment?.asap === false && order.fulfilment?.slotStart
+    ? `${new Date(order.fulfilment.slotStart).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}, ${new Date(order.fulfilment.slotStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}–${new Date(order.fulfilment.slotEnd).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+    : 'As soon as possible';
   const colorSet = statusColors[statusStr] || statusColors.pending;
 
   return (
@@ -346,10 +368,22 @@ export default function OrderDetailScreen({ route, navigation }) {
               </Text>
               <View style={[styles.statusBadge, { backgroundColor: colorSet.bg }]}>
                 <Text style={[styles.statusText, { color: colorSet.text }]}>
-                  {statusStr.charAt(0).toUpperCase() + statusStr.slice(1)}
+                  {STATUS_LABELS[statusStr] || statusStr.charAt(0).toUpperCase() + statusStr.slice(1)}
                 </Text>
               </View>
             </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>{collecting ? 'You collect' : 'Delivery'}</Text>
+              <Text style={styles.summaryValue}>{slot}</Text>
+            </View>
+            {collecting && order.fulfilment?.arrivedAt && statusStr !== 'collected' ? (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Store notified</Text>
+                <Text style={[styles.summaryValue, { color: Colors.successText }]}>
+                  You arrived at {new Date(order.fulfilment.arrivedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </View>
+            ) : null}
             {order.tracking?.estimatedReadyAt && ['confirmed', 'packed'].includes(statusStr) ? (
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Ready by</Text>
@@ -391,6 +425,16 @@ export default function OrderDetailScreen({ route, navigation }) {
         )}
         ListFooterComponent={
           <>
+          {canArrive && (
+            <Button
+              title={order.fulfilment?.arrivedAt ? "I'm here (tell the store again)" : "I've arrived"}
+              size="full"
+              loading={arriving}
+              onPress={handleArrived}
+              icon={<Feather name="map-pin" size={16} color={Colors.white} />}
+              style={{ marginTop: Spacing.base }}
+            />
+          )}
           {order.orderStatus === 'pending' && (
             <Button
               title="Cancel order"

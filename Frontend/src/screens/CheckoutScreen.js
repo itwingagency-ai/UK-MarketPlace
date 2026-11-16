@@ -143,6 +143,10 @@ export default function CheckoutScreen({ navigation }) {
 
   const [isLoadingPreview, setIsLoadingPreview] = useState(true);
   const [previewData, setPreviewData] = useState(null);
+  // Every store in the basket is being collected: no delivery address needed
+  const collectionOnly =
+    (previewData?.byStore || []).length > 0 &&
+    previewData.byStore.every((g) => g.fulfilment?.method === 'collection');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
   const storeName = items && items[0]?.product?.store?.name ? items[0].product.store.name : 'Your store';
@@ -282,6 +286,8 @@ export default function CheckoutScreen({ navigation }) {
     let outOfRangeMsg = '';
 
     for (const store of stores) {
+      // Collected orders don't need the address within the delivery radius
+      if (store.fulfilment?.method === 'collection') continue;
       if (!store.locationSet || !store.location?.coordinates) {
         continue;
       }
@@ -386,8 +392,8 @@ export default function CheckoutScreen({ navigation }) {
   };
 
   const handlePlaceOrder = async () => {
-    // Basic validation
-    if (!address.fullName?.trim() || !address.phone?.trim() || !address.line1?.trim() || !address.city?.trim() || !address.postalCode?.trim()) {
+    // Basic validation (a collection-only basket needs no delivery address)
+    if (!collectionOnly && (!address.fullName?.trim() || !address.phone?.trim() || !address.line1?.trim() || !address.city?.trim() || !address.postalCode?.trim())) {
       showAlert({
         title: 'Missing Details',
         message: 'Please fill in all mandatory address fields, including your Phone Number and UK Postcode.',
@@ -410,7 +416,7 @@ export default function CheckoutScreen({ navigation }) {
     try {
       // 1. Call Backend to create order and get Stripe clientSecret
       let finalAddressId = selectedSavedAddressId;
-      if (!finalAddressId) {
+      if (!finalAddressId && !collectionOnly) {
         try {
           const savedRes = await addMyAddress({
             label: 'Shipping',
@@ -433,7 +439,9 @@ export default function CheckoutScreen({ navigation }) {
         }
       }
 
-      const payload = finalAddressId
+      const payload = collectionOnly
+        ? { paymentMethod, clientType: 'mobile' }
+        : finalAddressId
         ? {
             addressId: finalAddressId,
             paymentMethod,
@@ -545,6 +553,17 @@ export default function CheckoutScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {collectionOnly ? (
+          <Animated.View entering={SECTION_IN[0]} style={styles.section}>
+            <View style={[styles.rangeBanner, styles.rangeBannerSuccess]}>
+              <Feather name="shopping-bag" size={18} color={Colors.successText} />
+              <Text style={[styles.rangeBannerText, styles.rangeTextSuccess]}>
+                You're collecting, so no delivery address is needed. Tap "I've arrived" on your order when you get there.
+              </Text>
+            </View>
+          </Animated.View>
+        ) : (
+          <>
         {/* Delivery address */}
         <Animated.View entering={SECTION_IN[0]} style={styles.section}>
           <View style={styles.sectionHeaderRow}>
@@ -689,6 +708,8 @@ export default function CheckoutScreen({ navigation }) {
             )}
           </View>
         </Animated.View>
+          </>
+        )}
 
         {/* Payment */}
         <Animated.View entering={SECTION_IN[1]} style={styles.section}>
@@ -793,8 +814,13 @@ export default function CheckoutScreen({ navigation }) {
                     <Text style={styles.summaryValue}>{formatPence(storeOrder.subtotal)}</Text>
                   </View>
                   <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Delivery</Text>
-                    <Text style={styles.summaryValue}>{storeOrder.shippingFee > 0 ? formatPence(storeOrder.shippingFee) : 'Free'}</Text>
+                    <Text style={styles.summaryLabel}>
+                      {storeOrder.fulfilment?.method === 'collection' ? 'You collect' : 'Delivery'}
+                      {storeOrder.fulfilment?.label ? ` · ${storeOrder.fulfilment.label}` : ''}
+                    </Text>
+                    <Text style={styles.summaryValue}>
+                      {storeOrder.fulfilment?.method === 'collection' ? '—' : storeOrder.shippingFee > 0 ? formatPence(storeOrder.shippingFee) : 'Free'}
+                    </Text>
                   </View>
                   <PriceLines lines={storeOrder.lines} />
                   {orders.length > 1 ? (

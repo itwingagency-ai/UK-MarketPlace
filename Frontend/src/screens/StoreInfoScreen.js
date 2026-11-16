@@ -136,9 +136,22 @@ export default function StoreInfoScreen({ route, navigation }) {
             </View>
 
             <View style={styles.infoBlock}>
+              <Text style={styles.infoTitle}>Getting your order</Text>
+              <Text style={styles.infoDesc}>
+                {[
+                  store?.deliveryEnabled !== false ? 'Delivery' : null,
+                  store?.collectionEnabled ? 'Click & collect (no delivery charge)' : null,
+                ].filter(Boolean).join(' or ')}
+                {store?.schedulingEnabled ? '. You can book a time in your basket.' : '. Orders are prepared as soon as possible.'}
+              </Text>
+            </View>
+
+            <View style={styles.infoBlock}>
               <Text style={styles.infoTitle}>Minimum order</Text>
               <Text style={styles.infoDesc}>
-                For orders below £10.00, we charge a small order fee.
+                {store?.minimumOrder > 0
+                  ? `£${(store.minimumOrder / 100).toFixed(2)} of shopping (before discounts).`
+                  : 'No minimum order.'}
               </Text>
             </View>
           </View>

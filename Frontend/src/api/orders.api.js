@@ -21,3 +21,9 @@ export const cancelMyOrder = async (id, reason) => {
   const response = await client.post(`/customer/orders/${id}/cancel`, reason ? { reason } : {});
   return response.data;
 };
+
+// Collecting: tell the store you're outside (note e.g. "Blue car, bay 3")
+export const markArrived = async (id, note) => {
+  const response = await client.post(`/customer/orders/${id}/arrived`, note ? { note } : {});
+  return response.data;
+};

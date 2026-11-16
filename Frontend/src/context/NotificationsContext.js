@@ -66,7 +66,7 @@ async function getPushToken() {
 
 function openFromNotification(data, role) {
   if (!data?.type) return;
-  if (data.type === 'order:new' && role === 'vendor') {
+  if ((data.type === 'order:new' || data.type === 'order:arrived') && role === 'vendor') {
     navigateWhenReady('VendorOrderDetail', { orderId: data.orderId });
   } else if (data.type === 'order:status' && role !== 'vendor') {
     navigateWhenReady('MainTabs', {
@@ -140,7 +140,9 @@ export function NotificationsProvider({ children }) {
         trigger: Platform.OS === 'android' ? { channelId: n.channelId || 'default' } : null,
       }).catch(() => {});
     });
-    ['order:created', 'order:status_changed'].forEach((name) => socket.on(name, (p) => emit(name, p)));
+    ['order:created', 'order:status_changed', 'order:customer_arrived'].forEach((name) =>
+      socket.on(name, (p) => emit(name, p))
+    );
 
     // A rejected login (e.g. expired token) is not retried automatically.
     // Try again shortly; by then the API client will usually have refreshed it.

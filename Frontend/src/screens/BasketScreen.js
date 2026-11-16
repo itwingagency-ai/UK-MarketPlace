@@ -11,6 +11,7 @@ import Asset3D from '../components/Asset3D';
 import Button from '../components/Button';
 import { formatPence } from '../components/ProductCard';
 import PriceLines from '../components/PriceLines';
+import HandoverPicker from '../components/HandoverPicker';
 import { Colors, Spacing, Typography, Radius, Shadow, Motion } from '../theme';
 
 // Entrance/exit/layout animations are built once: new builders per render remount views.
@@ -197,7 +198,7 @@ export default function BasketScreen({ navigation }) {
   const {
     items, byStore, total, subtotal, shippingFee, itemCount, storeId, updateItem, removeItem, isLoading,
     coupons, blockingIssues, discountTotal, feeTotal, tipTotal, options,
-    applyCoupon, removeCoupon, setTip, setCartOptions,
+    applyCoupon, removeCoupon, setTip, setCartOptions, setFulfilment,
   } = useCart();
   const { isAuthenticated } = useAuth();
   const { showAlert } = useCustomAlert();
@@ -228,6 +229,11 @@ export default function BasketScreen({ navigation }) {
   const toggleBags = async (sid, wanted) =>
     reportFailure(await setCartOptions({ stores: [{ storeId: sid, bags: wanted }] }), "Couldn't update bags");
   const dropCoupon = async (code) => reportFailure(await removeCoupon(code), "Couldn't remove that code");
+  const changeHandover = async (sid, method, slotStart) => {
+    const res = await setFulfilment(sid, method, slotStart);
+    reportFailure(res, "Couldn't change that");
+    return res.success;
+  };
 
   const handleCheckout = async () => {
     if (itemCount === 0) return;
@@ -326,10 +332,18 @@ export default function BasketScreen({ navigation }) {
               <View style={{ flex: 1 }}>
                 <Text style={styles.groupTitle} numberOfLines={1}>{group.storeName || `Store ${index + 1}`}</Text>
                 <Text style={styles.groupMeta}>
-                  {group.itemCount} {group.itemCount === 1 ? 'item' : 'items'} · delivery {group.shippingFee > 0 ? formatPence(group.shippingFee) : 'free'}
+                  {group.itemCount} {group.itemCount === 1 ? 'item' : 'items'} ·{' '}
+                  {group.fulfilment?.method === 'collection'
+                    ? 'you collect'
+                    : `delivery ${group.shippingFee > 0 ? formatPence(group.shippingFee) : 'free'}`}
                 </Text>
               </View>
             </View>
+            <HandoverPicker
+              storeSlug={group.storeSlug || String(group.storeId)}
+              fulfilment={group.fulfilment}
+              onChange={(method, slotStart) => changeHandover(group.storeId, method, slotStart)}
+            />
             {group.items.map((item, i) => (
               <BasketItem
                 key={String(item._id)}
