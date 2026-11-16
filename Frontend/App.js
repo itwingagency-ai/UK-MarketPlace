@@ -56,6 +56,8 @@ import HelpCenterScreen from './src/screens/HelpCenterScreen';
 import RewardsScreen from './src/screens/RewardsScreen';
 import DeleteAccountScreen from './src/screens/DeleteAccountScreen';
 import SavedCardsScreen from './src/screens/SavedCardsScreen';
+import RepeatOrdersScreen from './src/screens/RepeatOrdersScreen';
+import RepeatOrderSetupScreen from './src/screens/RepeatOrderSetupScreen';
 import AppGate from './src/components/AppGate';
 import { parseLink, openTarget } from './src/utils/deepLinks';
 import RiderHomeScreen from './src/screens/rider/RiderHomeScreen';
@@ -145,6 +147,8 @@ function AccountStack() {
           <Stack.Screen name="BecomeSeller" component={BecomeSellerScreen} />
           <Stack.Screen name="Rewards" component={RewardsScreen} />
           <Stack.Screen name="SavedCards" component={SavedCardsScreen} />
+          <Stack.Screen name="RepeatOrders" component={RepeatOrdersScreen} />
+          <Stack.Screen name="RepeatOrderSetup" component={RepeatOrderSetupScreen} />
           <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
         </>
       )}

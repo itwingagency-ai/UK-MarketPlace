@@ -94,6 +94,16 @@ export default function AccountScreen({ navigation }) {
 
           <View style={styles.divider} />
 
+          <TouchableOpacity style={styles.generalItem} activeOpacity={0.7} onPress={() => navigation.navigate('RepeatOrders')}>
+            <View style={styles.generalItemLeft}>
+              <Feather name="repeat" size={22} color={Colors.text} />
+              <Text style={styles.generalItemText}>Repeat orders</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color={Colors.muted} />
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
           <TouchableOpacity style={styles.generalItem} activeOpacity={0.7} onPress={() => navigation.navigate('SavedCards')}>
             <View style={styles.generalItemLeft}>
               <Feather name="credit-card" size={22} color={Colors.text} />

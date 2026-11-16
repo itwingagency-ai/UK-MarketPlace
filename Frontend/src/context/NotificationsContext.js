@@ -75,6 +75,11 @@ function openFromNotification(data, role) {
       screen: 'AccountTab',
       params: { screen: 'OrderDetail', params: { orderId: data.orderId }, initial: false },
     });
+  } else if (data.type === 'subscription' && role !== 'vendor') {
+    navigateWhenReady('MainTabs', {
+      screen: 'AccountTab',
+      params: { screen: 'RepeatOrders', initial: false },
+    });
   } else if (data.type === 'stock:back' && role !== 'vendor') {
     navigateWhenReady('ProductDetail', { product: { _id: data.productId } });
   }

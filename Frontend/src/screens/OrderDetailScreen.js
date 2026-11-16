@@ -497,6 +497,20 @@ export default function OrderDetailScreen({ route, navigation }) {
               style={{ marginTop: Spacing.base }}
             />
           )}
+          {statusStr !== 'cancelled' ? (
+            <Button
+              title="Repeat this order regularly"
+              variant="outline"
+              size="full"
+              onPress={() => navigation.navigate('RepeatOrderSetup', {
+                orderId: order._id,
+                storeName: order.store?.name || '',
+                ageCheck: order.ageCheck || 0,
+              })}
+              icon={<Feather name="repeat" size={16} color={Colors.primary} />}
+              style={{ marginTop: Spacing.base }}
+            />
+          ) : null}
           <Button
             title="Order again"
             variant="outline"
