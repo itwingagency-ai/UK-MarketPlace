@@ -170,4 +170,6 @@ module.exports = {
   localDate,
   zonedToUtc,
   safeZone,
+  addDays,
+  weekday,
 };

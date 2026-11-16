@@ -13,6 +13,10 @@ const bootstrap = async () => {
   // Live order alerts for the mobile app (see lib/appNotifications)
   initSocketIO(server);
 
+  // Repeat orders: places due subscriptions every 15 minutes (Mongo lock, so
+  // several API processes never double-place)
+  require("./lib/subscriptions").startSubscriptionScheduler();
+
   server.listen(env.port, () => {
     // eslint-disable-next-line no-console
     console.log(`Server running on port ${env.port}`);

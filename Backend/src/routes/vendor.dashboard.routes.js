@@ -179,6 +179,8 @@ router.patch("/riders/:id", riders.updateRider);
 router.patch("/orders/:id/rider", requireResourceInScope(Order), riders.assignRider);
 router.patch("/orders/:id/items/:index", requireResourceInScope(Order), riders.adjustItem);
 
+router.get("/subscriptions/upcoming", require("../controllers/subscriptions.controller").vendorUpcoming);
+
 router.get("/fulfilment", getFulfilment);
 router.patch("/fulfilment", updateFulfilment);
 router.get("/settings", getSettings);

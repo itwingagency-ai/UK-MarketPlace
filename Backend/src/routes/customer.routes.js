@@ -49,6 +49,12 @@ router.post("/orders/:id/reorder", reorder);
 router.post("/orders/:id/cancel", cancelMyOrder);
 router.post("/orders/:id/arrived", markArrived);
 
+// Repeat orders
+const subscriptions = require("../controllers/subscriptions.controller");
+router.post("/subscriptions", subscriptions.createSubscription);
+router.get("/subscriptions", subscriptions.listMine);
+router.patch("/subscriptions/:id", subscriptions.updateMine);
+
 router.get("/stock-alerts", listStockAlerts);
 router.post("/stock-alerts", createStockAlert);
 router.delete("/stock-alerts", deleteStockAlert);

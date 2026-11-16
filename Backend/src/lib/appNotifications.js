@@ -91,6 +91,24 @@ const notifyRiderAssigned = (order, rider) =>
     });
   });
 
+/** A repeat order ran (or couldn't) → the customer. */
+const notifySubscriptionResult = (sub, result) =>
+  safely("repeat order", async () => {
+    const paused = sub.status === "paused";
+    deliver([String(sub.user)], {
+      title: result.ok ? "Your repeat order is placed" : paused ? "Repeat order paused" : "Repeat order didn't go through",
+      body: result.ok
+        ? result.message
+        : paused
+          ? `${result.message}. Open the app to update it and resume.`
+          : `${result.message}. We'll try again tomorrow.`,
+      data: result.ok && result.orders?.[0]
+        ? { type: "order:status", orderId: String(result.orders[0]._id), orderStatus: "pending" }
+        : { type: "subscription", subscriptionId: String(sub._id) },
+      channelId: "orders",
+    });
+  });
+
 /** A collecting customer is outside → the store's phones. */
 const notifyCustomerArrived = (order) =>
   safely("customer arrived", async () => {
@@ -129,6 +147,7 @@ const notifyBackInStock = (userIds, { product, variantLabel, storeName }) =>
   });
 
 module.exports = {
+  notifySubscriptionResult,
   notifyOrderChanged,
   notifyRiderAssigned,
   notifyCustomerArrived,

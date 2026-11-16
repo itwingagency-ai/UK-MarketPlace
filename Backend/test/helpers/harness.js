@@ -41,7 +41,24 @@ const installFakeStripe = () => {
       create: async (args) => {
         n += 1;
         calls.push({ api: "paymentIntents.create", args });
+        // Off-session charge (repeat orders): "pm_decline" behaves like a declined card
+        if (args.confirm && args.off_session) {
+          if (args.payment_method === "pm_decline") {
+            const err = new Error("Your card has insufficient funds.");
+            err.code = "card_declined";
+            err.decline_code = "insufficient_funds";
+            throw err;
+          }
+          return { id: `pi_test_${n}`, status: "succeeded" };
+        }
         return { id: `pi_test_${n}`, client_secret: `pi_test_${n}_secret` };
+      },
+    },
+    setupIntents: {
+      create: async (args) => {
+        n += 1;
+        calls.push({ api: "setupIntents.create", args });
+        return { id: `seti_test_${n}`, client_secret: `seti_test_${n}_secret` };
       },
     },
     checkout: {
@@ -72,7 +89,10 @@ const installFakeStripe = () => {
     },
     paymentMethods: {
       list: async ({ customer }) => ({ data: [{ id: "pm_test_1", customer, card: { brand: "visa", last4: "4242", exp_month: 12, exp_year: 2030 } }] }),
-      retrieve: async (id) => (id === "pm_test_1" ? { id, customer: "cus_test_1" } : { id, customer: "cus_someone_else" }),
+      retrieve: async (id) =>
+        ["pm_test_1", "pm_decline"].includes(id)
+          ? { id, customer: "cus_test_1", card: { brand: "visa", last4: id === "pm_decline" ? "0002" : "4242" } }
+          : { id, customer: "cus_someone_else" },
       detach: async (id) => {
         calls.push({ api: "paymentMethods.detach", args: { id } });
         return { id };

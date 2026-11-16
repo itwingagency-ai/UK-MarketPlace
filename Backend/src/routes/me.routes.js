@@ -20,6 +20,7 @@ const { accountActionLimiter } = require("../middleware/rateLimit.middleware");
 router.post("/account/delete-code", accountActionLimiter, appPlatform.requestAccountDeletion);
 router.post("/account/delete", accountActionLimiter, appPlatform.confirmAccountDeletion);
 router.get("/payment-methods", appPlatform.listPaymentMethods);
+router.post("/payment-methods/setup", require("../controllers/subscriptions.controller").setupCardForRepeatOrders);
 router.delete("/payment-methods/:id", appPlatform.removePaymentMethod);
 router.delete("/push-tokens", deletePushToken);
 

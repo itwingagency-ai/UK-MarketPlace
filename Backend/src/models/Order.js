@@ -416,6 +416,8 @@ const orderSchema = new mongoose.Schema(
       type: orderFulfilmentSchema,
       default: () => ({}),
     },
+    // Set when a repeat order (Subscription) created this order
+    subscription: { type: mongoose.Schema.Types.ObjectId, ref: "Subscription", default: null, index: true },
     delivery: {
       type: orderDeliverySchema,
       default: () => ({}),
