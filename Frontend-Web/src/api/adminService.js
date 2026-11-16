@@ -222,4 +222,22 @@ export const adminService = {
     const { data } = await client.patch(`/admin/referrals/${id}`, payload);
     return data;
   },
+
+  /* ── Home banners ── */
+  getBanners: async () => {
+    const { data } = await client.get('/admin/banners');
+    return data;
+  },
+  createBanner: async (formData) => {
+    const { data } = await client.post('/admin/banners', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return data;
+  },
+  updateBanner: async (id, formData) => {
+    const { data } = await client.patch(`/admin/banners/${id}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return data;
+  },
+  deleteBanner: async (id) => {
+    const { data } = await client.delete(`/admin/banners/${id}`);
+    return data;
+  },
 };

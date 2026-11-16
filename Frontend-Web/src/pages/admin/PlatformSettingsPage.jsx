@@ -4,6 +4,7 @@ import { PageHeader } from '../../components/common';
 import { Save, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 import FeesSettings from './FeesSettings';
+import AppVersionSettings from './AppVersionSettings';
 
 export default function PlatformSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -191,6 +192,7 @@ export default function PlatformSettingsPage() {
       </div>
 
       <FeesSettings />
+      <AppVersionSettings />
     </div>
   );
 }
