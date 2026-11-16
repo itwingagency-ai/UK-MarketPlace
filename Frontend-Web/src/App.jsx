@@ -34,6 +34,7 @@ import StoreSettingsPage from './pages/vendor/settings/StoreSettingsPage';
 import OperatingHoursPage from './pages/vendor/settings/OperatingHoursPage';
 import LocationPage from './pages/vendor/settings/LocationPage';
 import ShippingMethodsPage from './pages/vendor/settings/ShippingMethodsPage';
+import FulfilmentPage from './pages/vendor/settings/FulfilmentPage';
 import VendorAnalyticsPage from './pages/vendor/VendorAnalyticsPage';
 import ProductsPage from './pages/vendor/ProductsPage';
 import CategoriesPage from './pages/vendor/CategoriesPage';
@@ -96,6 +97,7 @@ export default function App() {
             {/* Phase 4 */}
             <Route path="settings" element={<StoreSettingsPage />} />
             <Route path="shipping" element={<ShippingMethodsPage />} />
+            <Route path="fulfilment" element={<FulfilmentPage />} />
             <Route path="operating-hours" element={<OperatingHoursPage />} />
             <Route path="location" element={<LocationPage />} />
             {/* Phase 5 */}

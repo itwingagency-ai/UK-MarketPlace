@@ -19,6 +19,7 @@ import {
   Boxes,
   DollarSign,
   Ticket,
+  CalendarClock,
   MapPin,
   Clock,
   FolderTree,
@@ -90,6 +91,7 @@ const vendorNav = [
     label: 'Store',
     items: [
       { to: '/vendor/settings', icon: Settings, text: 'Store Settings' },
+      { to: '/vendor/fulfilment', icon: CalendarClock, text: 'Delivery & Collection' },
       { to: '/vendor/shipping', icon: Truck, text: 'Shipping Methods' },
       { to: '/vendor/operating-hours', icon: Clock, text: 'Operating Hours' },
       { to: '/vendor/location', icon: MapPin, text: 'Location' },

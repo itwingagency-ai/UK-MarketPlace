@@ -33,6 +33,10 @@ const STATUS_MAP = {
   delivery_attempted: 'warning',
   exception:          'danger',
 
+  // Collection orders
+  ready_for_collection: 'primary',
+  collected:            'success',
+
   // Vendor application statuses
   approved:   'success',
   rejected:   'danger',

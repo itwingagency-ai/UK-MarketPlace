@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { vendorService } from '../../api/vendorService';
 import { StatusBadge, Skeleton } from '../../components/common';
-import { formatDateTime, formatCurrency } from '../../utils/formatters';
+import { formatDateTime, formatCurrency, formatSlot } from '../../utils/formatters';
+import { useLiveOrders } from '../../context/LiveOrdersContext';
 import {
   X, Package, User, MapPin, Truck, Clock,
   CheckCircle, XCircle, ArrowRight, ExternalLink,
@@ -18,11 +19,23 @@ const STATUS_TRANSITIONS = {
   cancelled: [],
 };
 
+// Collection orders are made ready, then handed over (no shipping)
+const COLLECTION_TRANSITIONS = {
+  pending:              ['confirmed', 'cancelled'],
+  confirmed:            ['ready_for_collection', 'packed', 'cancelled'],
+  packed:               ['ready_for_collection', 'cancelled'],
+  ready_for_collection: ['collected', 'cancelled'],
+  collected:            [],
+  cancelled:            [],
+};
+
 const STATUS_BUTTON_STYLES = {
   confirmed: { className: 'btn btn-primary',  icon: CheckCircle, label: 'Confirm Order' },
   packed:    { className: 'btn btn-primary',  icon: Package,     label: 'Mark Packed' },
   shipped:   { className: 'btn btn-primary',  icon: Truck,       label: 'Mark Shipped' },
   delivered: { className: 'btn btn-success',  icon: CheckCircle, label: 'Mark Delivered' },
+  ready_for_collection: { className: 'btn btn-primary', icon: Package, label: 'Ready to Collect' },
+  collected: { className: 'btn btn-success',  icon: CheckCircle, label: 'Handed Over' },
   cancelled: { className: 'btn btn-danger',   icon: XCircle,     label: 'Cancel Order' },
 };
 
@@ -43,6 +56,11 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, orderId]);
+
+  // Arrival or a change from another device: reload this order if it's open
+  useLiveOrders((event, payload) => {
+    if (open && orderId && payload?.orderId === String(orderId) && event !== 'order:created') fetchOrder();
+  });
 
   const fetchOrder = async () => {
     try {
@@ -93,7 +111,8 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
 
   if (!open) return null;
 
-  const nextStatuses = order ? (STATUS_TRANSITIONS[order.orderStatus] || []) : [];
+  const transitions = order?.fulfilment?.method === 'collection' ? COLLECTION_TRANSITIONS : STATUS_TRANSITIONS;
+  const nextStatuses = order ? (transitions[order.orderStatus] || []) : [];
 
   return (
     <>
@@ -205,6 +224,14 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
                 <div className="order-section-title">Picking</div>
                 <div className="order-info-grid">
                   <div className="order-info-item">
+                    <label>Handover</label>
+                    <span>{order.fulfilment?.method === 'collection' ? 'Customer collects' : 'Delivery'}</span>
+                  </div>
+                  <div className="order-info-item">
+                    <label>When</label>
+                    <span>{formatSlot(order.fulfilment)}</span>
+                  </div>
+                  <div className="order-info-item">
                     <label>Substitutions</label>
                     <span>{order.allowSubstitutions === false ? 'Not allowed' : 'Allowed'}</span>
                   </div>
@@ -213,6 +240,12 @@ export default function OrderDetailDrawer({ orderId, open, onClose, onStatusChan
                     <span>{order.tipAmount ? formatCurrency(order.tipAmount) : '—'}</span>
                   </div>
                 </div>
+                {order.fulfilment?.arrivedAt && !['collected', 'cancelled'].includes(order.orderStatus) ? (
+                  <div style={{ marginTop: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: '#fef3c7', color: '#92400e', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
+                    Customer is outside (since {formatDateTime(order.fulfilment.arrivedAt)})
+                    {order.fulfilment.arrivalNote ? ` — ${order.fulfilment.arrivalNote}` : ''}
+                  </div>
+                ) : null}
                 {order.customerNote ? (
                   <div style={{ marginTop: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--surface-50)', fontSize: 'var(--text-sm)' }}>
                     <strong>Customer note:</strong> {order.customerNote}

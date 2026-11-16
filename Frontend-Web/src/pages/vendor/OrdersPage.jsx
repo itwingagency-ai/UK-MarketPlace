@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { vendorService } from '../../api/vendorService';
 import { PageHeader, DataTable, StatusBadge } from '../../components/common';
-import { formatDate, formatCurrency } from '../../utils/formatters';
-import { ShoppingCart, Eye, User } from 'lucide-react';
+import { formatDate, formatCurrency, formatSlot } from '../../utils/formatters';
+import { ShoppingCart, Eye, User, Truck, Store as StoreIcon, Car } from 'lucide-react';
+import { useLiveOrders } from '../../context/LiveOrdersContext';
 import toast from 'react-hot-toast';
 import OrderDetailDrawer from './OrderDetailDrawer';
 
@@ -13,7 +14,15 @@ const ORDER_STATUSES = [
   { value: 'packed', label: 'Packed' },
   { value: 'shipped', label: 'Shipped' },
   { value: 'delivered', label: 'Delivered' },
+  { value: 'ready_for_collection', label: 'Ready to collect' },
+  { value: 'collected', label: 'Collected' },
   { value: 'cancelled', label: 'Cancelled' },
+];
+
+const METHODS = [
+  { value: '', label: 'Delivery & collection' },
+  { value: 'delivery', label: 'Delivery' },
+  { value: 'collection', label: 'Collection' },
 ];
 
 const PAYMENT_STATUSES = [
@@ -34,6 +43,8 @@ export default function OrdersPage() {
   const [paymentFilter, setPaymentFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [methodFilter, setMethodFilter] = useState('');
+  const [bySlot, setBySlot] = useState(false);
 
   // Drawer
   const [drawerOrderId, setDrawerOrderId] = useState(null);
@@ -49,6 +60,8 @@ export default function OrdersPage() {
         paymentStatus: paymentFilter || undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
+        method: methodFilter || undefined,
+        sort: bySlot ? 'slot' : undefined,
       };
       const res = await vendorService.getOrders(params);
       setOrders(res.data || []);
@@ -58,11 +71,14 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, paymentFilter, startDate, endDate]);
+  }, [page, search, statusFilter, paymentFilter, startDate, endDate, methodFilter, bySlot]);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // New orders, status changes and arrivals from any device refresh the list
+  useLiveOrders(() => { fetchOrders(); });
 
   const handleSearch = (val) => {
     setSearch(val);
@@ -94,6 +110,29 @@ export default function OrdersPage() {
               <span style={{ fontWeight: 500, fontSize: 'var(--text-sm)' }}>{name}</span>
             </div>
             {email && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--gray-500)' }}>{email}</div>}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'fulfilment',
+      label: 'Handover',
+      width: 170,
+      render: (f, row) => {
+        const collecting = f?.method === 'collection';
+        const Icon = collecting ? StoreIcon : Truck;
+        const arrived = collecting && f?.arrivedAt && !['collected', 'cancelled'].includes(row.orderStatus);
+        return (
+          <div style={{ fontSize: 'var(--text-sm)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontWeight: 600 }}>
+              <Icon size={13} /> {collecting ? 'Collection' : 'Delivery'}
+            </div>
+            <div style={{ color: 'var(--gray-500)', fontSize: 'var(--text-xs)' }}>{formatSlot(f)}</div>
+            {arrived ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#b45309', fontWeight: 700, fontSize: 'var(--text-xs)' }}>
+                <Car size={12} /> Customer outside
+              </div>
+            ) : null}
           </div>
         );
       },
@@ -164,6 +203,15 @@ export default function OrdersPage() {
               style={{ height: 34, fontSize: 'var(--text-sm)' }}>
               {PAYMENT_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
+            <select className="form-input" value={methodFilter} aria-label="Delivery or collection"
+              onChange={e => { setMethodFilter(e.target.value); setPage(1); }}
+              style={{ height: 34, fontSize: 'var(--text-sm)' }}>
+              {METHODS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)' }}>
+              <input type="checkbox" checked={bySlot} onChange={e => { setBySlot(e.target.checked); setPage(1); }} />
+              Soonest slot first
+            </label>
           </div>
           <div className="date-range-group">
             <input type="date" className="form-input" value={startDate}

@@ -262,4 +262,14 @@ export const vendorService = {
     const { data } = await client.delete(`/vendor/dashboard/promotions/${id}`);
     return data;
   },
+
+  /* ── Delivery, collection and time slots ── */
+  getFulfilment: async () => {
+    const { data } = await client.get('/vendor/dashboard/fulfilment');
+    return data;
+  },
+  updateFulfilment: async (payload) => {
+    const { data } = await client.patch('/vendor/dashboard/fulfilment', payload);
+    return data;
+  },
 };

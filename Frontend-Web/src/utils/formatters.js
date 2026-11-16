@@ -12,6 +12,16 @@ export function formatCurrency(amount, currency = 'GBP') {
 /**
  * Format a date string to a readable format.
  */
+/** "Tue 17 Nov, 10:00–11:00" for a booked slot; "ASAP" when there isn't one. */
+export function formatSlot(fulfilment) {
+  if (!fulfilment || fulfilment.asap !== false || !fulfilment.slotStart) return 'ASAP';
+  const start = new Date(fulfilment.slotStart);
+  const end = fulfilment.slotEnd ? new Date(fulfilment.slotEnd) : null;
+  const day = start.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  const t = (d) => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return `${day}, ${t(start)}${end ? `–${t(end)}` : ''}`;
+}
+
 export function formatDate(dateStr, options = {}) {
   if (!dateStr) return '—';
   const defaults = { day: 'numeric', month: 'short', year: 'numeric' };
