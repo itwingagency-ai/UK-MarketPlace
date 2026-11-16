@@ -29,6 +29,7 @@ import { useCustomAlert } from '../context/AlertContext';
 import { getNearbyStores, getMarketplaceCategories } from '../api/stores.api';
 import { useFavorites } from '../context/FavoritesContext';
 import Asset3D from '../components/Asset3D';
+import BannerCarousel from '../components/BannerCarousel';
 import Button from '../components/Button';
 import { Colors, Spacing, Typography, Radius, Shadow, Motion } from '../theme';
 
@@ -331,6 +332,9 @@ export default function ShopHomeScreen({ route, navigation }) {
 
   const header = (
     <View>
+      {/* Admin-managed banners and local campaigns */}
+      <BannerCarousel lat={location?.lat} lng={location?.lng} />
+
       {/* Category tiles */}
       {categories.length > 0 && (
         <>

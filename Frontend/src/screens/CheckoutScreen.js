@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Pressable,
   Switch,
+  Platform,
 } from 'react-native';
 import Animated, { FadeInDown, useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +23,8 @@ const SECTION_IN = Array.from({ length: 4 }, (_, i) =>
   FadeInDown.delay(60 + i * Motion.stagger.cards).springify().damping(Motion.springs.gentle.damping)
 );
 import { previewCheckout, placeOrder, cancelTransaction, confirmTransaction } from '../api/checkout.api';
+import { getAppConfig, lookupAddress } from '../api/app.api';
+import Constants from 'expo-constants';
 import client from '../api/client';
 import { getMyAddresses, addMyAddress } from '../api/profile.api';
 import { useCart } from '../context/CartContext';
@@ -138,6 +141,28 @@ export default function CheckoutScreen({ navigation }) {
   const { clearCart, fetchCart, items, setCartOptions, setLoyaltyPoints } = useCart();
   const [pointsBusy, setPointsBusy] = useState(null);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
+  // Postcode -> address list, only when the server has a lookup provider
+  const [lookupEnabled, setLookupEnabled] = useState(false);
+  const [lookupResults, setLookupResults] = useState(null);
+  const [lookingUp, setLookingUp] = useState(false);
+
+  useEffect(() => {
+    getAppConfig(Platform.OS, Constants.expoConfig?.version || '0.0.0')
+      .then((cfg) => setLookupEnabled(Boolean(cfg?.features?.addressLookup)))
+      .catch(() => {});
+  }, []);
+
+  const findAddresses = async () => {
+    setLookingUp(true);
+    try {
+      const res = await lookupAddress(address.postalCode);
+      setLookupResults(res.addresses || []);
+    } catch (err) {
+      showAlert({ title: "Couldn't look that up", message: err.response?.data?.message || 'Type your address in instead.', icon: 'alert-circle' });
+    } finally {
+      setLookingUp(false);
+    }
+  };
   const { showAlert } = useCustomAlert();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
@@ -490,6 +515,13 @@ export default function CheckoutScreen({ navigation }) {
         const { error: initError } = await initPaymentSheet({
           merchantDisplayName: 'UK MarketPlace',
           paymentIntentClientSecret: payment.clientSecret,
+          // Saved cards: PaymentSheet lists them and offers to save new ones
+          ...(payment.customerId && payment.customerEphemeralKeySecret
+            ? { customerId: payment.customerId, customerEphemeralKeySecret: payment.customerEphemeralKeySecret }
+            : {}),
+          // Apple Pay (iOS). Google Pay needs enableGooglePay in app.json and a new build.
+          ...(Platform.OS === 'ios' ? { applePay: { merchantCountryCode: 'GB' } } : {}),
+          returnURL: 'ukmarketplace://stripe-redirect',
           allowsDelayedPaymentMethods: false,
           defaultBillingDetails: {
             name: address.fullName,
@@ -712,10 +744,36 @@ export default function CheckoutScreen({ navigation }) {
                 placeholder: 'Postcode',
                 autoCapitalize: 'characters',
                 value: address.postalCode,
-                onChangeText: (text) => setAddress({ ...address, postalCode: text }),
+                onChangeText: (text) => { setAddress({ ...address, postalCode: text }); setLookupResults(null); },
                 style: styles.halfInput,
               })}
             </View>
+
+            {lookupEnabled && address.postalCode.trim().length >= 5 ? (
+              <Pressable onPress={findAddresses} style={styles.lookupBtn} disabled={lookingUp} accessibilityRole="button">
+                {lookingUp ? <ActivityIndicator size="small" color={Colors.primary} /> : <Feather name="search" size={15} color={Colors.primary} />}
+                <Text style={styles.lookupText}>Find my address</Text>
+              </Pressable>
+            ) : null}
+            {lookupResults ? (
+              <View style={styles.suggestionsBox}>
+                {lookupResults.length === 0 ? (
+                  <Text style={styles.noSuggestionsText}>No addresses found. Type yours in above.</Text>
+                ) : lookupResults.slice(0, 30).map((a, i) => (
+                  <Pressable
+                    key={`${a.line1}-${i}`}
+                    style={[styles.suggestionItem, i === lookupResults.length - 1 && styles.suggestionItemLast]}
+                    onPress={() => {
+                      setSelectedSavedAddressId(null);
+                      setAddress((prev) => ({ ...prev, line1: a.line1, line2: a.line2 || '', city: a.city, postalCode: a.postalCode, lat: a.lat ?? prev.lat, lng: a.lng ?? prev.lng }));
+                      setLookupResults(null);
+                    }}
+                  >
+                    <Text style={styles.suggestionTitle} numberOfLines={1}>{[a.line1, a.line2].filter(Boolean).join(', ')}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
 
             {deliveryRangeStatus.checked && (
               <View style={[styles.rangeBanner, deliveryRangeStatus.inRange ? styles.rangeBannerSuccess : styles.rangeBannerError]}>
@@ -1170,6 +1228,8 @@ const styles = StyleSheet.create({
   orderTagText: { fontFamily: Typography.family.bold, fontSize: 11, color: Colors.primary },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  lookupBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: Spacing.sm, marginBottom: Spacing.sm },
+  lookupText: { fontFamily: Typography.family.bold, fontSize: 14, color: Colors.primary },
   pointsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.md },
   pointsChip: {
     minWidth: 64,

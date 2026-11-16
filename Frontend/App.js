@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { useCustomAlert } from './src/context/AlertContext';
+import { ActivityIndicator, Linking, View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -53,6 +54,10 @@ import CheckoutScreen from './src/screens/CheckoutScreen';
 import OrderSuccessScreen from './src/screens/OrderSuccessScreen';
 import HelpCenterScreen from './src/screens/HelpCenterScreen';
 import RewardsScreen from './src/screens/RewardsScreen';
+import DeleteAccountScreen from './src/screens/DeleteAccountScreen';
+import SavedCardsScreen from './src/screens/SavedCardsScreen';
+import AppGate from './src/components/AppGate';
+import { parseLink, openTarget } from './src/utils/deepLinks';
 import RiderHomeScreen from './src/screens/rider/RiderHomeScreen';
 import RiderDeliveryScreen from './src/screens/rider/RiderDeliveryScreen';
 import TermsPoliciesScreen from './src/screens/TermsPoliciesScreen';
@@ -139,6 +144,8 @@ function AccountStack() {
           <Stack.Screen name="Addresses" component={AddressesScreen} />
           <Stack.Screen name="BecomeSeller" component={BecomeSellerScreen} />
           <Stack.Screen name="Rewards" component={RewardsScreen} />
+          <Stack.Screen name="SavedCards" component={SavedCardsScreen} />
+          <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
         </>
       )}
       <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
@@ -221,6 +228,29 @@ function RiderRootStack() {
   );
 }
 
+/**
+ * ukmarketplace:// links (store / product / coupon), whether they opened the
+ * app or arrived while it was running. Shoppers only.
+ */
+function DeepLinkListener() {
+  const { applyCoupon } = useCart();
+  const { showAlert } = useCustomAlert();
+  useEffect(() => {
+    const handle = (url) => {
+      const target = parseLink(url);
+      if (!target) return;
+      openTarget(target, {
+        applyCoupon,
+        onMessage: (title, message) => showAlert({ title, message, showCancel: false, confirmText: 'OK' }),
+      });
+    };
+    Linking.getInitialURL().then(handle).catch(() => {});
+    const sub = Linking.addEventListener('url', ({ url }) => handle(url));
+    return () => sub.remove();
+  }, [applyCoupon, showAlert]);
+  return null;
+}
+
 function LoadingScreen() {
   return (
     <View style={styles.loadingContainer}>
@@ -251,9 +281,12 @@ function RootNavigator() {
   const mode = isRider ? 'rider' : isShopkeeper ? 'shopkeeper' : 'customer';
 
   return (
-    <NavigationContainer ref={navigationRef} key={mode}>
-      {isRider ? <RiderRootStack /> : isShopkeeper ? <VendorRootStack /> : <RootStack />}
-    </NavigationContainer>
+    <AppGate role={mode === 'customer' ? 'customer' : user?.role}>
+      <NavigationContainer ref={navigationRef} key={mode}>
+        {isRider ? <RiderRootStack /> : isShopkeeper ? <VendorRootStack /> : <RootStack />}
+        {mode === 'customer' ? <DeepLinkListener /> : null}
+      </NavigationContainer>
+    </AppGate>
   );
 }
 
@@ -283,6 +316,8 @@ export default function App() {
                 <CartProvider>
                   <StripeProvider
                     publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''}
+                    merchantIdentifier="merchant.com.ukmarketplace"
+                    urlScheme="ukmarketplace"
                   >
                     <NotificationsProvider>
                       <StatusBar style="auto" />

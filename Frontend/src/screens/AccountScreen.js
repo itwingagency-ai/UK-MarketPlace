@@ -94,6 +94,26 @@ export default function AccountScreen({ navigation }) {
 
           <View style={styles.divider} />
 
+          <TouchableOpacity style={styles.generalItem} activeOpacity={0.7} onPress={() => navigation.navigate('SavedCards')}>
+            <View style={styles.generalItemLeft}>
+              <Feather name="credit-card" size={22} color={Colors.text} />
+              <Text style={styles.generalItemText}>Saved cards</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color={Colors.muted} />
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity style={styles.generalItem} activeOpacity={0.7} onPress={() => navigation.navigate('DeleteAccount')}>
+            <View style={styles.generalItemLeft}>
+              <Feather name="user-x" size={22} color={Colors.errorText} />
+              <Text style={[styles.generalItemText, { color: Colors.errorText }]}>Delete account</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color={Colors.muted} />
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
           <TouchableOpacity style={styles.generalItem} activeOpacity={0.7} onPress={() => navigation.navigate('TermsPolicies')}>
             <View style={styles.generalItemLeft}>
               <Ionicons name="document-text-outline" size={22} color={Colors.text} />
