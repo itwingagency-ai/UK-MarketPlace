@@ -16,6 +16,7 @@ const {
   onShipmentEvent,
 } = require("../lib/notificationHooks");
 const Order = require("../models/Order");
+const { transitionOrder } = require("../lib/orderTransitions");
 const { notifyOrderStatus } = require("../lib/appNotifications");
 const { emitOrderStatusChanged } = require("../lib/orderEvents");
 const {
@@ -152,7 +153,6 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
 
   const method = order.fulfilment?.method || "delivery";
   const { nextStatus } = validateOrderStatusPayload(req.body, order.orderStatus, method);
-  const previousStatus = order.orderStatus;
 
   // Accepting an order can promise a ready time ("ready in 30 min")
   if (req.body.prepMinutes !== undefined && req.body.prepMinutes !== null) {
@@ -166,8 +166,6 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     order.tracking.estimatedReadyAt = new Date(Date.now() + prep * 60 * 1000);
   }
 
-  order.orderStatus = nextStatus;
-
   if (req.body.tracking) {
     const fields = ["carrier", "trackingNumber", "trackingUrl", "cancellationReason"];
     for (const key of fields) {
@@ -178,126 +176,11 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     }
   }
 
-  const now = new Date();
-  if (nextStatus === "shipped" && !order.tracking.shippedAt) {
-    order.tracking.shippedAt = now;
-
-    if (
-      order.shippingMethod &&
-      (order.shippingMethod.minDays || order.shippingMethod.maxDays)
-    ) {
-      const eta = computeEstimatedDelivery(order.shippingMethod, now);
-      if (eta.earliest && !order.tracking.estimatedDeliveryEarliest) {
-        order.tracking.estimatedDeliveryEarliest = eta.earliest;
-      }
-      if (eta.latest && !order.tracking.estimatedDeliveryLatest) {
-        order.tracking.estimatedDeliveryLatest = eta.latest;
-      }
-    }
-
-    order.tracking.events.push({
-      status: "created",
-      at: now,
-      location: "",
-      note: order.tracking.carrier
-        ? `Shipment created via ${order.tracking.carrier}`
-        : "Shipment created",
-      by: req.user.id,
-      byRole: req.user.role,
-    });
-  }
-  if (nextStatus === "delivered" && !order.tracking.deliveredAt) {
-    order.tracking.deliveredAt = now;
-
-    order.tracking.events.push({
-      status: "delivered",
-      at: now,
-      location: "",
-      note: "Order delivered to customer",
-      by: req.user.id,
-      byRole: req.user.role,
-    });
-  }
-  if (nextStatus === "cancelled" && !order.tracking.cancelledAt) {
-    order.tracking.cancelledAt = now;
-  }
-  if (nextStatus === "ready_for_collection" && !order.fulfilment.readyAt) {
-    order.fulfilment.readyAt = now;
-  }
-  if (nextStatus === "collected" && !order.fulfilment.collectedAt) {
-    order.fulfilment.collectedAt = now;
-  }
-
-  // Cash is taken at the door, or at the counter for collections
-  if (
-    Order.COMPLETED_STATUSES.includes(nextStatus) &&
-    order.paymentMethod === "cod" &&
-    order.paymentStatus !== "paid"
-  ) {
-    order.paymentStatus = "paid";
-    await applyCommissionSnapshot(order);
-    appendPaymentEvent(order, {
-      status: "paid",
-      provider: "cod",
-      by: req.user.id,
-      byRole: req.user.role,
-      note: nextStatus === "collected" ? "Cash taken at collection" : "Cash collected on delivery",
-    });
-  }
-
-  order.statusHistory.push({
-    status: nextStatus,
-    changedBy: req.user.id,
-    changedByRole: req.user.role,
-    changedAt: now,
-    note:
-      typeof req.body.note === "string" && req.body.note.trim()
-        ? req.body.note.trim().slice(0, 500)
-        : "",
+  const { refund } = await transitionOrder(order, nextStatus, {
+    actor: { id: req.user.id, role: req.user.role },
+    note: typeof req.body.note === "string" ? req.body.note : "",
+    cancelReason: "Cancelled by the store",
   });
-
-  await order.save();
-
-  // Cancelled items go back on the shelf, and card payments are refunded
-  let refund = null;
-  if (nextStatus === "cancelled") {
-    await releaseCancelledOrder(order, { reason: "Cancelled by the store" });
-    refund = await refundOrderIfPaid(order, {
-      by: req.user.id,
-      byRole: req.user.role,
-      reason: "Refunded after cancellation",
-    });
-  }
-
-  // Points and referral rewards are earned only once goods are handed over
-  if (Order.COMPLETED_STATUSES.includes(nextStatus)) {
-    await onOrderCompleted(order);
-  }
-
-  // Live update for anyone watching the order, and an alert to the customer
-  emitOrderStatusChanged(order, previousStatus);
-  notifyOrderStatus(order);
-
-  // Fire-and-forget notifications based on the new status
-  if (nextStatus === "shipped") {
-    onOrderShipped(order);
-  } else if (nextStatus === "delivered") {
-    onOrderDelivered(order);
-    if (order.paymentMethod === "cod" && order.paymentStatus === "paid") {
-      onOrderPaymentSucceeded(order);
-    }
-  } else if (nextStatus === "collected") {
-    if (order.paymentMethod === "cod" && order.paymentStatus === "paid") {
-      onOrderPaymentSucceeded(order);
-    }
-  } else if (nextStatus === "cancelled") {
-    onOrderCancelled(order, {
-      reason:
-        (typeof req.body.note === "string" && req.body.note.trim()) ||
-        order.tracking?.cancellationReason ||
-        "Order cancelled by vendor",
-    });
-  }
 
   res.status(200).json({
     message:
