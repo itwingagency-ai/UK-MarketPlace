@@ -21,7 +21,11 @@ const { savedCardAccess } = require("../lib/stripeCustomer");
 const { STORE_FULFILMENT_FIELDS, choiceFor, resolveFulfilment } = require("../lib/fulfilment");
 const { getPlatformCurrency } = require("../lib/currency");
 const { getStripeClient, isStripeConfigured } = require("../lib/stripeClient");
-const { appendPaymentEvent } = require("../lib/paymentService");
+const {
+  appendPaymentEvent,
+  cancelOrdersAndRestoreStock,
+  markOrdersPaid,
+} = require("../lib/paymentService");
 const {
   onOrderPlacedToCustomer,
   onOrderPlacedToVendor,
@@ -549,11 +553,15 @@ const placeOrdersWithTransaction = async ({
     await claimSlots({ orders, storesById: storesOf(storeGroups), session });
     await claimRedemption({ orders, userId: user._id, session });
 
-    await Cart.updateOne(
-      { _id: cart._id },
-      { $set: CLEARED_CART },
-      { session }
-    );
+    // Only a real cart is cleared: repeat orders pass a snapshot with no _id,
+    // and an undefined _id filter must never reach updateOne
+    if (cart._id) {
+      await Cart.updateOne(
+        { _id: cart._id },
+        { $set: CLEARED_CART },
+        { session }
+      );
+    }
 
     await session.commitTransaction();
     return orders;
@@ -606,7 +614,7 @@ const placeOrdersWithCompensation = async ({
     slotClaim = await claimSlots({ orders, storesById: storesOf(storeGroups) });
     pointsClaim = await claimRedemption({ orders, userId: user._id });
 
-    await Cart.updateOne({ _id: cart._id }, { $set: CLEARED_CART });
+    if (cart._id) await Cart.updateOne({ _id: cart._id }, { $set: CLEARED_CART });
 
     return orders;
   } catch (err) {
@@ -718,56 +726,67 @@ const createStripePaymentIntentForOrders = async ({ orders, user, transactionId,
   return paymentIntent;
 };
 
-const placeOrder = asyncHandler(async (req, res) => {
-  const cart = await getOrCreateCart(req.user.id);
-  // Collection-only baskets don't need a delivery address
-  const collectionOnly =
-    cart.items.length > 0 &&
-    cart.items.every((i) => choiceFor(cart, i.store).method === "collection");
-  validateCheckoutPayload(req.body, { addressRequired: !collectionOnly });
-
+/**
+ * Place orders for a basket. Used by the checkout endpoint (the customer's
+ * cart) and by repeat orders (a cart-shaped snapshot, see lib/subscriptions).
+ *
+ * @param {object} p
+ * @param {string} p.userId
+ * @param {object} p.cart            Cart doc, or a plain cart-shaped object
+ * @param {object} p.body            validated checkout payload
+ * @param {object} [p.deliveryCoords] { lat, lng } from the delivery-zone check
+ * @param {boolean} [p.dropUnavailable] place what's in stock instead of failing
+ * @param {object} [p.offSession]    { customer, paymentMethodId, subscriptionId }:
+ *                                   charge a saved card now, without the customer
+ * @returns {Promise<{ orders, payment, dropped }>}
+ */
+const placeCartOrders = async ({ userId, cart, body, deliveryCoords = null, dropUnavailable = false, offSession = null }) => {
   // Admin can switch payment methods off platform-wide
   const { features = {} } = await PlatformSettings.getOrInit();
-  if (req.body.paymentMethod === "cod" && features.codEnabled === false) {
+  if (body.paymentMethod === "cod" && features.codEnabled === false) {
     throw new ApiError(400, "Cash on delivery is currently unavailable");
   }
-  if (req.body.paymentMethod === "online" && features.onlinePaymentEnabled === false) {
+  if (body.paymentMethod === "online" && features.onlinePaymentEnabled === false) {
     throw new ApiError(400, "Card payments are currently unavailable");
   }
 
-  if (req.body.paymentMethod === "online" && !isStripeConfigured()) {
+  if (body.paymentMethod === "online" && !isStripeConfigured()) {
     throw new ApiError(
       503,
       "Online payments are not configured on this server"
     );
   }
 
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(userId);
   if (!user) throw new ApiError(404, "User not found");
 
   const shippingAddress =
-    req.body.addressId || req.body.shippingAddress
-      ? resolveShippingAddress(user, req.body)
+    body.addressId || body.shippingAddress
+      ? resolveShippingAddress(user, body)
       : { fullName: user.name, phone: user.phone || "" };
   // Where the delivery-zone check placed the customer, for the rider's map
-  if (req.deliveryCoords) {
-    shippingAddress.lat = req.deliveryCoords.lat;
-    shippingAddress.lng = req.deliveryCoords.lng;
+  if (deliveryCoords) {
+    shippingAddress.lat = deliveryCoords.lat;
+    shippingAddress.lng = deliveryCoords.lng;
   }
 
   if (!cart.items || cart.items.length === 0) {
     throw new ApiError(400, "Cart is empty");
   }
 
-  const evaluatedItems = await evaluateCart(cart);
+  let evaluatedItems = await evaluateCart(cart);
   const blocking = evaluatedItems.filter(({ status }) => !status.available);
-  if (blocking.length > 0) {
+  if (blocking.length > 0 && !dropUnavailable) {
     throw new ApiError(409, "Some items are no longer available; review your cart");
   }
+  // Repeat orders go ahead with whatever is still available
+  const dropped = blocking.map(({ item, status }) => ({ title: item.title, reason: status.reason }));
+  if (dropUnavailable) evaluatedItems = evaluatedItems.filter(({ status }) => status.available);
+  if (evaluatedItems.length === 0) throw new ApiError(409, "None of the items are available right now");
 
   // Age-restricted goods: the customer confirms their age now and shows ID on handover
   const ageCheck = Math.max(0, ...evaluatedItems.map(({ status }) => Number(status.live?.minAge || 0)));
-  if (ageCheck > 0 && req.body.ageConfirmed !== true) {
+  if (ageCheck > 0 && body.ageConfirmed !== true) {
     throw new ApiError(400, `Your basket has items for over-${ageCheck}s. Please confirm you're ${ageCheck} or over`);
   }
 
@@ -780,7 +799,7 @@ const placeOrder = asyncHandler(async (req, res) => {
   // for that store, reject the checkout request.
   await resolveShippingForGroups({
     groups: storeGroups,
-    selections: req.body.shippingSelections,
+    selections: body.shippingSelections,
     strict: true,
   });
 
@@ -803,8 +822,8 @@ const placeOrder = asyncHandler(async (req, res) => {
       storeGroups,
       user,
       shippingAddress,
-      paymentMethod: req.body.paymentMethod,
-      notes: req.body.notes,
+      paymentMethod: body.paymentMethod,
+      notes: body.notes,
       checkoutId,
     });
   } catch (err) {
@@ -814,8 +833,8 @@ const placeOrder = asyncHandler(async (req, res) => {
         storeGroups,
         user,
         shippingAddress,
-        paymentMethod: req.body.paymentMethod,
-        notes: req.body.notes,
+        paymentMethod: body.paymentMethod,
+        notes: body.notes,
         checkoutId,
       });
     } else {
@@ -827,9 +846,9 @@ const placeOrder = asyncHandler(async (req, res) => {
   for (const order of orders) {
     appendPaymentEvent(order, {
       status: "pending",
-      provider: req.body.paymentMethod === "online" ? "stripe" : "cod",
+      provider: body.paymentMethod === "online" ? "stripe" : "cod",
       note:
-        req.body.paymentMethod === "online"
+        body.paymentMethod === "online"
           ? "Awaiting online payment"
           : "Cash on Delivery — awaiting collection",
       by: user._id,
@@ -841,7 +860,7 @@ const placeOrder = asyncHandler(async (req, res) => {
 
   // Fire-and-forget notifications: customer confirmation + per-store vendor alert
   for (const order of orders) {
-    if (req.body.paymentMethod === "cod") {
+    if (body.paymentMethod === "cod") {
       onOrderPlacedToCustomer(order, user);
       // No await — onOrderPlacedToVendor schedules its own async dispatch
       onOrderPlacedToVendor(order, user);
@@ -850,7 +869,7 @@ const placeOrder = asyncHandler(async (req, res) => {
 
   let paymentPayload = null;
 
-  if (req.body.paymentMethod === "online") {
+  if (body.paymentMethod === "online") {
     const totalAmount = orders.reduce((acc, o) => acc + Number(o.total), 0);
     const currency = await getPlatformCurrency();
 
@@ -864,7 +883,31 @@ const placeOrder = asyncHandler(async (req, res) => {
     });
 
     try {
-      if (req.body.clientType === "mobile") {
+      if (offSession) {
+        // Repeat order: charge the card saved for it, without the customer present
+        const pi = await getStripeClient().paymentIntents.create(
+          {
+            amount: Math.round(totalAmount),
+            currency,
+            customer: offSession.customer,
+            payment_method: offSession.paymentMethodId,
+            payment_method_types: ["card"],
+            off_session: true,
+            confirm: true,
+            metadata: { transactionId: String(transaction._id), userId: String(user._id), subscription: String(offSession.subscriptionId || "") },
+          },
+          { idempotencyKey: `offsession-${transaction._id}` }
+        );
+        transaction.providerIntentId = pi.id;
+        transaction.status = pi.status === "succeeded" ? "succeeded" : "processing";
+        transaction.events.push({ type: "stripe.payment_intent.off_session", status: transaction.status, at: new Date() });
+        await transaction.save();
+        await Order.updateMany({ _id: { $in: orders.map((o) => o._id) } }, { $set: { paymentTransaction: transaction._id } });
+        if (pi.status === "succeeded") {
+          await markOrdersPaid({ orderIds: orders.map((o) => o._id), provider: "stripe", providerRef: pi.id, note: "Charged for a repeat order" });
+        }
+        paymentPayload = { provider: "stripe", transactionId: transaction._id, status: pi.status, amount: totalAmount, currency };
+      } else if (body.clientType === "mobile") {
         const cardAccess = await savedCardAccess(user);
         const paymentIntent = await createStripePaymentIntentForOrders({
           customer: cardAccess?.customer,
@@ -933,6 +976,17 @@ const placeOrder = asyncHandler(async (req, res) => {
         };
       }
     } catch (err) {
+      if (offSession) {
+        // Declined or needs the customer (3-D Secure): undo the orders
+        transaction.status = "failed";
+        transaction.failureReason = err?.message || "Card payment failed";
+        transaction.events.push({ type: "stripe.payment_intent.off_session_failed", status: "failed", at: new Date(), note: transaction.failureReason });
+        await transaction.save();
+        await cancelOrdersAndRestoreStock({ orderIds: orders.map((o) => o._id), reason: "Card payment for the repeat order failed" });
+        throw new ApiError(402, err?.code === "authentication_required"
+          ? "Your bank wants you to approve this payment. Please update your card"
+          : `Your card was declined${err?.decline_code ? ` (${err.decline_code.replace(/_/g, " ")})` : ""}`);
+      }
       transaction.status = "failed";
       transaction.failureReason =
         err?.message || "Failed to create Stripe session";
@@ -949,6 +1003,24 @@ const placeOrder = asyncHandler(async (req, res) => {
       );
     }
   }
+
+  return { orders, payment: paymentPayload, dropped };
+};
+
+const placeOrder = asyncHandler(async (req, res) => {
+  const cart = await getOrCreateCart(req.user.id);
+  // Collection-only baskets don't need a delivery address
+  const collectionOnly =
+    cart.items.length > 0 &&
+    cart.items.every((i) => choiceFor(cart, i.store).method === "collection");
+  validateCheckoutPayload(req.body, { addressRequired: !collectionOnly });
+
+  const { orders, payment: paymentPayload } = await placeCartOrders({
+    userId: req.user.id,
+    cart,
+    body: req.body,
+    deliveryCoords: req.deliveryCoords || null,
+  });
 
   const storeIds = [...new Set(orders.map((o) => o.store.toString()))];
   const stores = await require("../models/Store").find({ _id: { $in: storeIds } });
@@ -980,4 +1052,5 @@ const placeOrder = asyncHandler(async (req, res) => {
 module.exports = {
   previewCheckout,
   placeOrder,
+  placeCartOrders,
 };
