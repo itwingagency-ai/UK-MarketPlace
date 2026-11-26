@@ -10,9 +10,14 @@ cleanup, Category Studio, the Docker deploy, and feature Waves 0–6.
 
 `main` and `development` stop at 16 Sept 2026 (iOS / pod / gradle build fixes).
 They have **diverged** from `ui-redesign`. The PR `ui-redesign → main` brings
-them together; resolve conflicts in the native build files (`Frontend/ios`,
-`Frontend/android`, `package.json`) by keeping the September build fixes and
-the newer app code. Until that PR is merged, branch new work off `ui-redesign`.
+them together (PR #21). It currently conflicts in 12 files:
+`Backend/src/index.js`; portal `api/authService.js`, `index.css`,
+`layouts/AdminLayout.jsx`, `layouts/VendorLayout.jsx`, `pages/auth/SignUpPage.jsx`;
+app `app.json`, `package.json`, `package-lock.json`, `src/constants.js`,
+`screens/CheckoutScreen.js`, `screens/HomeScreen.js`. Keep the September
+build/package fixes from `main` and the newer feature code from `ui-redesign`;
+regenerate `package-lock.json` rather than hand-merging it, then run the tests
+and an iOS + Android build. Until that PR is merged, branch new work off `ui-redesign`.
 
 The `wave*` and `polish-fixes` branches are local snapshots that are already
 inside `ui-redesign`; ignore them.
